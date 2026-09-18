@@ -86,6 +86,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--model", default="jev-latest", help="Jev model name")
     parser.add_argument(
+        "--script", default="demo.sql", help="SQL file whose statements bind to F1..F9"
+    )
+    parser.add_argument(
+        "--type-cps", type=int, default=120, help="typewriter speed; 0 = instant"
+    )
+    parser.add_argument(
         "-c",
         "--command",
         default=None,

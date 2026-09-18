@@ -349,3 +349,38 @@ def test_shipped_demo_script_statements_run_in_demo_mode(tmp_path):
         assert (
             main([*base, "-c", statement], console=Console(record=True, width=120)) == 0
         )
+
+
+def test_parser_script_defaults():
+    args = build_parser().parse_args([])
+    assert args.script == "demo.sql"
+    assert args.type_cps == 120
+
+
+def test_main_starts_repl_with_script(monkeypatch, tmp_path):
+    """Regression: main() must reach repl() with the parsed script (REPL startup was untested)."""
+    from semsql import cli
+
+    seen = {}
+
+    def fake_repl(*args, script=None, type_cps=None, **kwargs):
+        seen.update(script=script, type_cps=type_cps)
+        return 0
+
+    monkeypatch.setattr(cli, "repl", fake_repl)
+    script = tmp_path / "s.sql"
+    script.write_text("-- hi\nSELECT 1;\n")
+    rc = cli.main(
+        [
+            "--db",
+            str(tmp_path / "t.duckdb"),
+            "--demo",
+            "--no-cache",
+            "--script",
+            str(script),
+            "--type-cps",
+            "0",
+        ]
+    )
+    assert rc == 0
+    assert seen == {"script": ["-- hi\nSELECT 1;"], "type_cps": 0}
