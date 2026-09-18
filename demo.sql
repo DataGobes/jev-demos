@@ -5,7 +5,7 @@
 SELECT count(*) AS keyword_hits FROM reviews WHERE body ILIKE '%refund%';
 
 -- Same question in plain English, inside SQL
--- An AI model judges every review and returns a probability, graded by anger
+-- Jev (TypeSafe) judges every review and returns a probability, graded by anger
 WITH unhappy AS (SELECT * FROM reviews WHERE stars <= 2)
 SELECT id, body,
        jev_noul(body, 'The customer is asking for their money back') AS p_refund,
