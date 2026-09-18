@@ -1,0 +1,35 @@
+[anger]
+instructions = "How angry does the writer of this text sound?"
+levels = [
+    "Neutral or pleasant tone; no sign of frustration or complaint.",
+    "Mild frustration or disappointment is stated, but the writer stays polite and cooperative.",
+    "Clear irritation: blunt language, complaints repeated, or a demand made in a terse tone.",
+    "Open hostility: insults, all-caps shouting, swearing, or explicit threats directed at the company.",
+]
+
+[urgency]
+instructions = "How urgently does the writer need a response or action?"
+levels = [
+    "No timeline mentioned; the writer is fine waiting for a routine reply.",
+    "A soft deadline or preference is mentioned (\"whenever you get a chance\", \"this week would be nice\").",
+    "A hard deadline or consequence is named (\"before my trip on Friday\", \"or I'll dispute the charge\").",
+    "The writer says the situation is happening right now and needs immediate action (\"my kitchen is flooding\", \"call me back today or I'm cancelling\").",
+]
+
+[churn_risk]
+instructions = "Based on this message, how likely is the customer to stop buying from this company?"
+levels = [
+    "The customer asks a routine question or gives positive feedback with no mention of leaving.",
+    "The customer names a real problem but is still asking for help fixing it, not for a refund or cancellation.",
+    "The customer says they are considering returning the product, cancelling a subscription, or comparing competitors.",
+    "The customer states they are done: they have already bought a replacement elsewhere, cancelled, or say they will never buy from this company again.",
+]
+
+[review_quality]
+instructions = "How useful is this review to another shopper deciding whether to buy the product?"
+levels = [
+    "One line with no detail (\"good\", \"bad\", \"meh\") and no reason given.",
+    "States whether the writer liked it and gives one concrete reason (a feature, a defect, a use case).",
+    "Describes how the product performed over real use: several specifics such as durability, fit, comparison to another product, or a specific scenario.",
+    "Goes further with actionable detail a buyer could act on: exact measurements, what accessory to pair it with, how it compares across competing models, or step-by-step troubleshooting.",
+]
