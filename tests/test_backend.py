@@ -34,12 +34,16 @@ def _fake_answer(kind: str, value):
 
 
 def _response(answers: dict, input_tokens: int = 100):
-    return SimpleNamespace(answers=answers, usage=SimpleNamespace(input_tokens=input_tokens))
+    return SimpleNamespace(
+        answers=answers, usage=SimpleNamespace(input_tokens=input_tokens)
+    )
 
 
 def test_single_row_request_shape() -> None:
     backend = JevBackend(model="jev-latest")
-    fake = FakeClient(response=_response({"q": _fake_answer("noul", 0.75)}, input_tokens=42))
+    fake = FakeClient(
+        response=_response({"q": _fake_answer("noul", 0.75)}, input_tokens=42)
+    )
     backend._client = fake
     question = Question(kind="noul", instructions="Is the customer angry?")
 
@@ -88,7 +92,9 @@ def test_packed_score_request_uses_same_criteria_per_row() -> None:
         )
     )
     backend._client = fake
-    question = Question(kind="score", instructions="How angry?", levels=("calm", "mild", "furious"))
+    question = Question(
+        kind="score", instructions="How angry?", levels=("calm", "mild", "furious")
+    )
 
     result = asyncio.run(backend.judge(["a", "b"], question))
 
@@ -152,7 +158,9 @@ def test_backend_metadata() -> None:
 @pytest.mark.asyncio
 async def test_demo_backend_deterministic_noul() -> None:
     backend = DemoBackend(latency=0.0)
-    question = Question(kind="noul", instructions="Is the customer asking for a refund?")
+    question = Question(
+        kind="noul", instructions="Is the customer asking for a refund?"
+    )
     r1 = await backend.judge(["I want my money back"], question)
     r2 = await backend.judge(["I want my money back"], question)
     assert r1.values == r2.values
@@ -171,8 +179,12 @@ async def test_demo_backend_noul_rewards_overlap() -> None:
 @pytest.mark.asyncio
 async def test_demo_backend_score_in_range() -> None:
     backend = DemoBackend(latency=0.0)
-    question = Question(kind="score", instructions="anger", levels=("calm", "mild", "furious"))
-    result = await backend.judge(["I AM SO ANGRY!!! THIS IS UNACCEPTABLE!!!", "have a nice day"], question)
+    question = Question(
+        kind="score", instructions="anger", levels=("calm", "mild", "furious")
+    )
+    result = await backend.judge(
+        ["I AM SO ANGRY!!! THIS IS UNACCEPTABLE!!!", "have a nice day"], question
+    )
     for value in result.values:
         assert value in (0.0, 1.0, 2.0)
     assert result.values[0] >= result.values[1]
@@ -181,7 +193,9 @@ async def test_demo_backend_score_in_range() -> None:
 @pytest.mark.asyncio
 async def test_demo_backend_choice_picks_overlapping_option() -> None:
     backend = DemoBackend(latency=0.0)
-    question = Question(kind="choice", instructions="sentiment", options=("happy", "angry"))
+    question = Question(
+        kind="choice", instructions="sentiment", options=("happy", "angry")
+    )
     result = await backend.judge(["I am furious and angry about this"], question)
     assert result.values[0] == "angry"
 

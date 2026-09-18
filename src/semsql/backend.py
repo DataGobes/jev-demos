@@ -42,7 +42,10 @@ def _to_sdk_question(question: Question) -> Noul | Score | Choice:
         return Noul(instructions=question.instructions)
     if question.kind == "score":
         return Score(instructions=question.instructions, criteria=list(question.levels))
-    return Choice(instructions=question.instructions, criteria={opt: None for opt in question.options})
+    return Choice(
+        instructions=question.instructions,
+        criteria={opt: None for opt in question.options},
+    )
 
 
 def _packed_instructions(row_id: str, instructions: str) -> str:
@@ -80,14 +83,17 @@ class JevBackend:
                     row_id = _row_id(i)
                     packed = Question(
                         kind=question.kind,
-                        instructions=_packed_instructions(row_id, question.instructions),
+                        instructions=_packed_instructions(
+                            row_id, question.instructions
+                        ),
                         levels=question.levels,
                         options=question.options,
                     )
                     questions[row_id] = _to_sdk_question(packed)
                 resp = await client.system_one(state, questions)
                 values = [
-                    _extract_value(resp.answers[_row_id(i)], question.kind) for i in range(len(texts))
+                    _extract_value(resp.answers[_row_id(i)], question.kind)
+                    for i in range(len(texts))
                 ]
             return BatchResult(values=values, input_tokens=resp.usage.input_tokens)
         except (TypeSafeError, KeyError) as exc:
@@ -199,14 +205,18 @@ class DemoBackend:
         else:
             union = q_tokens | t_tokens
             coverage = len(q_tokens & t_tokens) / len(union) if union else 0.0
-        squashed = coverage**0.6  # spreads mid-range overlap upward for a punchier signal
+        squashed = (
+            coverage**0.6
+        )  # spreads mid-range overlap upward for a punchier signal
         jitter = (_hash_unit(text, question.instructions) - 0.5) * 0.06
         return _clamp(0.05 + 0.9 * squashed + jitter, 0.0, 1.0)
 
     def _score(self, text: str, question: Question) -> float:
         n = len(question.levels)
         letters = [c for c in text if c.isalpha()]
-        caps_ratio = sum(1 for c in letters if c.isupper()) / len(letters) if letters else 0.0
+        caps_ratio = (
+            sum(1 for c in letters if c.isupper()) / len(letters) if letters else 0.0
+        )
         exclaim = min(text.count("!"), 5)
         neg_hits = len(_tokenize(text) & _NEGATIVE_WORDS)
         raw = caps_ratio * 3.0 + exclaim * 0.25 + neg_hits * 0.4

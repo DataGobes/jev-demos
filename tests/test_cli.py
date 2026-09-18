@@ -231,7 +231,9 @@ def test_run_sql_plain_select():
 def test_run_sql_ddl_prints_ok():
     con = duckdb.connect(":memory:")
     console = Console(record=True, width=120)
-    ok = run_sql(con, "CREATE TABLE t(x INTEGER)", _FakeStats(), _FakeBackend(), console)
+    ok = run_sql(
+        con, "CREATE TABLE t(x INTEGER)", _FakeStats(), _FakeBackend(), console
+    )
     assert ok is True
     assert "OK" in console.export_text()
 
@@ -254,8 +256,9 @@ def test_run_sql_no_jev_omits_cost_footer():
 # --- --live without an API key: must not require sibling modules -----------
 
 
-def test_live_without_api_key_errors_with_exit_code_2(monkeypatch):
+def test_live_without_api_key_errors_with_exit_code_2(monkeypatch, tmp_path):
     monkeypatch.delenv("TYPESAFE_API_KEY", raising=False)
+    monkeypatch.chdir(tmp_path)  # keep the project's real .env out of the test
     from semsql.cli import main
 
     console = Console(record=True, width=120)
@@ -278,7 +281,9 @@ def test_end_to_end_demo_mode(tmp_path, monkeypatch):
     db_path = str(tmp_path / "semsql.duckdb")
     cache_path = str(tmp_path / "cache.sqlite")
 
-    rc = main(["--db", db_path, "--demo", "--cache-path", cache_path, "gen", "--rows", "200"])
+    rc = main(
+        ["--db", db_path, "--demo", "--cache-path", cache_path, "gen", "--rows", "200"]
+    )
     assert rc == 0
 
     rc = main(
@@ -299,7 +304,9 @@ def test_load_dotenv_sets_missing_and_keeps_existing(tmp_path, monkeypatch):
     from semsql.cli import load_dotenv
 
     env = tmp_path / ".env"
-    env.write_text("# comment\nexport SEMSQL_T_A='abc'\nSEMSQL_T_B=from_file\nSEMSQL_T_EMPTY=\n")
+    env.write_text(
+        "# comment\nexport SEMSQL_T_A='abc'\nSEMSQL_T_B=from_file\nSEMSQL_T_EMPTY=\n"
+    )
     monkeypatch.delenv("SEMSQL_T_A", raising=False)
     monkeypatch.setenv("SEMSQL_T_B", "from_env")
     monkeypatch.delenv("SEMSQL_T_EMPTY", raising=False)

@@ -1,4 +1,5 @@
 [anger]
+labels = ["calm", "annoyed", "angry", "furious"]
 instructions = "How angry does the writer of this text sound?"
 levels = [
     "Neutral or pleasant tone; no sign of frustration or complaint.",
@@ -8,6 +9,7 @@ levels = [
 ]
 
 [urgency]
+labels = ["no rush", "soon", "deadline", "emergency"]
 instructions = "How urgently does the writer need a response or action?"
 levels = [
     "No timeline mentioned; the writer is fine waiting for a routine reply.",
@@ -17,6 +19,7 @@ levels = [
 ]
 
 [churn_risk]
+labels = ["loyal", "wavering", "at risk", "leaving"]
 instructions = "Based on this message, how likely is the customer to stop buying from this company?"
 levels = [
     "The customer asks a routine question or gives positive feedback with no mention of leaving.",

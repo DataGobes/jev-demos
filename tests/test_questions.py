@@ -27,9 +27,13 @@ def test_choice_requires_two_to_255_options() -> None:
     with pytest.raises(ValueError):
         Question(kind="choice", instructions="x", options=("only one",))
     with pytest.raises(ValueError):
-        Question(kind="choice", instructions="x", options=tuple(f"o{i}" for i in range(256)))
+        Question(
+            kind="choice", instructions="x", options=tuple(f"o{i}" for i in range(256))
+        )
     Question(kind="choice", instructions="x", options=("a", "b"))
-    Question(kind="choice", instructions="x", options=tuple(f"o{i}" for i in range(255)))
+    Question(
+        kind="choice", instructions="x", options=tuple(f"o{i}" for i in range(255))
+    )
 
 
 def test_key_is_stable_and_distinguishes_fields() -> None:

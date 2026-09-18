@@ -44,7 +44,9 @@ def test_jev_noul_basic(con) -> None:
 
 
 def test_jev_score_rubric(con) -> None:
-    rows = con.execute("SELECT id, jev_score(body, 'anger') AS anger FROM reviews ORDER BY id").fetchall()
+    rows = con.execute(
+        "SELECT id, jev_score(body, 'anger') AS anger FROM reviews ORDER BY id"
+    ).fetchall()
     assert rows[0][1] in (0.0, 1.0, 2.0, 3.0)
     assert rows[1][1] in (0.0, 1.0, 2.0, 3.0)
     assert rows[2][1] is None
@@ -52,7 +54,9 @@ def test_jev_score_rubric(con) -> None:
 
 def test_jev_score_unknown_rubric_raises(con) -> None:
     with pytest.raises(duckdb.InvalidInputException, match="unknown rubric"):
-        con.execute("SELECT jev_score(body, 'not_a_real_rubric') FROM reviews").fetchall()
+        con.execute(
+            "SELECT jev_score(body, 'not_a_real_rubric') FROM reviews"
+        ).fetchall()
 
 
 def test_jev_score_levels_ad_hoc(con) -> None:
@@ -91,7 +95,9 @@ def test_distinct_rubric_values_per_chunk_grouped_correctly(con) -> None:
         "(1, 'text one', 'anger'), (2, 'text two', 'urgency'), (3, 'text three', 'anger')"
         ") t(id, body, rubric)"
     )
-    rows = con.execute("SELECT id, jev_score(body, rubric) AS s FROM mixed ORDER BY id").fetchall()
+    rows = con.execute(
+        "SELECT id, jev_score(body, rubric) AS s FROM mixed ORDER BY id"
+    ).fetchall()
     assert len(rows) == 3
     for _, value in rows:
         assert value in (0.0, 1.0, 2.0, 3.0)
@@ -119,3 +125,30 @@ def test_large_table_5000_rows(con) -> None:
     scored_count, null_count = scored
     assert scored_count == 5000 - null_count
     assert null_count > 0
+
+
+def test_jev_grade_labels_match_score(con) -> None:
+    rows = con.execute(
+        "SELECT jev_score(body, 'anger'), jev_grade(body, 'anger') FROM reviews ORDER BY id"
+    ).fetchall()
+    labels = load_rubrics()["anger"].labels
+    for score, grade in rows[:2]:
+        assert grade == f"{round(score)} {labels[round(score)]}"
+    assert rows[2] == (None, None)
+
+
+def test_jev_grade_without_labels_falls_back(con) -> None:
+    grade = con.execute(
+        "SELECT jev_grade(body, 'review_quality') FROM reviews WHERE id = 1"
+    ).fetchone()[0]
+    assert grade.startswith("level ")
+
+
+def test_labels_do_not_change_cache_key() -> None:
+    from semsql.questions import Question
+
+    plain = Question(kind="score", instructions="x", levels=("a", "b"))
+    labelled = Question(
+        kind="score", instructions="x", levels=("a", "b"), labels=("lo", "hi")
+    )
+    assert plain.key() == labelled.key() and plain == labelled

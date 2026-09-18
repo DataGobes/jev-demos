@@ -1,4 +1,4 @@
-"""DuckDB arrow UDFs: jev_noul, jev_score, jev_score_levels, jev_choice."""
+"""DuckDB arrow UDFs: jev_noul, jev_score, jev_grade, jev_score_levels, jev_choice."""
 
 from __future__ import annotations
 
@@ -35,7 +35,9 @@ def _group_and_score(
     return out
 
 
-def register(con: duckdb.DuckDBPyConnection, scorer: Scorer, rubrics: dict[str, Question]) -> None:
+def register(
+    con: duckdb.DuckDBPyConnection, scorer: Scorer, rubrics: dict[str, Question]
+) -> None:
     """Register jev_noul, jev_score, jev_score_levels, jev_choice on `con`."""
 
     def jev_noul(text_col, question_col):
@@ -46,7 +48,7 @@ def register(con: duckdb.DuckDBPyConnection, scorer: Scorer, rubrics: dict[str, 
         )
         return pa.array(values, type=pa.float64())
 
-    def jev_score(text_col, rubric_col):
+    def _rubric_scores(text_col, rubric_col):
         texts = text_col.to_pylist()
         names = rubric_col.to_pylist()
         unknown = sorted({n for n in names if n is not None and n not in rubrics})
@@ -55,8 +57,24 @@ def register(con: duckdb.DuckDBPyConnection, scorer: Scorer, rubrics: dict[str, 
             raise duckdb.InvalidInputException(
                 f"unknown rubric(s) {unknown}; available rubrics: {available}"
             )
-        values = _group_and_score(scorer, texts, names, lambda n: rubrics[n])
+        return names, _group_and_score(scorer, texts, names, lambda n: rubrics[n])
+
+    def jev_score(text_col, rubric_col):
+        _, values = _rubric_scores(text_col, rubric_col)
         return pa.array(values, type=pa.float64())
+
+    def jev_grade(text_col, rubric_col):
+        """Nearest rubric level as a sortable label, e.g. '3 furious'. Shares jev_score's cache."""
+        names, values = _rubric_scores(text_col, rubric_col)
+        grades = []
+        for name, value in zip(names, values):
+            if value is None:
+                grades.append(None)
+                continue
+            level = round(value)
+            labels = rubrics[name].labels
+            grades.append(f"{level} {labels[level]}" if labels else f"level {level}")
+        return pa.array(grades, type=pa.string())
 
     def jev_score_levels(text_col, instructions_col, levels_col):
         texts = text_col.to_pylist()
@@ -79,7 +97,9 @@ def register(con: duckdb.DuckDBPyConnection, scorer: Scorer, rubrics: dict[str, 
         instructions = instructions_col.to_pylist()
         options_lists = options_col.to_pylist()
         keys = [
-            (instr, tuple(options)) if instr is not None and options is not None else None
+            (instr, tuple(options))
+            if instr is not None and options is not None
+            else None
             for instr, options in zip(instructions, options_lists)
         ]
         values = _group_and_score(
@@ -95,8 +115,15 @@ def register(con: duckdb.DuckDBPyConnection, scorer: Scorer, rubrics: dict[str, 
         "null_handling": FunctionNullHandling.SPECIAL,
         "side_effects": False,
     }
-    con.create_function("jev_noul", jev_noul, ["VARCHAR", "VARCHAR"], "DOUBLE", **common)
-    con.create_function("jev_score", jev_score, ["VARCHAR", "VARCHAR"], "DOUBLE", **common)
+    con.create_function(
+        "jev_noul", jev_noul, ["VARCHAR", "VARCHAR"], "DOUBLE", **common
+    )
+    con.create_function(
+        "jev_score", jev_score, ["VARCHAR", "VARCHAR"], "DOUBLE", **common
+    )
+    con.create_function(
+        "jev_grade", jev_grade, ["VARCHAR", "VARCHAR"], "VARCHAR", **common
+    )
     con.create_function(
         "jev_score_levels",
         jev_score_levels,
@@ -105,5 +132,9 @@ def register(con: duckdb.DuckDBPyConnection, scorer: Scorer, rubrics: dict[str, 
         **common,
     )
     con.create_function(
-        "jev_choice", jev_choice, ["VARCHAR", "VARCHAR", "VARCHAR[]"], "VARCHAR", **common
+        "jev_choice",
+        jev_choice,
+        ["VARCHAR", "VARCHAR", "VARCHAR[]"],
+        "VARCHAR",
+        **common,
     )

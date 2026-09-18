@@ -32,6 +32,7 @@ cost in USD and cache hits. Change the English, re-run, new answer.
 | --- | --- | --- |
 | `jev_noul(text, question)` | DOUBLE 0..1 | probability the statement/question holds for the text |
 | `jev_score(text, rubric)` | DOUBLE 0..n-1 | position on named rubric from `rubrics.toml` |
+| `jev_grade(text, rubric)` | VARCHAR | nearest rubric level as a sortable label, e.g. `3 furious` (labels in `rubrics.toml`; shares `jev_score`'s cache) |
 | `jev_score_levels(text, instructions, levels VARCHAR[])` | DOUBLE | ad-hoc rubric |
 | `jev_choice(text, instructions, options VARCHAR[])` | VARCHAR | chosen option |
 

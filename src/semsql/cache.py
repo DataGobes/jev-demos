@@ -31,7 +31,9 @@ class Cache:
         )
         self._con.commit()
 
-    def get_many(self, model: str, question: Question, texts: list[str]) -> dict[str, float | str]:
+    def get_many(
+        self, model: str, question: Question, texts: list[str]
+    ) -> dict[str, float | str]:
         """Return {text: value} for texts found in the cache."""
         keys = {_digest(model, question, text): text for text in texts}
         if not keys:
@@ -51,7 +53,9 @@ class Cache:
                     result[text] = float(value) if kind == "float" else value
         return result
 
-    def put_many(self, model: str, question: Question, items: dict[str, float | str]) -> None:
+    def put_many(
+        self, model: str, question: Question, items: dict[str, float | str]
+    ) -> None:
         """Upsert {text: value} into the cache in a single transaction."""
         if not items:
             return

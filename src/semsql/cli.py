@@ -31,7 +31,19 @@ if TYPE_CHECKING:
 SIMULATED_BADGE = "SIMULATED — no TYPESAFE_API_KEY, judgments are fake"
 JEV_PATTERN = re.compile(r"jev_", re.IGNORECASE)
 _RESULT_KEYWORDS = frozenset(
-    {"select", "with", "show", "describe", "explain", "pragma", "summarize", "values", "table", "from", "call"}
+    {
+        "select",
+        "with",
+        "show",
+        "describe",
+        "explain",
+        "pragma",
+        "summarize",
+        "values",
+        "table",
+        "from",
+        "call",
+    }
 )
 HELP_TEXT = (
     ".help         show this message\n"
@@ -49,16 +61,36 @@ def build_parser() -> argparse.ArgumentParser:
         prog="semsql", description="Semantic SQL over DuckDB, powered by TypeSafe Jev."
     )
     parser.add_argument("--db", default="semsql.duckdb", help="DuckDB database file")
-    parser.add_argument("--pack", type=int, default=1, help="rows packed per Jev request")
-    parser.add_argument("--concurrency", type=int, default=32, help="max in-flight requests")
-    parser.add_argument("--rpm", type=int, default=1200, help="requests per minute budget")
+    parser.add_argument(
+        "--pack", type=int, default=1, help="rows packed per Jev request"
+    )
+    parser.add_argument(
+        "--concurrency", type=int, default=32, help="max in-flight requests"
+    )
+    parser.add_argument(
+        "--rpm", type=int, default=1200, help="requests per minute budget"
+    )
     mode = parser.add_mutually_exclusive_group()
-    mode.add_argument("--demo", action="store_true", help="force the deterministic demo backend")
-    mode.add_argument("--live", action="store_true", help="force the real TypeSafe backend")
-    parser.add_argument("--no-cache", action="store_true", help="disable the judgment cache")
-    parser.add_argument("--cache-path", default=".semsql_cache.sqlite", help="cache sqlite path")
+    mode.add_argument(
+        "--demo", action="store_true", help="force the deterministic demo backend"
+    )
+    mode.add_argument(
+        "--live", action="store_true", help="force the real TypeSafe backend"
+    )
+    parser.add_argument(
+        "--no-cache", action="store_true", help="disable the judgment cache"
+    )
+    parser.add_argument(
+        "--cache-path", default=".semsql_cache.sqlite", help="cache sqlite path"
+    )
     parser.add_argument("--model", default="jev-latest", help="Jev model name")
-    parser.add_argument("-c", "--command", default=None, metavar="SQL", help="run one SQL statement and exit")
+    parser.add_argument(
+        "-c",
+        "--command",
+        default=None,
+        metavar="SQL",
+        help="run one SQL statement and exit",
+    )
 
     subparsers = parser.add_subparsers(dest="subcommand")
 
@@ -66,10 +98,20 @@ def build_parser() -> argparse.ArgumentParser:
     gen.add_argument("--rows", type=int, default=10_000)
     gen.add_argument("--seed", type=int, default=7)
 
-    eval_pack = subparsers.add_parser("eval-pack", help="compare pack=1 vs pack=K agreement")
+    eval_pack = subparsers.add_parser(
+        "eval-pack", help="compare pack=1 vs pack=K agreement"
+    )
     eval_pack.add_argument("--sample", type=int, default=200)
-    eval_pack.add_argument("--pack", dest="eval_pack", type=int, default=16, help="pack size to test against 1")
-    eval_pack.add_argument("--question", default="The customer is asking for their money back")
+    eval_pack.add_argument(
+        "--pack",
+        dest="eval_pack",
+        type=int,
+        default=16,
+        help="pack size to test against 1",
+    )
+    eval_pack.add_argument(
+        "--question", default="The customer is asking for their money back"
+    )
 
     return parser
 
@@ -114,19 +156,25 @@ def _format_cell(value: object, is_prob_col: bool) -> str | Text:
     return str(value)
 
 
-def render_result(columns: list[str], rows: list[tuple], *, max_rows: int = 20) -> Table:
+def render_result(
+    columns: list[str], rows: list[tuple], *, max_rows: int = 20
+) -> Table:
     """Build a Rich Table for a query result: bars for probability columns, truncated strings."""
     table = Table(show_header=True, header_style="bold")
     for name in columns:
         table.add_column(str(name))
 
     if rows:
-        prob_cols = [is_probability_column([row[i] for row in rows]) for i in range(len(columns))]
+        prob_cols = [
+            is_probability_column([row[i] for row in rows]) for i in range(len(columns))
+        ]
     else:
         prob_cols = [False] * len(columns)
 
     for row in rows[:max_rows]:
-        table.add_row(*[_format_cell(value, prob_cols[i]) for i, value in enumerate(row)])
+        table.add_row(
+            *[_format_cell(value, prob_cols[i]) for i, value in enumerate(row)]
+        )
 
     if len(rows) > max_rows:
         table.caption = f"… {len(rows) - max_rows} more rows"
@@ -151,7 +199,9 @@ class StatsPanel:
         grid.add_row("input tokens", f"{snap.input_tokens:,}")
         grid.add_row("cost", f"${snap.cost_usd:.4f}")
         grid.add_row("cache hits", f"{snap.cache_hits:,}")
-        grid.add_row("errors", Text(str(snap.errors), style="bold red" if snap.errors else "dim"))
+        grid.add_row(
+            "errors", Text(str(snap.errors), style="bold red" if snap.errors else "dim")
+        )
         grid.add_row("backend", self.backend.name)
         grid.add_row("elapsed", f"{snap.elapsed_s:.1f}s")
 
@@ -186,7 +236,12 @@ def run_sql(
     start = time.perf_counter()
     try:
         if uses_jev:
-            with Live(StatsPanel(stats, backend), console=console, refresh_per_second=12, transient=False):
+            with Live(
+                StatsPanel(stats, backend),
+                console=console,
+                refresh_per_second=12,
+                transient=False,
+            ):
                 con.execute(sql)
         else:
             con.execute(sql)
@@ -210,24 +265,32 @@ def run_sql(
     console.print(footer)
     if uses_jev and snap.errors:
         detail = getattr(backend, "last_error", None) or "unknown error"
-        console.print(f"[red]{snap.errors:,} failed requests (rows returned as NULL): {detail}[/red]")
+        console.print(
+            f"[red]{snap.errors:,} failed requests (rows returned as NULL): {detail}[/red]"
+        )
     return True
 
 
-def cmd_gen(con: duckdb.DuckDBPyConnection, args: argparse.Namespace, console: Console) -> int:
+def cmd_gen(
+    con: duckdb.DuckDBPyConnection, args: argparse.Namespace, console: Console
+) -> int:
     """`semsql gen`: load synthetic reviews and print a sample."""
     from semsql.data import load_reviews
 
     load_reviews(con, n=args.rows, seed=args.seed)
     count = con.execute("SELECT count(*) FROM reviews").fetchone()[0]
     console.print(f"loaded {count:,} reviews into `reviews`")
-    samples = con.execute("SELECT body FROM reviews WHERE body IS NOT NULL AND body != '' LIMIT 3").fetchall()
+    samples = con.execute(
+        "SELECT body FROM reviews WHERE body IS NOT NULL AND body != '' LIMIT 3"
+    ).fetchall()
     for i, (body,) in enumerate(samples, start=1):
         console.print(f"  {i}. {truncate(body, 100)}")
     return 0
 
 
-def cmd_eval_pack(con: duckdb.DuckDBPyConnection, args: argparse.Namespace, console: Console) -> int:
+def cmd_eval_pack(
+    con: duckdb.DuckDBPyConnection, args: argparse.Namespace, console: Console
+) -> int:
     """`semsql eval-pack`: agreement between pack=1 and pack=K on a sample, no cache."""
     if not os.environ.get("TYPESAFE_API_KEY"):
         console.print(
@@ -242,7 +305,8 @@ def cmd_eval_pack(con: duckdb.DuckDBPyConnection, args: argparse.Namespace, cons
     from semsql.stats import Stats
 
     rows = con.execute(
-        "SELECT body FROM reviews WHERE body IS NOT NULL AND body != '' LIMIT ?", [args.sample]
+        "SELECT body FROM reviews WHERE body IS NOT NULL AND body != '' LIMIT ?",
+        [args.sample],
     ).fetchall()
     texts = [r[0] for r in rows]
     question = Question(kind="noul", instructions=args.question)
@@ -250,7 +314,9 @@ def cmd_eval_pack(con: duckdb.DuckDBPyConnection, args: argparse.Namespace, cons
     def run(pack: int) -> tuple[list, Stats]:
         backend = make_backend(demo=False, model=args.model)
         stats = Stats()
-        scorer = Scorer(backend, stats, None, pack=pack, concurrency=args.concurrency, rpm=args.rpm)
+        scorer = Scorer(
+            backend, stats, None, pack=pack, concurrency=args.concurrency, rpm=args.rpm
+        )
         try:
             values = scorer.score_many(texts, question)
         finally:
@@ -260,7 +326,9 @@ def cmd_eval_pack(con: duckdb.DuckDBPyConnection, args: argparse.Namespace, cons
     values1, stats1 = run(1)
     valuesk, statsk = run(args.eval_pack)
 
-    pairs = [(a, b) for a, b in zip(values1, valuesk) if a is not None and b is not None]
+    pairs = [
+        (a, b) for a, b in zip(values1, valuesk) if a is not None and b is not None
+    ]
     diffs = [abs(a - b) for a, b in pairs]
     mean_abs_diff = sum(diffs) / len(diffs) if diffs else 0.0
     max_diff = max(diffs) if diffs else 0.0
@@ -280,7 +348,10 @@ def cmd_eval_pack(con: duckdb.DuckDBPyConnection, args: argparse.Namespace, cons
     table.add_row("flip rate @0.5", f"{flip_rate(0.5):.2%}")
     table.add_row("flip rate @0.8", f"{flip_rate(0.8):.2%}")
     table.add_row("pack=1 requests / cost", f"{snap1.requests} / ${snap1.cost_usd:.4f}")
-    table.add_row(f"pack={args.eval_pack} requests / cost", f"{snapk.requests} / ${snapk.cost_usd:.4f}")
+    table.add_row(
+        f"pack={args.eval_pack} requests / cost",
+        f"{snapk.requests} / ${snapk.cost_usd:.4f}",
+    )
     console.print(table)
     return 0
 
@@ -395,7 +466,14 @@ def main(argv: list[str] | None = None, console: Console | None = None) -> int:
     backend = make_backend(demo=demo, model=args.model)
     stats = Stats()
     cache = None if args.no_cache else Cache(args.cache_path)
-    scorer = Scorer(backend, stats, cache, pack=args.pack, concurrency=args.concurrency, rpm=args.rpm)
+    scorer = Scorer(
+        backend,
+        stats,
+        cache,
+        pack=args.pack,
+        concurrency=args.concurrency,
+        rpm=args.rpm,
+    )
     con = duckdb.connect(args.db)
     rubrics = load_rubrics()
     udf.register(con, scorer, rubrics)

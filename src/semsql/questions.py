@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import tomllib
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from importlib import resources
 from pathlib import Path
 from typing import Literal
@@ -17,12 +17,17 @@ class Question:
     instructions: str
     levels: tuple[str, ...] = ()
     options: tuple[str, ...] = ()
+    labels: tuple[str, ...] = field(
+        default=(), compare=False
+    )  # display only; not part of key()
 
     def __post_init__(self) -> None:
         if not self.instructions or not self.instructions.strip():
             raise ValueError("instructions must be non-empty")
         if self.kind == "score" and len(self.levels) < 2:
             raise ValueError("score questions need at least 2 levels")
+        if self.labels and len(self.labels) != len(self.levels):
+            raise ValueError("labels must match levels one-to-one")
         if self.kind == "choice" and not (2 <= len(self.options) <= 255):
             raise ValueError("choice questions need between 2 and 255 options")
 
@@ -47,11 +52,16 @@ def _question_from_table(name: str, table: dict) -> Question:
     if levels is not None:
         if not isinstance(levels, list):
             raise ValueError(f"rubric {name!r} 'levels' must be a list")
-        return Question(kind="score", instructions=instructions, levels=tuple(levels))
+        labels = tuple(table.get("labels", ()))
+        return Question(
+            kind="score", instructions=instructions, levels=tuple(levels), labels=labels
+        )
     if options is not None:
         if not isinstance(options, list):
             raise ValueError(f"rubric {name!r} 'options' must be a list")
-        return Question(kind="choice", instructions=instructions, options=tuple(options))
+        return Question(
+            kind="choice", instructions=instructions, options=tuple(options)
+        )
     return Question(kind="noul", instructions=instructions)
 
 

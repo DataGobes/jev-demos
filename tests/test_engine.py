@@ -16,7 +16,9 @@ from semsql.stats import Stats
 class RecordingBackend:
     """Fake backend: returns len(text) as a float, records every judge() call."""
 
-    def __init__(self, latency: float = 0.0, fail_texts: set[str] | None = None) -> None:
+    def __init__(
+        self, latency: float = 0.0, fail_texts: set[str] | None = None
+    ) -> None:
         self.name = "fake"
         self.simulated = True
         self.calls: list[list[str]] = []
@@ -32,7 +34,9 @@ class RecordingBackend:
             await asyncio.sleep(self._latency)
         if any(t in self._fail_texts for t in texts):
             return BatchResult(values=[None] * len(texts), input_tokens=0)
-        return BatchResult(values=[float(len(t)) for t in texts], input_tokens=len(texts) * 10)
+        return BatchResult(
+            values=[float(len(t)) for t in texts], input_tokens=len(texts) * 10
+        )
 
     async def aclose(self) -> None:
         self.closed = True

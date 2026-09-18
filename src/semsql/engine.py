@@ -58,7 +58,9 @@ class Scorer:
         self._semaphore: asyncio.Semaphore | None = None
         self._pacer: _RpmPacer | None = None
         ready = threading.Event()
-        self._thread = threading.Thread(target=self._run_loop, args=(ready,), daemon=True)
+        self._thread = threading.Thread(
+            target=self._run_loop, args=(ready,), daemon=True
+        )
         self._thread.start()
         ready.wait()
 
@@ -71,7 +73,9 @@ class Scorer:
         ready.set()
         loop.run_forever()
 
-    def score_many(self, texts: list[str | None], question: Question) -> list[Value | None]:
+    def score_many(
+        self, texts: list[str | None], question: Question
+    ) -> list[Value | None]:
         """Resolve `texts` against `question`, using cache then backend. Order preserved."""
         result: list[Value | None] = [None] * len(texts)
         positions_by_text: dict[str, list[int]] = {}
@@ -92,7 +96,9 @@ class Scorer:
 
         missing = [t for t in distinct_texts if t not in resolved]
         if missing:
-            chunks = [missing[i : i + self.pack] for i in range(0, len(missing), self.pack)]
+            chunks = [
+                missing[i : i + self.pack] for i in range(0, len(missing), self.pack)
+            ]
             future = asyncio.run_coroutine_threadsafe(
                 self._run_chunks(chunks, question), self._loop
             )
@@ -113,7 +119,10 @@ class Scorer:
         return result
 
     async def _run_chunks(self, chunks: list[list[str]], question: Question) -> list:
-        tasks = [asyncio.create_task(self._run_one_chunk(chunk, question)) for chunk in chunks]
+        tasks = [
+            asyncio.create_task(self._run_one_chunk(chunk, question))
+            for chunk in chunks
+        ]
         return await asyncio.gather(*tasks)
 
     async def _run_one_chunk(self, chunk: list[str], question: Question):
