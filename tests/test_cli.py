@@ -317,3 +317,35 @@ def test_load_dotenv_sets_missing_and_keeps_existing(tmp_path, monkeypatch):
     assert os.environ["SEMSQL_T_B"] == "from_env"
     assert "SEMSQL_T_EMPTY" not in os.environ
     monkeypatch.delenv("SEMSQL_T_A")
+
+
+def test_load_script_splits_statements_and_drops_comments(tmp_path):
+    from semsql.cli import load_script
+
+    path = tmp_path / "demo.sql"
+    path.write_text("-- intro\nSELECT 1;\n\nSELECT a,\n  b\nFROM t;\n")
+    assert load_script(path) == ["SELECT 1;", "SELECT a,\n  b\nFROM t;"]
+    assert load_script(tmp_path / "missing.sql") == []
+
+
+def test_shipped_demo_script_statements_run_in_demo_mode(tmp_path):
+    from pathlib import Path
+
+    from semsql.cli import load_script, main
+
+    statements = load_script(Path(__file__).parent.parent / "demo.sql")
+    assert len(statements) == 3
+    base = [
+        "--db",
+        str(tmp_path / "t.duckdb"),
+        "--demo",
+        "--cache-path",
+        str(tmp_path / "c.sqlite"),
+        "--rpm",
+        "0",
+    ]
+    assert main([*base, "gen", "--rows", "150"]) == 0
+    for statement in statements:
+        assert (
+            main([*base, "-c", statement], console=Console(record=True, width=120)) == 0
+        )

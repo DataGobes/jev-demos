@@ -51,7 +51,8 @@ HELP_TEXT = (
     ".rubrics      list named rubrics from rubrics.toml\n"
     ".stats        show the last query's stats snapshot\n"
     ".cache clear  clear the judgment cache\n"
-    ".quit / .exit leave the REPL (Ctrl-D also works)"
+    ".quit / .exit leave the REPL (Ctrl-D also works)\n"
+    "F1..F9        type statement 1..9 from --script (default demo.sql) into the prompt"
 )
 
 
@@ -386,6 +387,43 @@ def _handle_dot_command(
         console.print(f"unknown dot command: {command}. Try .help")
 
 
+def load_script(path: str | Path) -> list[str]:
+    """Split a .sql file into statements (each keeps its `;`); `--` comment lines are dropped."""
+    try:
+        text = Path(path).read_text(encoding="utf-8")
+    except OSError:
+        return []
+    lines = [line for line in text.splitlines() if not line.lstrip().startswith("--")]
+    return [part.strip() + ";" for part in "\n".join(lines).split(";") if part.strip()]
+
+
+def _script_key_bindings(statements: list[str], cps: int):
+    """F1..F9 type out statement 1..9 into the prompt, typewriter-style; Enter then runs it."""
+    import asyncio
+
+    from prompt_toolkit.key_binding import KeyBindings
+
+    bindings = KeyBindings()
+
+    def bind(key: str, statement: str) -> None:
+        @bindings.add(key)
+        def _(event) -> None:
+            buffer = event.current_buffer
+            buffer.reset()
+
+            async def type_out() -> None:
+                for char in statement:
+                    buffer.insert_text(char)
+                    if cps > 0:
+                        await asyncio.sleep(1 / cps)
+
+            event.app.create_background_task(type_out())
+
+    for index, statement in enumerate(statements[:9], start=1):
+        bind(f"f{index}", statement)
+    return bindings
+
+
 def repl(
     con: duckdb.DuckDBPyConnection,
     db_path: str,
@@ -394,6 +432,8 @@ def repl(
     cache: Cache | None,
     rubrics: dict[str, Question],
     console: Console,
+    script: list[str] | None = None,
+    type_cps: int = 120,
 ) -> int:
     """Multi-line prompt_toolkit REPL: statements run once the buffer ends in `;`."""
     from prompt_toolkit import PromptSession
@@ -406,7 +446,15 @@ def repl(
     console.print(backend_line)
     console.print(f"db: {db_path}  ·  type .help for commands")
 
-    session: PromptSession = PromptSession(history=FileHistory(".semsql_history"))
+    if script:
+        console.print(
+            f"script: {len(script[:9])} statements on F1–F{len(script[:9])}",
+            style="dim",
+        )
+    session: PromptSession = PromptSession(
+        history=FileHistory(".semsql_history"),
+        key_bindings=_script_key_bindings(script or [], type_cps),
+    )
     buffer = ""
     while True:
         try:
@@ -485,7 +533,17 @@ def main(argv: list[str] | None = None, console: Console | None = None) -> int:
             return cmd_eval_pack(con, args, console)
         if args.command:
             return 0 if run_sql(con, args.command, stats, backend, console) else 1
-        return repl(con, args.db, stats, backend, cache, rubrics, console)
+        return repl(
+            con,
+            args.db,
+            stats,
+            backend,
+            cache,
+            rubrics,
+            console,
+            script=load_script(args.script),
+            type_cps=args.type_cps,
+        )
     finally:
         scorer.close()
         con.close()

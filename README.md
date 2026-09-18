@@ -121,3 +121,9 @@ if the API key isn't set).
    ORDER BY anger DESC LIMIT 10;
    ```
 5. Re-run step 3 again — all cache hits, 0 requests, $0.0000.
+
+## Hands-free typing for recordings
+
+`demo.sql` holds the recording queries. In the REPL, **F1–F9 type statement 1–9 into the prompt**
+typewriter-style; press Enter to run it. No clipboard, no window switching. Use `--script other.sql`
+for a different file and `--type-cps 0` for instant insertion (default 120 chars/s).
