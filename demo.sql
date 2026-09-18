@@ -1,4 +1,4 @@
--- Recording script: F1, F2, F3 type these into the semsql prompt. Press Enter to run.
+-- Recording script: F1..F4 type these into the semsql prompt. Press Enter to run.
 SELECT count(*) AS keyword_hits FROM reviews WHERE body ILIKE '%refund%';
 
 WITH unhappy AS (SELECT * FROM reviews WHERE stars <= 2)
@@ -18,3 +18,12 @@ SELECT jev_grade(body, 'anger') AS anger_grade,
        count(*) FILTER (WHERE body NOT ILIKE '%refund%') AS never_say_refund,
        any_value(body) AS example
 FROM refunders GROUP BY anger_grade ORDER BY anger_grade DESC;
+
+SELECT product,
+       count(*) AS about_to_leave,
+       round(avg(jev_noul(body, 'The customer is threatening to stop buying from this shop or switch to a competitor')), 2) AS avg_p_churn,
+       any_value(body) AS example
+FROM reviews
+WHERE stars <= 2
+  AND jev_noul(body, 'The customer is threatening to stop buying from this shop or switch to a competitor') > 0.8
+GROUP BY product ORDER BY about_to_leave DESC LIMIT 6;

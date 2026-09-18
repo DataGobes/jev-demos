@@ -334,7 +334,7 @@ def test_shipped_demo_script_statements_run_in_demo_mode(tmp_path):
     from semsql.cli import load_script, main
 
     statements = load_script(Path(__file__).parent.parent / "demo.sql")
-    assert len(statements) == 3
+    assert len(statements) == 4
     base = [
         "--db",
         str(tmp_path / "t.duckdb"),
