@@ -123,3 +123,22 @@ def test_load_reviews_is_fast() -> None:
         assert elapsed < 2.0
     finally:
         con.close()
+
+
+def test_churn_threats_cluster_on_hotspot_products() -> None:
+    from collections import Counter
+
+    from semsql.data import generate_labeled
+
+    churn = Counter(
+        row["product"]
+        for row, label in generate_labeled(10_000)
+        if label == "churn_threat"
+    )
+    top3 = [product for product, _ in churn.most_common(3)]
+    assert top3 == [
+        "GlowBake Smart Oven",
+        "SilentSweep Robot Vacuum",
+        "FreshCycle Washer Dryer Combo",
+    ]
+    assert churn["GlowBake Smart Oven"] > 5 * churn.most_common(4)[3][1]

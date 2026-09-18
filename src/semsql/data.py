@@ -180,6 +180,12 @@ _TEMPLATES: dict[str, tuple[str, ...]] = {
         "This {product} was my last purchase from this store.",
         "I've already ordered a replacement {product} from another brand.",
         "Telling everyone I know to skip this brand's {product} line.",
+        "Order {order} was the final straw, my next {product} comes from someone else.",
+        "{days} days of excuses about order {order}. I'm cancelling my account and moving on.",
+        "I've been a customer for years, but after order {order} I'm closing my account.",
+        "Your rival has the same {product} with actual support. Guess where order {order} should have gone.",
+        "Consider order {order} my goodbye. {days} days without an answer is enough.",
+        "I already told my family to avoid the {product}, and we're done ordering here after {order}.",
     ),
     "delivery_problem": (
         "My {product} still hasn't arrived, order {order} placed {days} days ago.",
@@ -401,6 +407,24 @@ def _pick_stars(rng: random.Random, intent: str) -> int:
 _SECONDS_PER_YEAR = 365 * 24 * 3600
 
 
+# Churn threats cluster on a few troubled products so per-product rollups show real hotspots.
+_CHURN_HOTSPOTS: tuple[tuple[str, float], ...] = (
+    ("GlowBake Smart Oven", 0.30),
+    ("SilentSweep Robot Vacuum", 0.16),
+    ("FreshCycle Washer Dryer Combo", 0.09),
+)
+
+
+def _pick_product(rng: random.Random, intent: str) -> str:
+    if intent == "churn_threat":
+        roll = rng.random()
+        for product, share in _CHURN_HOTSPOTS:
+            if roll < share:
+                return product
+            roll -= share
+    return rng.choice(PRODUCTS)
+
+
 def generate_labeled(n: int, seed: int = 7) -> list[tuple[dict, str]]:
     """Generate `n` deterministic (row, intent_label) pairs for evaluation.
 
@@ -410,7 +434,7 @@ def generate_labeled(n: int, seed: int = 7) -> list[tuple[dict, str]]:
     rows: list[tuple[dict, str]] = []
     for i in range(1, n + 1):
         intent = rng.choices(INTENTS, weights=_INTENT_WEIGHTS, k=1)[0]
-        product = rng.choice(PRODUCTS)
+        product = _pick_product(rng, intent)
         stars = _pick_stars(rng, intent)
         body: str | None = _make_body(rng, intent, product)
         if rng.random() < 0.03:

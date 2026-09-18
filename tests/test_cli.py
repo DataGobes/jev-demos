@@ -323,8 +323,8 @@ def test_load_script_splits_statements_and_drops_comments(tmp_path):
     from semsql.cli import load_script
 
     path = tmp_path / "demo.sql"
-    path.write_text("-- intro\nSELECT 1;\n\nSELECT a,\n  b\nFROM t;\n")
-    assert load_script(path) == ["SELECT 1;", "SELECT a,\n  b\nFROM t;"]
+    path.write_text("--# file note\n-- caption\nSELECT 1;\n\nSELECT a,\n  b\nFROM t;\n")
+    assert load_script(path) == ["-- caption\nSELECT 1;", "SELECT a,\n  b\nFROM t;"]
     assert load_script(tmp_path / "missing.sql") == []
 
 

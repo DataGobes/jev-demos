@@ -388,12 +388,16 @@ def _handle_dot_command(
 
 
 def load_script(path: str | Path) -> list[str]:
-    """Split a .sql file into statements (each keeps its `;`); `--` comment lines are dropped."""
+    """Split a .sql file into statements (each keeps its `;`).
+
+    `--` comment lines stay with their statement so they are typed on screen as captions;
+    `--#` lines are file-only notes and are dropped. Comments must not contain `;`.
+    """
     try:
         text = Path(path).read_text(encoding="utf-8")
     except OSError:
         return []
-    lines = [line for line in text.splitlines() if not line.lstrip().startswith("--")]
+    lines = [line for line in text.splitlines() if not line.lstrip().startswith("--#")]
     return [part.strip() + ";" for part in "\n".join(lines).split(";") if part.strip()]
 
 

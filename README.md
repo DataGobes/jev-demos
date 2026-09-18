@@ -125,5 +125,6 @@ if the API key isn't set).
 ## Hands-free typing for recordings
 
 `demo.sql` holds the recording queries. In the REPL, **F1–F9 type statement 1–9 into the prompt**
-typewriter-style; press Enter to run it. No clipboard, no window switching. Use `--script other.sql`
+typewriter-style; press Enter to run it. No clipboard, no window switching. `--` comment lines above a
+statement are typed too and act as on-screen captions; `--#` lines are file-only notes (no `;` in comments). Use `--script other.sql`
 for a different file and `--type-cps 0` for instant insertion (default 120 chars/s).
