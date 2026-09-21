@@ -13,7 +13,7 @@ def humanise(name: str) -> str:
 
 
 def vl(mark: str | dict, encoding: dict, **extra) -> dict:
-    return {"$schema": "https://vega.github.io/schema/vega-lite/v5.json", "data": {"name": "rows"},
+    return {"$schema": "https://vega.github.io/schema/vega-lite/v6.json", "data": {"name": "rows"},
             "mark": mark, "encoding": encoding, "width": "container", "height": 280, **extra}
 
 
