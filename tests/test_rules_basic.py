@@ -38,6 +38,14 @@ def test_multi_line_blocked_by_high_cardinality():
     assert "multi_line" not in kinds(make_profile(month=("t", 24), sku=("n", 40), revenue=("q", 90, 0.0, 9.0)))
 
 
+def test_multi_line_aggregates_like_line():
+    # F6: multi_line's y encoding must aggregate (sum), matching line, so it
+    # doesn't draw a zig-zag polyline through duplicate x values.
+    cands, _ = enumerate_candidates(make_profile(month=("t", 24), region=("n", 5), revenue=("q", 90, 0.0, 500.0)))
+    ml = next(c for c in cands if c.kind == "multi_line")
+    assert ml.vega["encoding"]["y"]["aggregate"] == "sum"
+
+
 def test_pie_needs_few_nonnegative_slices():
     assert "pie" in kinds(make_profile(row_count=4, channel=("n", 4), revenue=("q", 4, 10.0, 90.0)))
     assert "pie" not in kinds(make_profile(row_count=4, channel=("n", 4), profit=("q", 4, -5.0, 90.0)))

@@ -84,6 +84,6 @@ def multi_line(p: Profile) -> list[Candidate]:
                       f"{humanise(q.name)} over {humanise(t.name)} by {humanise(n.name)}",
                       f"Multi-series line chart of `{q.name}` over `{t.name}`, one line per `{n.name}`. "
                       f"Shows how each {humanise(n.name).lower()}'s value changes over time and lets them be compared.",
-                      vl("line", {"x": time_enc(t), "y": enc(q.name, "quantitative"),
+                      vl("line", {"x": time_enc(t), "y": enc(q.name, "quantitative", aggregate="sum"),
                                   "color": enc(n.name, "nominal")})))
     return out
