@@ -1,122 +1,68 @@
-import { useState } from 'react'
-import heroImg from './assets/hero.png'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import './App.css'
+import { ActionProvider, Renderer, StateProvider, VisibilityProvider } from "@json-render/react";
+import { useCallback, useEffect, useMemo, useReducer, useState } from "react";
+import { Editor } from "./Editor";
+import { EXAMPLES } from "./examples";
+import { initialState, reduce } from "./reducer";
+import { registry } from "./registry";
+import { PanelActionsContext, RowsContext } from "./rows";
+import { runQuery } from "./stream";
+import { TimingBar } from "./TimingBar";
 
-function App() {
-  const [count, setCount] = useState(0)
+export default function App() {
+  const [sql, setSql] = useState(EXAMPLES[0].sql);
+  const [s, dispatch] = useReducer(reduce, initialState);
+
+  const run = useCallback(async () => {
+    dispatch({ type: "start" });
+    try {
+      for await (const event of runQuery(sql)) dispatch({ type: "event", event });
+    } catch (err) {
+      dispatch({ type: "event", event: { type: "error", stage: "network", message: String(err) } });
+    } finally {
+      dispatch({ type: "done" });
+    }
+  }, [sql]);
+
+  useEffect(() => {
+    const onRendered = (e: Event) => dispatch({ type: "rendered", ms: (e as CustomEvent<number>).detail });
+    window.addEventListener("jevviz:rendered", onRendered);
+    return () => window.removeEventListener("jevviz:rendered", onRendered);
+  }, []);
+
+  const actions = useMemo(() => ({
+    alternates: (i: number) => s.panels[i]?.alternates ?? [],
+    swap: (panelIndex: number, altId: string) => dispatch({ type: "swap", panelIndex, altId }),
+  }), [s.panels]);
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
+    <div className="app">
+      <aside>
+        <h1>Jev <code>VISUALIZE</code></h1>
+        <Editor value={sql} onChange={setSql} onRun={run} />
+        <div className="controls">
+          <select aria-label="examples" onChange={(e) => setSql(EXAMPLES[Number(e.target.value)].sql)}>
+            {EXAMPLES.map((ex, i) => <option key={ex.label} value={i}>{ex.label}</option>)}
+          </select>
+          <button onClick={run} disabled={s.running}>{s.running ? "Running…" : "Run ⌘↵"}</button>
         </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.tsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
-
-      <div className="ticks"></div>
-
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
+        {s.error && <p className={`error stage-${s.error.stage}`} role="alert">{s.error.stage}: {s.error.message}</p>}
+      </aside>
+      <main>
+        {s.spec ? (
+          <RowsContext.Provider value={s.rows}>
+            <PanelActionsContext.Provider value={actions}>
+              <StateProvider initialState={{}}>
+                <VisibilityProvider>
+                  <ActionProvider>
+                    <Renderer spec={s.spec} registry={registry} />
+                  </ActionProvider>
+                </VisibilityProvider>
+              </StateProvider>
+            </PanelActionsContext.Provider>
+          </RowsContext.Provider>
+        ) : <p className="empty">Run a query. End it with <code>VISUALIZE '…'</code> to let Jev pick the chart.</p>}
+      </main>
+      <TimingBar s={s} />
+    </div>
+  );
 }
-
-export default App
