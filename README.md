@@ -80,14 +80,21 @@ request**, with chunks over that size fired concurrently.
 
 **Golden-set eval** (`docs/eval-results.md`, 2026-09-21, `jev-latest`,
 typesafe-sdk 0.7.1, 20-case golden set — 10 seed cases from the plan plus 10
-drafted by the assistant): Jev top-1 **95%**, top-3 **100%**, vs. a
-rules-only ("first valid candidate") baseline of top-1 **35%**. The first run,
+drafted by the assistant): Jev top-1 **90–95%** across two live runs (95%, then
+90% after the final-review fixes), top-3 **100%**, vs. a rules-only ("first
+valid candidate") baseline of top-1 **35%**. Every miss was a pie chosen over an
+accepted bar of the same columns, within ~0.1 of each other. The first run,
 on the 10 seed cases alone, was top-1 80% / top-3 100% / baseline 40%. The
 set is small and half of it was drafted by the same model family that built
 the system, the rules-only baseline is weak on position ties, and near-tie
 scores move by roughly ±0.01 between live runs — so treat these numbers as
 "the approach works," not as a rigorous benchmark. Ranking thresholds are
 unchanged from the design defaults: `STRONG` 0.6, `WEAK` 0.3, `ID_NOUL` 0.5.
+
+**End-to-end latency** (live, 2026-09-21, localhost, 5–13 candidates): first
+query after server start 671 ms to the `spec` event (cold connection); later
+queries 240–414 ms, including a 3-intent dashboard (414 ms, 7.4k input tokens);
+a cache hit 7 ms. Vega render measured in the browser: 13–42 ms.
 
 ## Adding a chart type
 

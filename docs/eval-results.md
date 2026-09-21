@@ -101,3 +101,52 @@ Caveats, stated plainly:
 - 20 cases, half of them written by the same model family's assistant that built the system. Treat 95% as "the approach works", not as a benchmark number.
 
 Thresholds unchanged (`STRONG` 0.6, `WEAK` 0.3, `ID_NOUL` 0.5): the lowest accepted top pick in this run is 0.95.
+
+---
+
+## Run 3 — after the final-review fix wave (2026-09-21)
+
+**Correction to Run 2.** The final code review found that integer-year columns (`signup_year`) were encoded as Vega-Lite `temporal`, which renders `2015` as 2015 ms after 1970-01-01 — a meaningless chart. Run 2 counted `signup_trend chose=line` as correct because the eval checks the chosen candidate's kind and columns, not what it renders. Jev's pick was the right *candidate*; the chart it would have drawn was broken. Fixed (integer years are now an ordinal axis, verified in the browser: axis reads 2015 … 2025). The same wave added `aggregate: sum` to `multi_line` and moved specs to the Vega-Lite v6 schema; no rule description or `LEVELS` wording changed, so the questions Jev sees are identical to Run 2.
+
+```
+backend=jev-latest simulated=False
+✓ region_trend                 chose=multi_line   p=1.00 top3=True baseline=False
+✓ declining_region             chose=multi_line   p=1.00 top3=True baseline=False
+✓ seasonality                  chose=line         p=0.99 top3=True baseline=True
+✓ top_categories               chose=bar          p=1.00 top3=True baseline=True
+✓ channel_share                chose=pie          p=0.98 top3=True baseline=True
+✓ price_vs_rating              chose=scatter      p=0.98 top3=True baseline=False
+✓ order_value_distribution     chose=histogram    p=1.00 top3=True baseline=True
+✓ region_channel_mix           chose=grouped_bar  p=0.99 top3=True baseline=False
+✓ margin_problem               chose=bar          p=0.99 top3=True baseline=False
+✗ identifier_trap              chose=pie          p=0.90 top3=True baseline=False
+✗ region_total                 chose=pie          p=0.98 top3=True baseline=False
+✓ region_share                 chose=pie          p=0.92 top3=True baseline=False
+✓ latam_vague                  chose=multi_line   p=0.92 top3=True baseline=False
+✓ signup_trend                 chose=line         p=0.96 top3=True baseline=True
+✓ price_by_rating              chose=bar          p=1.00 top3=True baseline=True
+✓ category_revenue_compare     chose=bar          p=1.00 top3=True baseline=True
+✓ channel_growth               chose=multi_line   p=0.99 top3=True baseline=False
+✓ channel_biggest              chose=pie          p=0.99 top3=True baseline=False
+✓ segment_country_mix          chose=stacked_bar  p=1.00 top3=True baseline=False
+✓ order_size_profit            chose=scatter      p=1.00 top3=True baseline=False
+
+Jev top-1 90% · top-3 100% · rules-only top-1 35%
+```
+
+**Gate 2: PASS**, +55 points. `region_total` ("which region sold the most overall") flipped from bar (Run 2, 0.97) to pie (0.98) with identical questions — run-to-run jitter on a near-tie. Both misses are a pie chosen over the accepted bar of the same columns. A recurring pattern worth acting on: for "which X is the most" intents Jev rates pie and bar almost equally, because both descriptions say they compare categories. Sharpening the pie description toward "share of a whole" and the bar description toward "ranking" is the obvious next tuning step (it requires a fresh eval run).
+
+## Live end-to-end timing (spec §1 success criterion 2)
+
+Live backend on localhost, wall clock from request to the `spec` event, 2026-09-21:
+
+| query | candidates | jev ms | wall ms to `spec` | input tokens | cache |
+|---|---|---|---|---|---|
+| regions trending (first request after server start) | 5 | 654 | 671 | 1,493 | miss |
+| same SQL, "which region sold the most overall" | 5 | 351 | 357 | 1,473 | miss |
+| regions trending again | 5 | 0.4 | 7 | 0 | hit |
+| identifier trap | 7 | 228 | 241 | 1,756 | miss |
+| 3-intent dashboard | 13 | 406 | 414 | 7,451 | miss |
+| signup years (with a trailing `--` comment) | 1 | 238 | 240 | 630 | miss |
+
+The `result` (table) event arrived within 2–16 ms in every case. Vega render time measured in the browser (timing bar): 42 ms for the 5-series multi-line chart, 13 ms for the year line chart. So run → chart painted is roughly 0.25–0.45 s warm and about 0.7 s for the first request on a cold connection.
