@@ -60,7 +60,7 @@ class JevBackend:
             else:
                 answers[qid] = Answer("score", probabilities={int(k): float(v) for k, v in raw.probabilities.items()},
                                       confidence=float(raw.confidence))
-        return JudgeResult(answers=answers, input_tokens=resp.usage.input_tokens)
+        return JudgeResult(answers=answers, input_tokens=resp.usage.input_tokens or 0)
 
     async def aclose(self) -> None:
         if self._client is not None:

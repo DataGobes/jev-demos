@@ -1,4 +1,4 @@
-from jevviz.backend import DemoBackend, make_backend
+from jevviz.backend import DemoBackend, JevBackend, make_backend
 from jevviz.types import Question
 
 LEVELS = ("unrelated", "hidden", "partly", "directly")
@@ -28,3 +28,25 @@ async def test_demo_backend_flags_identifier_columns():
 def test_make_backend_without_key_is_simulated(monkeypatch):
     monkeypatch.delenv("TYPESAFE_API_KEY", raising=False)
     assert make_backend().simulated is True
+
+
+async def test_jev_backend_coerces_missing_input_tokens_to_zero():
+    class _Usage:
+        input_tokens = None
+
+    class _Response:
+        def __init__(self) -> None:
+            self.answers = {}
+            self.usage = _Usage()
+
+    class _FakeClient:
+        async def system_one(self, state, questions):
+            return _Response()
+
+    backend = JevBackend()
+    backend._client = _FakeClient()
+
+    result = await backend.judge({}, {})
+
+    assert result.input_tokens == 0
+    assert result.error is None
