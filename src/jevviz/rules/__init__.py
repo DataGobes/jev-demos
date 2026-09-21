@@ -33,6 +33,8 @@ def enumerate_candidates(profile: Profile, cap: int = 24, per_rule: int = 4) -> 
             (uncapped if c.kind in _UNCAPPED else capped).append(c)
     capped = sorted(capped, key=lambda c: _prerank(profile, c))[:cap]
     ordered = [c for c in uncapped if c.kind == "kpi"] + capped + [c for c in uncapped if c.kind == "table"]
+    # Invariant rank.py relies on: ids are zero-padded in this pre-rank `ordered`
+    # sequence, so lexicographic string order over ids equals pre-rank order.
     return [replace(c, id=f"c{i:02d}") for i, c in enumerate(ordered)], total
 
 

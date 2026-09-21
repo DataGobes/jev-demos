@@ -21,5 +21,6 @@ main { padding:16px; overflow:auto; min-width:0; } .empty { color:var(--muted); 
 .table-wrap { overflow:auto; max-height:420px; } table { border-collapse:collapse; width:100%; font-variant-numeric:tabular-nums; }
 th, td { text-align:left; padding:4px 10px; border-bottom:1px solid var(--line); white-space:nowrap; } th { color:var(--muted); position:sticky; top:0; background:var(--panel); }
 .error { color:#ff8080; margin:0; } .error.stage-jev { color:var(--warn); }
+.chart-error { color:#ff8080; margin:8px 0 0; padding:8px; border:1px solid var(--warn); border-radius:6px; font-size:12px; }
 .timing { grid-column:1 / -1; display:flex; flex-wrap:wrap; gap:16px; padding:8px 16px; border-top:1px solid var(--line); color:var(--muted); font:12px ui-monospace,monospace; }
 .timing b { color:var(--text); } .simulated { margin-left:auto; color:#000; background:var(--warn); font-weight:700; padding:0 8px; border-radius:4px; }

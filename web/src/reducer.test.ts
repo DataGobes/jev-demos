@@ -31,6 +31,26 @@ test("swap exchanges chosen and alternate without losing the old one", () => {
   expect(s.panels[0].alternates.map((a) => a.id)).toEqual(["c00"]);
 });
 
+test("swap recomputes the match band for the newly-chosen alternate (E1)", () => {
+  // specEvent's panel starts "strong" (p: 0.8); its only alternate is p: 0.4
+  // ("weak" under the strong>=0.6, weak>=0.3 bands) - swapping it in must not
+  // keep the stale "strong" label on either the panel state or the spec props.
+  let s = reduce(reduce(initialState, { type: "event", event: resultEvent }), { type: "event", event: specEvent });
+  s = reduce(s, { type: "swap", panelIndex: 0, altId: "c05" });
+  expect(s.panels[0].match).toBe("weak");
+  expect(s.spec?.elements["panel-0"].props).toMatchObject({ match: "weak" });
+});
+
+test("swap to a below-threshold alternate recomputes match down to none (E1)", () => {
+  let s = reduce(reduce(initialState, { type: "event", event: resultEvent }), { type: "event", event: specEvent });
+  const lowSpecEvent = { ...specEvent, panels: [{ ...specEvent.panels[0],
+    alternates: [{ id: "c09", kind: "scatter", title: "Scatter", p: 0.2, element: leaf("Chart") }] }] };
+  s = reduce(reduce(initialState, { type: "event", event: resultEvent }), { type: "event", event: lowSpecEvent });
+  s = reduce(s, { type: "swap", panelIndex: 0, altId: "c09" });
+  expect(s.panels[0].match).toBe("none");
+  expect(s.spec?.elements["panel-0"].props).toMatchObject({ match: "none" });
+});
+
 test("jev error keeps the rendered spec and records a warning", () => {
   let s = reduce(reduce(initialState, { type: "event", event: resultEvent }), { type: "event", event: specEvent });
   s = reduce(s, { type: "event", event: { type: "error", stage: "jev", message: "boom" } });

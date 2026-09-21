@@ -14,6 +14,15 @@ export type Action =
 export const initialState: AppState = { running: false, rows: [], spec: null, panels: [], timings: {}, usage: null,
   scored: null, cache: null, simulated: false, rowNote: null, error: null };
 
+// Mirrors jevviz.rank.match_band (STRONG = 0.6, WEAK = 0.3): the band the p in a
+// panel's chosen candidate falls into. Recomputed client-side on `swap` so a swap
+// never leaves a stale band (e.g. "strong") on a newly-chosen, weaker alternate.
+const STRONG = 0.6;
+const WEAK = 0.3;
+export function matchBand(p: number): PanelInfo["match"] {
+  return p >= STRONG ? "strong" : p >= WEAK ? "weak" : "none";
+}
+
 export function reduce(state: AppState, action: Action): AppState {
   switch (action.type) {
     case "start": return { ...initialState, running: true, simulated: state.simulated };
@@ -24,11 +33,12 @@ export function reduce(state: AppState, action: Action): AppState {
       const panel = state.panels[action.panelIndex];
       const alt = panel?.alternates.find((a) => a.id === action.altId);
       if (!state.spec || !panel || !alt) return state;
+      const match = matchBand(alt.p);
       const panels = state.panels.map((p, i) => i !== action.panelIndex ? p
-        : { ...p, chosen: alt, alternates: [panel.chosen, ...p.alternates.filter((a) => a.id !== alt.id)] });
+        : { ...p, chosen: alt, match, alternates: [panel.chosen, ...p.alternates.filter((a) => a.id !== alt.id)] });
       const pid = `panel-${action.panelIndex}`, lid = `leaf-${action.panelIndex}`;
       const elements = { ...state.spec.elements, [lid]: alt.element,
-        [pid]: { ...state.spec.elements[pid], props: { ...state.spec.elements[pid].props, title: alt.title, p: alt.p } } };
+        [pid]: { ...state.spec.elements[pid], props: { ...state.spec.elements[pid].props, title: alt.title, p: alt.p, match } } };
       return { ...state, panels, spec: { ...state.spec, elements } };
     }
     case "event": {
