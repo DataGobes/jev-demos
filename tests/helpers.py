@@ -1,6 +1,12 @@
 from jevviz.types import Column, Profile
 
-_KINDS = {"t": ("temporal",), "q": ("quantitative",), "n": ("nominal",), "nq": ("nominal", "quantitative")}
+_KINDS = {
+    "t": ("temporal",), "q": ("quantitative",), "n": ("nominal",), "nq": ("nominal", "quantitative"),
+    # "ty": temporal kind carried by bare year integers (e.g. `signup_year`), as opposed
+    # to "t" which the tests otherwise leave without a min/max. Pass an explicit int
+    # range, e.g. signup_year=("ty", 11, 2015, 2025), so col.min/col.max are ints.
+    "ty": ("temporal",),
+}
 
 
 def make_profile(row_count=100, **cols) -> Profile:

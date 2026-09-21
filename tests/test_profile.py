@@ -23,6 +23,15 @@ def test_integer_year_is_temporal():
     assert p.columns[0].kind == ("temporal",)
 
 
+def test_double_year_values_are_not_temporal():
+    # F1: the year heuristic must only fire for integral SQL types. A DOUBLE
+    # column of whole numbers in range must not be classified temporal, since
+    # the rules would then encode it as Vega `temporal` (epoch-ms) instead of
+    # a plain quantitative/ordinal axis.
+    p = profile(result(["yr", "n"], ["DOUBLE", "BIGINT"], [(float(y), y * 3) for y in range(2015, 2026)]))
+    assert "temporal" not in p.columns[0].kind
+
+
 def test_small_integer_domain_is_dual_tagged():
     p = profile(result(["rating"], ["INTEGER"], [(r,) for r in (1, 2, 3, 4, 5, 5, 4)]))
     assert p.columns[0].kind == ("nominal", "quantitative")

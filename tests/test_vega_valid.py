@@ -12,6 +12,8 @@ PROFILES = [
     make_profile(row_count=15, region=("n", 5), channel=("n", 3), revenue=("q", 15, 0.0, 9.0)),
     make_profile(row_count=200, price=("q", 150, 1.0, 9.0), rating=("nq", 5, 1, 5), category=("n", 5)),
     make_profile(row_count=500, revenue=("q", 400, 0.0, 9.0)),
+    # F1: an integer-year temporal column (ordinal x encoding) must still emit a valid spec.
+    make_profile(signup_year=("ty", 11, 2015, 2025), customers=("q", 11, 1.0, 50.0)),
 ]
 
 

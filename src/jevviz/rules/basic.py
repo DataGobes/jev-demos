@@ -5,7 +5,7 @@ from __future__ import annotations
 from itertools import product
 
 from jevviz.rules import rule
-from jevviz.rules.titles import enc, humanise, vl
+from jevviz.rules.titles import enc, humanise, time_enc, vl
 from jevviz.types import Candidate, Profile
 
 
@@ -70,7 +70,7 @@ def line(p: Profile) -> list[Candidate]:
                       f"Line chart of `{q.name}` over `{t.name}`. "
                       "Shows how the overall value changes over time, including trends and seasonal peaks.",
                       vl({"type": "line", "point": True},
-                         {"x": enc(t.name, "temporal"), "y": enc(q.name, "quantitative", aggregate="sum")})))
+                         {"x": time_enc(t), "y": enc(q.name, "quantitative", aggregate="sum")})))
     return out
 
 
@@ -84,6 +84,6 @@ def multi_line(p: Profile) -> list[Candidate]:
                       f"{humanise(q.name)} over {humanise(t.name)} by {humanise(n.name)}",
                       f"Multi-series line chart of `{q.name}` over `{t.name}`, one line per `{n.name}`. "
                       f"Shows how each {humanise(n.name).lower()}'s value changes over time and lets them be compared.",
-                      vl("line", {"x": enc(t.name, "temporal"), "y": enc(q.name, "quantitative"),
+                      vl("line", {"x": time_enc(t), "y": enc(q.name, "quantitative"),
                                   "color": enc(n.name, "nominal")})))
     return out

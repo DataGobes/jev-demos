@@ -8,6 +8,11 @@ from jevviz.db import QueryResult
 from jevviz.types import Column, Profile
 
 _NUMERIC = ("INT", "DOUBLE", "FLOAT", "DECIMAL", "HUGEINT", "REAL")
+# Integral SQL types only: TINYINT/SMALLINT/INTEGER/BIGINT/HUGEINT and their unsigned
+# variants all contain "INT" as a substring; DOUBLE/FLOAT/DECIMAL/REAL do not. Used to
+# gate the year-integer -> temporal heuristic below (F1): a DOUBLE column of whole
+# numbers in 1900-2100 must not be classified temporal, only a genuinely integral one.
+_INTEGRAL = ("INT",)
 _TEMPORAL = ("DATE", "TIMESTAMP")
 _BOOL_STR = ("VARCHAR", "BOOLEAN")
 
@@ -31,8 +36,9 @@ def _kind(type_name: str, values: list, distinct: int) -> tuple[str, ...]:
     if any(t.startswith(x) for x in _TEMPORAL):
         return ("temporal",)
     is_numeric = any(x in t for x in _NUMERIC)
+    is_integral_type = any(x in t for x in _INTEGRAL)
     is_int_like = is_numeric and all(isinstance(v, int) or float(v).is_integer() for v in values)
-    if values and (not is_numeric or is_int_like):
+    if values and (not is_numeric or (is_int_like and is_integral_type)):
         share = sum(_parses_as_date(int(v) if is_int_like else v) for v in values) / len(values)
         if share >= 0.95:
             return ("temporal",)

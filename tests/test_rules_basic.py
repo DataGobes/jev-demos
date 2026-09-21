@@ -19,6 +19,21 @@ def test_time_series_with_breakdown():
     assert "line" in ks and "multi_line" in ks and "bar" in ks and ks[-1] == "table"
 
 
+def test_int_year_column_is_ordinal_x_but_date_column_is_temporal():
+    # F1: an integer-year temporal column must not be encoded as Vega `temporal`
+    # (which compiles to epoch-ms and smears every year onto a 1970 axis).
+    year_cands, _ = enumerate_candidates(
+        make_profile(signup_year=("ty", 11, 2015, 2025), customers=("q", 11, 1.0, 50.0))
+    )
+    year_line = next(c for c in year_cands if c.kind == "line")
+    assert year_line.vega["encoding"]["x"]["field"] == "signup_year"
+    assert year_line.vega["encoding"]["x"]["type"] == "ordinal"
+
+    date_cands, _ = enumerate_candidates(make_profile(month=("t", 24), revenue=("q", 24, 0.0, 9.0)))
+    date_line = next(c for c in date_cands if c.kind == "line")
+    assert date_line.vega["encoding"]["x"]["type"] == "temporal"
+
+
 def test_multi_line_blocked_by_high_cardinality():
     assert "multi_line" not in kinds(make_profile(month=("t", 24), sku=("n", 40), revenue=("q", 90, 0.0, 9.0)))
 
