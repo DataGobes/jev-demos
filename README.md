@@ -1,5 +1,7 @@
 # Jev `VISUALIZE`
 
+## What this is
+
 A SQL query ends in a natural-language `VISUALIZE '<intent>'` clause, and
 TypeSafe's Jev model decides which chart (or dashboard) answers it, rendered
 in well under a second. For example:
@@ -27,7 +29,13 @@ NDJSON:
 6. `rank` picks the winner (and alternates) per intent; `spec.py` assembles the flat json-render spec.
 
 A viz failure never hides the data: the table from the `result` event stays
-on screen even if the `spec` stage errors.
+on screen even if the `spec` stage errors. The same principle holds one layer
+up in the frontend — if a chosen chart's Vega-Lite spec fails to render,
+`Chart` shows an inline "Chart failed to render" alert instead of blanking
+the panel; the underlying data is never hidden. The frontend renders the
+backend's flat json-render spec through `Renderer`, which (in the installed
+json-render 0.21.0) requires an `ActionProvider` ancestor even though this
+catalog declares no actions — see `web/README.md` for the full rationale.
 
 ## Run it
 
@@ -98,7 +106,9 @@ chart kind.
 - Localhost only — no auth, no multi-user, no deployment story.
 - Ranking thresholds (`STRONG`, `WEAK`, `ID_NOUL`) were tuned on a small
   (20-case) golden set; revisit if it's extended.
-- `run_query` enforces a 10-second per-statement timeout and a 5,000-row cap.
+- `run_query` enforces a 10-second per-statement timeout and a 5,000-row cap,
+  and makes duplicate result column names unique (`id`, `id_2`, ...) so no
+  column silently overwrites another.
 - The seeded dataset generator (`jevviz.data`, `n_orders=50_000` by default)
   produces roughly 31,000 `orders` rows — most candidate order IDs are
   skipped by the generator's planted seasonality/region filters, so the row
