@@ -1,0 +1,24 @@
+[project]
+name = "jevviz"
+version = "0.1.0"
+description = "SQL VISUALIZE clause ranked by TypeSafe Jev"
+requires-python = ">=3.13"
+dependencies = [
+    "duckdb>=1.5.5",
+    "fastapi>=0.115",
+    "uvicorn>=0.32",
+    "python-dotenv>=1.0",
+    "typesafe-sdk>=0.7.0",
+]
+
+[build-system]
+requires = ["uv_build>=0.12.9,<0.13.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = ["pytest>=9.1.1", "pytest-asyncio>=1.4.0", "httpx>=0.27", "jsonschema>=4.23", "ruff>=0.16.8"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+markers = ["live: needs TYPESAFE_API_KEY and network"]
+addopts = "-m 'not live'"
