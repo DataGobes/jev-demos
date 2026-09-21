@@ -77,9 +77,13 @@ def run_query(con: duckdb.DuckDBPyConnection, sql: str, row_cap: int = 5000, tim
         row_count = len(rows)
         if truncated:
             count_cur = con.cursor()
-            _execute_with_timeout(
-                count_cur, f"SELECT count(*) FROM ({sql.rstrip().rstrip(';')})", timeout_s
-            )
+            inner = sql.rstrip().rstrip(";")
+            # The inner SQL must be on its own line: if it ends in a `--` comment,
+            # a closing paren placed right after it on the same line would itself
+            # be commented out, breaking the wrapping SELECT with no `result`
+            # event ever reaching the client (F2).
+            count_sql = f"SELECT count(*) FROM (\n{inner}\n) AS _jevviz_count"
+            _execute_with_timeout(count_cur, count_sql, timeout_s)
             row_count = count_cur.fetchone()[0]
         return QueryResult(columns, types, rows, row_count, truncated)
     except duckdb.Error as exc:

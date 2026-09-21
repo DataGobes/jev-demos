@@ -46,3 +46,13 @@ def test_duplicate_column_names_are_made_unique(con):
     r = run_query(con, "SELECT 1 AS id, 2 AS id, 3 AS id")
     assert len(r.columns) == len(set(r.columns)) == 3
     assert r.rows == [(1, 2, 3)]
+
+
+def test_truncation_count_survives_trailing_line_comment(con):
+    r = run_query(con, "SELECT order_id FROM orders -- trailing comment", row_cap=100)
+    assert r.truncated is True and r.row_count > 100
+
+
+def test_truncation_count_survives_trailing_block_comment(con):
+    r = run_query(con, "SELECT order_id FROM orders /* block comment */", row_cap=100)
+    assert r.truncated is True and r.row_count > 100
