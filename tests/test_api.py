@@ -61,6 +61,16 @@ def test_viz_failure_keeps_the_data(db):
     assert events[2]["panels"][0]["chosen"]["kind"] == "table" and events[3]["stage"] == "jev"
 
 
+def test_pipeline_exception_is_reported_as_jev_stage_error(db):
+    class Raising(DemoBackend):
+        async def judge(self, state, questions):
+            raise RuntimeError("boom")
+
+    events = run(TestClient(create_app(db, Raising())), TREND + " VISUALIZE 'x'")
+    assert [e["type"] for e in events] == ["parsed", "result", "error"]
+    assert events[2]["stage"] == "jev" and events[2]["message"] == "RuntimeError: boom"
+
+
 def test_dates_are_json_serialised(db):
     events = run(TestClient(create_app(db, DemoBackend())), "SELECT order_date FROM orders LIMIT 1")
     assert isinstance(events[1]["rows"][0]["order_date"], str)

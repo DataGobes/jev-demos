@@ -74,7 +74,14 @@ def create_app(db_path: Path | str, backend: Backend | None = None, cache_path: 
                          "truncated": result.truncated, "ms": {"query": round((time.perf_counter() - t0) * 1000, 1)}})
             if intents is None:
                 return
-            out = await visualize(sql, result, intents, judge, cache, max_questions)
+            try:
+                out = await visualize(sql, result, intents, judge, cache, max_questions)
+            except Exception as exc:  # noqa: BLE001 - any pipeline failure must become an error event, not a silently truncated stream
+                # The result event has already been sent, so the table stays on
+                # screen (F4): an unguarded pipeline exception must not silently
+                # truncate the NDJSON stream with no error event.
+                yield _line({"type": "error", "stage": "jev", "message": f"{type(exc).__name__}: {exc}"})
+                return
             yield _line({"type": "spec", "spec": out.spec, "panels": out.panels, "ms": out.ms,
                          "usage": {"input_tokens": out.input_tokens, "usd": out.usd},
                          "scored": out.scored, "cache": out.cache, "simulated": out.simulated})
