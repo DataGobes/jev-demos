@@ -7,9 +7,9 @@ from typing import Literal
 
 from jevviz.types import Answer, Candidate
 
-STRONG = 0.6     # placeholder — tune on the golden set (Task 10)
-WEAK = 0.3       # placeholder — tune on the golden set (Task 10)
-ID_NOUL = 0.5    # placeholder — tune on the golden set (Task 10)
+STRONG = 0.6     # confirmed on the seed golden set, see docs/eval-results.md
+WEAK = 0.3       # spec default; not exercised by the seed golden set
+ID_NOUL = 0.5    # confirmed on the seed golden set, see docs/eval-results.md
 
 
 def rank_key(answer: Answer) -> float:
