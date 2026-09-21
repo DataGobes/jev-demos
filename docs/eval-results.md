@@ -59,3 +59,45 @@ Rank key `P(level ≥ 2)` across all 10 cases:
 | `WEAK` | 0.3 (unchanged) | no case in the seed set exercises the weak/none boundary; keep the spec default |
 
 Ten cases are too few to justify moving any threshold; the defaults are consistent with the data. Revisit after the golden set is extended.
+
+---
+
+## Run 2 — golden set extended to 20 cases (2026-09-21)
+
+The owner asked for the set to be extended to 20; the 10 added cases were drafted by Claude, not by the owner (they are marked in `golden.toml`). They target what the seed set lacked: the same SQL under different intents (`region_trend` / `region_total` / `region_share` / `latam_vague`; `channel_growth` / `channel_biggest`; `margin_problem` / `category_revenue_compare`), trap columns (`signup_year`, `rating`), and vague phrasing. Every added case was checked offline to be reachable (at least one enumerated candidate satisfies its `accept`).
+
+```
+backend=jev-latest simulated=False
+✓ region_trend                 chose=multi_line   p=1.00 top3=True baseline=False
+✓ declining_region             chose=multi_line   p=1.00 top3=True baseline=False
+✓ seasonality                  chose=line         p=0.99 top3=True baseline=True
+✓ top_categories               chose=bar          p=1.00 top3=True baseline=True
+✓ channel_share                chose=pie          p=0.98 top3=True baseline=True
+✓ price_vs_rating              chose=scatter      p=0.98 top3=True baseline=False
+✓ order_value_distribution     chose=histogram    p=0.99 top3=True baseline=True
+✓ region_channel_mix           chose=grouped_bar  p=0.99 top3=True baseline=False
+✓ margin_problem               chose=bar          p=0.99 top3=True baseline=False
+✗ identifier_trap              chose=pie          p=0.89 top3=True baseline=False
+✓ region_total                 chose=bar          p=0.97 top3=True baseline=False
+✓ region_share                 chose=pie          p=0.95 top3=True baseline=False
+✓ latam_vague                  chose=multi_line   p=0.95 top3=True baseline=False
+✓ signup_trend                 chose=line         p=0.96 top3=True baseline=True
+✓ price_by_rating              chose=bar          p=1.00 top3=True baseline=True
+✓ category_revenue_compare     chose=bar          p=1.00 top3=True baseline=True
+✓ channel_growth               chose=multi_line   p=0.99 top3=True baseline=False
+✓ channel_biggest              chose=pie          p=0.99 top3=True baseline=False
+✓ segment_country_mix          chose=stacked_bar  p=0.99 top3=True baseline=False
+✓ order_size_profit            chose=scatter      p=1.00 top3=True baseline=False
+
+Jev top-1 95% · top-3 100% · rules-only top-1 35%
+```
+
+**Gate 2: PASS**, +60 percentage points. The one query asked four ways (`order_month, region, revenue`) got four different, correct charts: multi-line for the trend and the vague LATAM question, bar for "sold the most", pie for "share".
+
+Caveats, stated plainly:
+- The only miss is again `identifier_trap` (pie of revenue by segment over the accepted bar of the same columns) — a form preference, not a relevance or identifier error.
+- `region_channel_mix` flipped from ✗ (run 1) to ✓ here with no code change: near-tie scores move ~0.01 between live runs.
+- The rules-only baseline is "first candidate in pre-rank order". Because `rules/advanced.py` registers before `rules/basic.py`, position ties go to `histogram`, so for a `month, region, revenue` result the baseline's pick is a histogram of revenue. That makes the baseline weak on exactly the multi-intent cases; the margin against a smarter hand-written heuristic would be smaller.
+- 20 cases, half of them written by the same model family's assistant that built the system. Treat 95% as "the approach works", not as a benchmark number.
+
+Thresholds unchanged (`STRONG` 0.6, `WEAK` 0.3, `ID_NOUL` 0.5): the lowest accepted top pick in this run is 0.95.

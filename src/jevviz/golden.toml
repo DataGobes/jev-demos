@@ -47,3 +47,55 @@ accept = ["bar:category+profit"]
 sql = "SELECT segment, customer_id, sum(revenue) AS revenue FROM orders JOIN customers USING (customer_id) GROUP BY ALL LIMIT 2000"
 intent = "which customer segment spends the most"
 accept = ["bar:segment+revenue"]
+
+# --- extension (2026-09-21): same SQL under different intents, trap columns, vague phrasing ---
+
+[region_total]
+sql = "SELECT date_trunc('month', order_date) AS order_month, region, sum(revenue) AS revenue FROM orders GROUP BY ALL"
+intent = "which region sold the most overall"
+accept = ["bar:region+revenue"]
+
+[region_share]
+sql = "SELECT date_trunc('month', order_date) AS order_month, region, sum(revenue) AS revenue FROM orders GROUP BY ALL"
+intent = "what share of total revenue does each region have"
+accept = ["pie:region+revenue", "bar:region+revenue"]
+
+[latam_vague]
+sql = "SELECT date_trunc('month', order_date) AS order_month, region, sum(revenue) AS revenue FROM orders GROUP BY ALL"
+intent = "anything unusual happening in LATAM lately"
+accept = ["multi_line:region+revenue"]
+
+[signup_trend]
+sql = "SELECT signup_year, count(*) AS customers FROM customers GROUP BY ALL"
+intent = "how has the number of new customers changed over the years"
+accept = ["line:signup_year+customers"]
+
+[price_by_rating]
+sql = "SELECT rating, avg(price) AS avg_price FROM products GROUP BY ALL"
+intent = "how does the average price differ between rating levels"
+accept = ["bar:rating+avg_price"]
+
+[category_revenue_compare]
+sql = "SELECT category, sum(revenue) AS revenue, sum(profit) AS profit FROM orders JOIN products USING (product_id) GROUP BY ALL"
+intent = "how does revenue compare across categories"
+accept = ["bar:category+revenue"]
+
+[channel_growth]
+sql = "SELECT date_trunc('month', order_date) AS order_month, channel, sum(revenue) AS revenue FROM orders GROUP BY ALL"
+intent = "is the web channel growing faster than stores"
+accept = ["multi_line:channel+revenue"]
+
+[channel_biggest]
+sql = "SELECT date_trunc('month', order_date) AS order_month, channel, sum(revenue) AS revenue FROM orders GROUP BY ALL"
+intent = "which channel is biggest overall"
+accept = ["bar:channel+revenue", "pie:channel+revenue"]
+
+[segment_country_mix]
+sql = "SELECT country, segment, count(*) AS customers FROM customers GROUP BY ALL"
+intent = "how do customer segments break down within each country"
+accept = ["stacked_bar:country+segment+customers", "grouped_bar:country+segment+customers"]
+
+[order_size_profit]
+sql = "SELECT revenue, profit FROM orders LIMIT 3000"
+intent = "do bigger orders make more profit"
+accept = ["scatter:revenue+profit"]
