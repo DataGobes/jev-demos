@@ -31,12 +31,14 @@ def _line(event: dict) -> bytes:
 
 
 @cache
-def _connection(db_path: str):
+def _connection(resolved_db_path: str):
     # DuckDB caches instances by file path within a process, so re-opening the
     # same file (e.g. multiple `create_app` calls against one db in tests)
-    # fails on the second `SET lock_configuration`. Cache by path so repeated
-    # `create_app` calls for the same file share one connection.
-    return open_db(db_path)
+    # fails on the second `SET lock_configuration`. Cache by resolved path so
+    # repeated `create_app` calls for the same file, spelled differently
+    # (relative vs. absolute, redundant `.`/`..` components), share one
+    # connection instead of racing to open the file twice.
+    return open_db(resolved_db_path)
 
 
 def create_app(db_path: Path | str, backend: Backend | None = None, cache_path: Path | str | None = None,
@@ -44,7 +46,7 @@ def create_app(db_path: Path | str, backend: Backend | None = None, cache_path: 
     app = FastAPI(title="jevviz")
     app.add_middleware(CORSMiddleware, allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
                        allow_methods=["POST", "GET"], allow_headers=["*"])
-    con = _connection(str(db_path))
+    con = _connection(str(Path(db_path).resolve()))
     judge = backend or make_backend()
     cache = Cache(cache_path) if cache_path else None
 

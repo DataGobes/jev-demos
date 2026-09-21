@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -63,3 +64,21 @@ def test_viz_failure_keeps_the_data(db):
 def test_dates_are_json_serialised(db):
     events = run(TestClient(create_app(db, DemoBackend())), "SELECT order_date FROM orders LIMIT 1")
     assert isinstance(events[1]["rows"][0]["order_date"], str)
+
+
+def test_duplicate_result_columns_are_unique_and_keep_all_values(db):
+    events = run(TestClient(create_app(db, DemoBackend())), "SELECT 1 AS id, 2 AS id")
+    result = events[1]
+    assert len(result["columns"]) == len(set(result["columns"])) == 2
+    assert sorted(result["rows"][0].values()) == [1, 2]
+
+
+def test_connection_is_shared_across_path_spellings(db):
+    abs_path = str(db.resolve())
+    alt_path = str(db.parent) + "/./" + db.name
+
+    run(TestClient(create_app(abs_path, DemoBackend())), "SELECT 1 AS x")
+    events = run(TestClient(create_app(alt_path, DemoBackend())), "SELECT 1 AS x")
+
+    assert [e["type"] for e in events] == ["parsed", "result"]
+    assert Path(alt_path).resolve() == Path(abs_path).resolve()

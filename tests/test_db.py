@@ -40,3 +40,9 @@ def test_query_times_out(con):
             timeout_s=0.2,
         )
     assert "timed out after 0.2" in str(excinfo.value)
+
+
+def test_duplicate_column_names_are_made_unique(con):
+    r = run_query(con, "SELECT 1 AS id, 2 AS id, 3 AS id")
+    assert len(r.columns) == len(set(r.columns)) == 3
+    assert r.rows == [(1, 2, 3)]

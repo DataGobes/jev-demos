@@ -28,6 +28,28 @@ def open_db(path: Path | str) -> duckdb.DuckDBPyConnection:
     return con
 
 
+def _dedupe_columns(names: list[str]) -> list[str]:
+    """Make column names unique: the first occurrence of a name keeps it; each
+    later duplicate gets an incrementing `_2`, `_3`, ... suffix, skipping any
+    suffix that would itself collide with another column name."""
+    used = set(names)
+    counts: dict[str, int] = {}
+    out: list[str] = []
+    for name in names:
+        counts[name] = counts.get(name, 0) + 1
+        if counts[name] == 1:
+            out.append(name)
+            continue
+        n = counts[name]
+        candidate = f"{name}_{n}"
+        while candidate in used:
+            n += 1
+            candidate = f"{name}_{n}"
+        used.add(candidate)
+        out.append(candidate)
+    return out
+
+
 def _execute_with_timeout(cur: duckdb.DuckDBPyConnection, sql: str, timeout_s: float) -> None:
     timer = threading.Timer(timeout_s, cur.interrupt)
     timer.start()
@@ -47,7 +69,7 @@ def run_query(con: duckdb.DuckDBPyConnection, sql: str, row_cap: int = 5000, tim
         _execute_with_timeout(cur, sql, timeout_s)
         if cur.description is None:
             raise QueryError("statement returned no result set")
-        columns = [d[0] for d in cur.description]
+        columns = _dedupe_columns([d[0] for d in cur.description])
         types = [str(d[1]) for d in cur.description]
         rows = cur.fetchmany(row_cap + 1)
         truncated = len(rows) > row_cap
