@@ -7,21 +7,15 @@ import { registry } from "./registry";
 import { PanelActionsContext, RowsContext } from "./rows";
 import { runQuery } from "./stream";
 import { TimingBar } from "./TimingBar";
+import { useRun } from "./useRun";
 
 export default function App() {
   const [sql, setSql] = useState(EXAMPLES[0].sql);
   const [s, dispatch] = useReducer(reduce, initialState);
-
-  const run = useCallback(async () => {
-    dispatch({ type: "start" });
-    try {
-      for await (const event of runQuery(sql)) dispatch({ type: "event", event });
-    } catch (err) {
-      dispatch({ type: "event", event: { type: "error", stage: "network", message: String(err) } });
-    } finally {
-      dispatch({ type: "done" });
-    }
-  }, [sql]);
+  const runSql = useRun(dispatch, runQuery);
+  // A newer run always supersedes an in-flight older one (useRun aborts it),
+  // so this is safe to call unconditionally from both the button and ⌘↵.
+  const run = useCallback(() => runSql(sql), [runSql, sql]);
 
   useEffect(() => {
     const onRendered = (e: Event) => dispatch({ type: "rendered", ms: (e as CustomEvent<number>).detail });
