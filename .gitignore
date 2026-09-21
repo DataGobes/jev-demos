@@ -7,3 +7,4 @@ node_modules/
 *.duckdb
 .jev_cache.sqlite
 .DS_Store
+.superpowers/
