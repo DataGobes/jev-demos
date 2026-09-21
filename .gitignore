@@ -8,3 +8,7 @@ node_modules/
 .jev_cache.sqlite
 .DS_Store
 .superpowers/
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/

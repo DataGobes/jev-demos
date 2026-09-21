@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "e2e": "playwright test"
   },
   "dependencies": {
     "@codemirror/lang-sql": "^6.10.0",

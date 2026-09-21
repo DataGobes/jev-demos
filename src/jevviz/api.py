@@ -86,7 +86,8 @@ def create_app(db_path: Path | str, backend: Backend | None = None, cache_path: 
     return app
 
 
-load_dotenv()
+if not os.environ.get("DOTENV_DISABLE"):
+    load_dotenv()
 app = create_app(os.environ.get("JEVVIZ_DB", "jevviz.duckdb"), cache_path=".jev_cache.sqlite",
                  max_questions=int(os.environ.get("JEVVIZ_MAX_QUESTIONS", "72"))) \
     if Path(os.environ.get("JEVVIZ_DB", "jevviz.duckdb")).exists() else None
