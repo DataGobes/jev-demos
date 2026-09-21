@@ -1,0 +1,49 @@
+[region_trend]
+sql = "SELECT date_trunc('month', order_date) AS order_month, region, sum(revenue) AS revenue FROM orders GROUP BY ALL"
+intent = "how are regions trending"
+accept = ["multi_line:region+revenue"]
+
+[declining_region]
+sql = "SELECT date_trunc('month', order_date) AS order_month, region, sum(revenue) AS revenue FROM orders GROUP BY ALL"
+intent = "which region is losing ground over time"
+accept = ["multi_line:region+revenue"]
+
+[seasonality]
+sql = "SELECT date_trunc('month', order_date) AS order_month, sum(revenue) AS revenue FROM orders GROUP BY ALL"
+intent = "is there a seasonal peak"
+accept = ["line:revenue"]
+
+[top_categories]
+sql = "SELECT category, sum(revenue) AS revenue FROM orders JOIN products USING (product_id) GROUP BY ALL"
+intent = "which categories bring in the most money"
+accept = ["bar:category+revenue"]
+
+[channel_share]
+sql = "SELECT channel, sum(revenue) AS revenue FROM orders GROUP BY ALL"
+intent = "what share of revenue comes from each channel"
+accept = ["pie:channel+revenue", "bar:channel+revenue"]
+
+[price_vs_rating]
+sql = "SELECT price, rating, category FROM products"
+intent = "do more expensive products get better ratings"
+accept = ["scatter:price+rating"]
+
+[order_value_distribution]
+sql = "SELECT revenue FROM orders"
+intent = "how are order values distributed"
+accept = ["histogram:revenue"]
+
+[region_channel_mix]
+sql = "SELECT region, channel, sum(revenue) AS revenue FROM orders GROUP BY ALL"
+intent = "which region and channel combinations are strongest"
+accept = ["heatmap:revenue", "grouped_bar:revenue"]
+
+[margin_problem]
+sql = "SELECT category, sum(revenue) AS revenue, sum(profit) AS profit FROM orders JOIN products USING (product_id) GROUP BY ALL"
+intent = "which category earns the least profit"
+accept = ["bar:category+profit"]
+
+[identifier_trap]
+sql = "SELECT segment, customer_id, sum(revenue) AS revenue FROM orders JOIN customers USING (customer_id) GROUP BY ALL LIMIT 2000"
+intent = "which customer segment spends the most"
+accept = ["bar:segment+revenue"]
