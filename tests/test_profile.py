@@ -9,12 +9,12 @@ def result(columns, types, rows):
 
 
 def test_kinds_and_stats():
-    rows = [(date(2024, m, 1), "EMEA" if m % 2 else "APAC", float(m * 10)) for m in range(1, 13)]
+    rows = [(date(2024, m, 1), "EMEA" if m % 2 else "APAC", float(m * 10) + 0.5) for m in range(1, 13)]
     p = profile(result(["month", "region", "revenue"], ["DATE", "VARCHAR", "DOUBLE"], rows))
     month, region, revenue = p.columns
     assert month.kind == ("temporal",) and month.evenly_spaced is False  # months differ in length
     assert region.kind == ("nominal",) and region.distinct == 2 and region.samples == ("APAC", "EMEA")
-    assert revenue.kind == ("quantitative",) and revenue.min == 10.0 and revenue.max == 120.0
+    assert revenue.kind == ("quantitative",) and revenue.min == 10.5 and revenue.max == 120.5
     assert p.row_count == 12 and [c.position for c in p.columns] == [0, 1, 2]
 
 
@@ -26,6 +26,13 @@ def test_integer_year_is_temporal():
 def test_small_integer_domain_is_dual_tagged():
     p = profile(result(["rating"], ["INTEGER"], [(r,) for r in (1, 2, 3, 4, 5, 5, 4)]))
     assert p.columns[0].kind == ("nominal", "quantitative")
+
+
+def test_distinct_count_boundary_at_twelve():
+    twelve = profile(result(["v"], ["INTEGER"], [(n,) for n in range(10, 130, 10)]))  # 12 distinct
+    thirteen = profile(result(["v"], ["INTEGER"], [(n,) for n in range(10, 140, 10)]))  # 13 distinct
+    assert twelve.columns[0].kind == ("nominal", "quantitative")
+    assert thirteen.columns[0].kind == ("quantitative",)
 
 
 def test_date_strings_are_temporal_and_nulls_counted():

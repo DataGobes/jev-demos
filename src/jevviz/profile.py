@@ -37,7 +37,7 @@ def _kind(type_name: str, values: list, distinct: int) -> tuple[str, ...]:
         if share >= 0.95:
             return ("temporal",)
     if is_numeric:
-        return ("nominal", "quantitative") if is_int_like and distinct <= 10 else ("quantitative",)
+        return ("nominal", "quantitative") if is_int_like and distinct <= 12 else ("quantitative",)
     return ("nominal",)
 
 
