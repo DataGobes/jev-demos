@@ -1,5 +1,10 @@
 import { expect, test } from "@playwright/test";
 
+test("SIMULATED badge is seeded from /health on load, before any run (F3)", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.getByTestId("simulated")).toHaveText("SIMULATED");
+});
+
 test("run example: table first, then a chart, in simulated mode", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("button", { name: /Run/ }).click();

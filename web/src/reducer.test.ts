@@ -43,3 +43,14 @@ test("start clears the previous run", () => {
   expect(s.spec).toBeNull();
   expect(s.running).toBe(true);
 });
+
+test("health action seeds simulated before any spec event", () => {
+  const s = reduce(initialState, { type: "health", simulated: true });
+  expect(s.simulated).toBe(true);
+});
+
+test("start preserves simulated seeded by health", () => {
+  const seeded = reduce(initialState, { type: "health", simulated: true });
+  const s = reduce(seeded, { type: "start" });
+  expect(s.simulated).toBe(true);
+});

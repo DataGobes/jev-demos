@@ -8,7 +8,8 @@ export type AppState = {
 };
 export type Action =
   | { type: "start" } | { type: "done" } | { type: "event"; event: RunEvent }
-  | { type: "swap"; panelIndex: number; altId: string } | { type: "rendered"; ms: number };
+  | { type: "swap"; panelIndex: number; altId: string } | { type: "rendered"; ms: number }
+  | { type: "health"; simulated: boolean };
 
 export const initialState: AppState = { running: false, rows: [], spec: null, panels: [], timings: {}, usage: null,
   scored: null, cache: null, simulated: false, rowNote: null, error: null };
@@ -18,6 +19,7 @@ export function reduce(state: AppState, action: Action): AppState {
     case "start": return { ...initialState, running: true, simulated: state.simulated };
     case "done": return { ...state, running: false };
     case "rendered": return { ...state, timings: { ...state.timings, render: Math.round(action.ms) } };
+    case "health": return { ...state, simulated: action.simulated };
     case "swap": {
       const panel = state.panels[action.panelIndex];
       const alt = panel?.alternates.find((a) => a.id === action.altId);

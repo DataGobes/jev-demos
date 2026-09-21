@@ -2,6 +2,7 @@ import { ActionProvider, Renderer, StateProvider, VisibilityProvider } from "@js
 import { useCallback, useEffect, useMemo, useReducer, useState } from "react";
 import { Editor } from "./Editor";
 import { EXAMPLES } from "./examples";
+import { fetchSimulated } from "./health";
 import { initialState, reduce } from "./reducer";
 import { registry } from "./registry";
 import { PanelActionsContext, RowsContext } from "./rows";
@@ -21,6 +22,18 @@ export default function App() {
     const onRendered = (e: Event) => dispatch({ type: "rendered", ms: (e as CustomEvent<number>).detail });
     window.addEventListener("jevviz:rendered", onRendered);
     return () => window.removeEventListener("jevviz:rendered", onRendered);
+  }, []);
+
+  useEffect(() => {
+    // F3: seed the SIMULATED badge from /health on load, so it's visible
+    // before the first viz run - not only once a `spec` event arrives (demo
+    // mode otherwise shows no badge for plain-SQL runs or runs that fail
+    // before `spec`). A failed fetch (backend down) is ignored silently.
+    let cancelled = false;
+    void fetchSimulated().then((simulated) => {
+      if (!cancelled && simulated !== null) dispatch({ type: "health", simulated });
+    });
+    return () => { cancelled = true; };
   }, []);
 
   const actions = useMemo(() => ({
