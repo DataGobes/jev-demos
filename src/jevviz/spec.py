@@ -19,15 +19,6 @@ def _entry(r: Ranked) -> dict:
     return {"id": c.id, "kind": c.kind, "title": c.title, "p": round(r.p, 4), "element": _leaf(r)}
 
 
-def element_for(r: Ranked, intent: str, match: str) -> dict:
-    """A `Panel` element wrapping one inline child descriptor (its chosen leaf)."""
-    return {
-        "type": "Panel",
-        "props": {"title": r.candidate.title, "intent": intent, "p": round(r.p, 4), "match": match},
-        "children": [_leaf(r)],
-    }
-
-
 def assemble_spec(panels: list[PanelChoice]) -> dict:
     elements: dict[str, dict] = {}
     children = []

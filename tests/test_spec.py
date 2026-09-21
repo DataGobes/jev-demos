@@ -1,5 +1,5 @@
 from jevviz.rank import PanelChoice, Ranked
-from jevviz.spec import assemble_spec, element_for, panel_payload
+from jevviz.spec import assemble_spec, panel_payload
 from jevviz.types import Candidate
 
 LINE = Candidate("c01", "line", ("month", "revenue"), ("revenue",), "Revenue over Month", "d", {"mark": "line"})
@@ -29,10 +29,3 @@ def test_single_panel_grid_is_one_column_and_payload_carries_full_alternate_elem
     alt = p["alternates"][0]
     assert alt["kind"] == "kpi" and alt["p"] == 0.4 and alt["element"]["type"] == "Kpi"
     assert alt["element"]["props"] == {"label": "Total", "field": "total"}
-
-
-def test_element_for_returns_a_standalone_panel_with_an_inline_child():
-    el = element_for(Ranked(LINE, 0.82), "trend", "strong")
-    assert el["type"] == "Panel"
-    assert el["props"] == {"title": "Revenue over Month", "intent": "trend", "p": 0.82, "match": "strong"}
-    assert el["children"] == [{"type": "Chart", "props": {"vega": {"mark": "line"}}, "children": []}]
