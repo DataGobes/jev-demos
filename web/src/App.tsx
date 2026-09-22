@@ -1,5 +1,6 @@
 import { ActionProvider, Renderer, StateProvider, VisibilityProvider } from "@json-render/react";
-import { useCallback, useEffect, useMemo, useReducer, useState } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
+import { parseAutoplay, splitVisualize } from "./autoplay";
 import { Editor } from "./Editor";
 import { EXAMPLES } from "./examples";
 import { fetchSimulated } from "./health";
@@ -11,12 +12,48 @@ import { TimingBar } from "./TimingBar";
 import { useRun } from "./useRun";
 
 export default function App() {
-  const [sql, setSql] = useState(EXAMPLES[0].sql);
+  const auto = useMemo(() => parseAutoplay(window.location.search), []);
+  const [exampleIndex, setExampleIndex] = useState(0);
+  // Autoplay opens on a blank editor so a recording can start on a clean frame.
+  const [sql, setSql] = useState(auto ? "" : EXAMPLES[0].sql);
   const [s, dispatch] = useReducer(reduce, initialState);
   const runSql = useRun(dispatch, runQuery);
   // A newer run always supersedes an in-flight older one (useRun aborts it),
   // so this is safe to call unconditionally from both the button and ⌘↵.
   const run = useCallback(() => runSql(sql), [runSql, sql]);
+  const pickExample = (i: number) => { setExampleIndex(i); setSql(EXAMPLES[i].sql); };
+
+  // The sequencer reads panel count for the dwell; a ref avoids a stale closure.
+  const panelCount = useRef(0);
+  panelCount.current = s.panels.length;
+
+  useEffect(() => {
+    if (!auto) return;
+    document.documentElement.style.setProperty("zoom", String(auto.scale));
+    const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+    // Subscribed *before* run() so a warm-cache chart (paints in ~50ms) can't be missed.
+    const painted = () => new Promise<void>((r) => window.addEventListener("jevviz:rendered", () => r(), { once: true }));
+    const loop = EXAMPLES.filter((e) => !e.skipInLoop);
+    let cancelled = false;
+    void (async () => {
+      await sleep(auto.lead);
+      for (let n = 0; !cancelled; n++) {
+        const ex = loop[n % loop.length];
+        const { head, tail } = splitVisualize(ex.sql);
+        setExampleIndex(EXAMPLES.indexOf(ex));
+        setSql(head);
+        await sleep(auto.pause);
+        for (let i = 1; i <= tail.length && !cancelled; i++) { setSql(head + tail.slice(0, i)); await sleep(auto.type); }
+        if (cancelled) return;
+        const done = painted();
+        runSql(ex.sql);
+        // 8s ceiling only matters if a run errors and nothing ever paints.
+        await Promise.race([done, sleep(8000)]);
+        await sleep(auto.dwell + Math.max(0, panelCount.current - 1) * auto.extra);
+      }
+    })();
+    return () => { cancelled = true; document.documentElement.style.removeProperty("zoom"); };
+  }, [auto, runSql]);
 
   useEffect(() => {
     const onRendered = (e: Event) => dispatch({ type: "rendered", ms: (e as CustomEvent<number>).detail });
@@ -46,12 +83,12 @@ export default function App() {
       <header>
         <div className="controls">
           <h1>Jev <code>VISUALIZE</code></h1>
-          <select aria-label="examples" onChange={(e) => setSql(EXAMPLES[Number(e.target.value)].sql)}>
+          <select aria-label="examples" value={exampleIndex} onChange={(e) => pickExample(Number(e.target.value))}>
             {EXAMPLES.map((ex, i) => <option key={ex.label} value={i}>{ex.label}</option>)}
           </select>
           <button className="run" onClick={run} disabled={s.running}>{s.running ? "Running…" : "Run ⌘↵"}</button>
         </div>
-        <Editor value={sql} onChange={setSql} onRun={run} />
+        <Editor value={sql} onChange={setSql} onRun={run} autoFocus={!!auto} />
         {s.error && <p className={`error stage-${s.error.stage}`} role="alert">{s.error.stage}: {s.error.message}</p>}
       </header>
       <main>

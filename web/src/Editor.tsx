@@ -12,7 +12,7 @@ const visualizeKeyword = ViewPlugin.fromClass(class {
   update(u: ViewUpdate) { this.decorations = matcher.updateDeco(u, this.decorations); }
 }, { decorations: (v) => v.decorations });
 
-export function Editor({ value, onChange, onRun }: { value: string; onChange: (v: string) => void; onRun: () => void }) {
+export function Editor({ value, onChange, onRun, autoFocus }: { value: string; onChange: (v: string) => void; onRun: () => void; autoFocus?: boolean }) {
   const host = useRef<HTMLDivElement>(null);
   const view = useRef<EditorView | null>(null);
   const run = useRef(onRun); run.current = onRun;
@@ -28,13 +28,24 @@ export function Editor({ value, onChange, onRun }: { value: string; onChange: (v
       EditorView.lineWrapping,
       EditorView.updateListener.of((u) => { if (u.docChanged) change.current(u.state.doc.toString()); }),
     ] }) });
+    if (autoFocus) view.current.focus();
     return () => view.current?.destroy();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
     const v = view.current;
-    if (v && v.state.doc.toString() !== value) v.dispatch({ changes: { from: 0, to: v.state.doc.length, insert: value } });
+    if (!v) return;
+    const cur = v.state.doc.toString();
+    if (cur === value) return;
+    if (value.startsWith(cur)) {
+      // The new value extends the current text (autoplay typing): insert only the
+      // delta and keep the caret at the end, so it reads as typing rather than as a
+      // whole-document replace with the caret stranded at the top.
+      v.dispatch({ changes: { from: cur.length, insert: value.slice(cur.length) }, selection: { anchor: value.length }, scrollIntoView: true });
+    } else {
+      v.dispatch({ changes: { from: 0, to: cur.length, insert: value } });
+    }
   }, [value]);
 
   return <div ref={host} className="editor" />;

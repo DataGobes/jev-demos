@@ -8,6 +8,7 @@ Jev VISUALIZE demo: a SQL `VISUALIZE '<intent>'` clause where TypeSafe's Jev mod
 - Frontend: `cd web && npm install && npm run dev`
 - Tests: `uv run pytest -q` · `uv run ruff check` · `cd web && npx vitest run` · `cd web && npm run e2e`
 - Live eval (needs key): `uv run python -m jevviz.eval jevviz.duckdb`
+- Recording, unattended: open `http://localhost:5173/?autoplay&scale=1.25` — pastes each example, types its `VISUALIZE` line, runs, dwells, loops; one cycle is ~43 s warm / ~48 s cold. Delete `.jev_cache.sqlite` first so the timing bar shows real Jev latency instead of `cache: hit`. Params `type`, `pause`, `dwell`, `extra`, `lead`, `scale` (see `web/src/autoplay.ts`); `skipInLoop` in `examples.ts` keeps an example out.
 
 ## Rules
 - Never read, print or log `.env` or `TYPESAFE_API_KEY`. The key stays server-side.
