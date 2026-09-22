@@ -81,3 +81,28 @@ def test_cap_and_per_rule_limit():
     assert sum(c.kind not in ("table", "kpi") for c in cands) <= 24
     assert sum(c.kind == "bar" for c in cands) <= 4
     assert next(c for c in cands if c.kind == "bar").columns == ("d0", "m0")   # SELECT order wins
+
+
+def test_pie_aggregates_theta_into_one_arc_per_slice():
+    """Without an aggregate, Vega-Lite stacks `theta` and draws one arc *per row*,
+    which only looks like a pie because the per-row arcs sit flush against each
+    other. The totals are right either way, so this is invisible until something
+    strokes or hit-tests a slice - then a 3-channel pie over 72 rows turns into 72
+    slivers. Aggregating makes the mark count match the slice count."""
+    cands, _ = enumerate_candidates(
+        make_profile(row_count=72, month=("t", 24), channel=("n", 3), revenue=("q", 70, 0.0, 9.0))
+    )
+    pie = next(c for c in cands if c.kind == "pie")
+    assert pie.vega["encoding"]["theta"]["aggregate"] == "sum"
+
+
+def test_bar_aggregates_the_measure_into_one_rect_per_category():
+    """Same defect as the pie: unaggregated, Vega-Lite stacks `y` and emits one
+    rect per row, so a 2000-row result draws 2000 one-pixel segments per column
+    and the bar renders visibly hatched. Aggregating also makes the `-y`/`-x`
+    sort meaningful, since there is now a single value per category to sort by."""
+    cands, _ = enumerate_candidates(
+        make_profile(row_count=2000, segment=("n", 3), revenue=("q", 1800, 0.0, 9.0))
+    )
+    bar = next(c for c in cands if c.kind == "bar")
+    assert bar.vega["encoding"]["y"]["aggregate"] == "sum"

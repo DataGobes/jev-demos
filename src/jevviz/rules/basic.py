@@ -37,11 +37,21 @@ def bar(p: Profile) -> list[Candidate]:
     for n, q in product(p.by_kind("nominal"), p.by_kind("quantitative")):
         if n.name == q.name or n.distinct > 30:
             continue
-        cat, val = enc(n.name, "nominal", sort="-x" if n.distinct > 8 else "-y"), enc(q.name, "quantitative")
+        # Aggregated for the same reason as `pie`: unaggregated, Vega-Lite stacks the
+        # value channel and emits one rect per row, so a 2000-row result renders each
+        # bar as thousands of hairline segments. It also gives the `-x`/`-y` sort a
+        # single value per category to order by.
+        cat = enc(n.name, "nominal", sort="-x" if n.distinct > 8 else "-y")
+        val = enc(q.name, "quantitative", aggregate="sum")
         encoding = {"y": cat, "x": val} if n.distinct > 8 else {"x": cat, "y": val}
         out.append(_c("bar", [n.name, q.name], [q.name], f"{humanise(q.name)} by {humanise(n.name)}",
+                      # MODEL-FACING. `bar` and `pie` both used to say they "compare categories",
+                      # which is why Jev rated them within 0.01 on ranking intents and often
+                      # picked the pie. These two descriptions are now split along the axis that
+                      # actually separates them: ranking (bar) vs share of a whole (pie).
                       f"Bar chart of `{q.name}` for each `{n.name}`, sorted from largest to smallest. "
-                      f"Shows which {humanise(n.name).lower()} values are highest and lowest and lets them be compared.",
+                      f"Ranks the {humanise(n.name).lower()} values against a common axis, so which is "
+                      f"highest, which is lowest, and how far apart they are can all be read off directly.",
                       vl("bar", encoding)))
     return out
 
@@ -53,10 +63,17 @@ def pie(p: Profile) -> list[Candidate]:
         if n.name == q.name or n.distinct > 6 or q.min is None or q.min < 0:
             continue
         out.append(_c("pie", [n.name, q.name], [q.name], f"Share of {humanise(q.name)} by {humanise(n.name)}",
+                      # MODEL-FACING - see the note on `bar`.
                       f"Pie chart of `{q.name}` split by `{n.name}`. "
-                      f"Shows each {humanise(n.name).lower()}'s share of the whole, as a proportion.",
+                      f"Shows how the total divides up: what share of the whole each "
+                      f"{humanise(n.name).lower()} accounts for. Slices are judged by angle, so "
+                      f"values that are close together cannot be put in order by eye.",
                       vl({"type": "arc", "innerRadius": 50},
-                         {"theta": enc(q.name, "quantitative"), "color": enc(n.name, "nominal")})))
+                         # Aggregated so each slice is one arc. Unaggregated, Vega-Lite
+                         # stacks `theta` and emits one arc per row, which merely groups
+                         # by colour - the totals look right until a stroke or a hover
+                         # reveals the per-row slivers underneath.
+                         {"theta": enc(q.name, "quantitative", aggregate="sum"), "color": enc(n.name, "nominal")})))
     return out
 
 

@@ -23,10 +23,20 @@ def _two_dims(p: Profile):
 def grouped_bar(p: Profile) -> list[Candidate]:
     return [_c("grouped_bar", [a.name, b.name, q.name], [q.name],
                f"{humanise(q.name)} by {humanise(a.name)} and {humanise(b.name)}",
+               # MODEL-FACING. `stacked_bar` and `grouped_bar` both used to say they show one
+               # measure broken down by two dimensions, leaving them within 0.01 of each other
+               # (and of `heatmap`) on every two-dimension intent. They are now split on what
+               # the reader can actually do: compare individual values (grouped, common
+               # baseline) vs read category totals (stacked, only the bottom segment is
+               # baselined). Same perceptual asymmetry that separates `bar` from `pie`.
                f"Grouped bar chart of `{q.name}` for each `{a.name}`, with side-by-side bars per `{b.name}`. "
-               f"Shows how {humanise(b.name).lower()} values compare within each {humanise(a.name).lower()}.",
+               f"Every bar starts at the same axis, so any {humanise(b.name).lower()} value can be compared "
+               f"with any other, within one {humanise(a.name).lower()} or across them. Does not show "
+               f"{humanise(a.name).lower()} totals.",
+               # One rect per (category, group), not one per row - see `bar` and `pie`.
+               # `stacked_bar` below already aggregates; this keeps the pair consistent.
                vl("bar", {"x": enc(a.name, "nominal"), "xOffset": {"field": b.name, "type": "nominal"},
-                          "y": enc(q.name, "quantitative"), "color": enc(b.name, "nominal")}))
+                          "y": enc(q.name, "quantitative", aggregate="sum"), "color": enc(b.name, "nominal")}))
             for a, b, q in _two_dims(p) if a.distinct <= 30 and b.distinct <= 6]
 
 
@@ -34,8 +44,16 @@ def grouped_bar(p: Profile) -> list[Candidate]:
 def stacked_bar(p: Profile) -> list[Candidate]:
     return [_c("stacked_bar", [a.name, b.name, q.name], [q.name],
                f"{humanise(q.name)} by {humanise(a.name)}, stacked by {humanise(b.name)}",
+               # MODEL-FACING - see the note on `grouped_bar`.
+               # Leads with what it is FOR. Run 6 closed on the baseline caveat and Run 7 showed
+               # the cost: on a pure composition intent the caveat out-worked the claim and the
+               # stacked bar fell out of the top 3. The caveat is now a trailing qualifier.
                f"Stacked bar chart of `{q.name}` for each `{a.name}`, stacked by `{b.name}`. "
-               f"Shows each {humanise(a.name).lower()}'s total and how much each {humanise(b.name).lower()} contributes to it.",
+               f"The chart for composition: how each {humanise(a.name).lower()}'s total breaks down, what "
+               f"mix of {humanise(b.name).lower()} makes it up, and how that mix and total differ from one "
+               f"{humanise(a.name).lower()} to the next. Less exact for comparing a single "
+               f"{humanise(b.name).lower()}'s values across {humanise(a.name).lower()}, since only the "
+               f"bottom segment starts at the axis.",
                vl("bar", {"x": enc(a.name, "nominal"), "y": enc(q.name, "quantitative", aggregate="sum"),
                           "color": enc(b.name, "nominal")}))
             for a, b, q in _two_dims(p) if a.distinct <= 30 and b.distinct <= 6 and (q.min is None or q.min >= 0)]
@@ -51,8 +69,12 @@ def heatmap(p: Profile) -> list[Candidate]:
         seen.add(key)
         out.append(_c("heatmap", [a.name, b.name, q.name], [q.name],
                       f"{humanise(q.name)} by {humanise(a.name)} and {humanise(b.name)}",
+                      # MODEL-FACING. The last of the two-dimension trio to say what it cannot do;
+                      # until it did, it absorbed composition intents the other two had disclaimed.
                       f"Heatmap of `{q.name}` with `{a.name}` across and `{b.name}` down, darker cells meaning higher values. "
-                      "Shows which combinations of the two are strongest and weakest.",
+                      f"Shows which combinations of the two are strongest and weakest across the whole grid. "
+                      f"Reads each cell's level only: no totals per {humanise(a.name).lower()} or per "
+                      f"{humanise(b.name).lower()}, and nothing about how a total is made up.",
                       vl("rect", {"x": enc(a.name, "nominal"), "y": enc(b.name, "nominal"),
                                   "color": enc(q.name, "quantitative", aggregate="sum")})))
     return out

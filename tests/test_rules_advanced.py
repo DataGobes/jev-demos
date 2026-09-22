@@ -26,3 +26,13 @@ def test_histogram_needs_volume_and_spread():
     assert "histogram" in kinds(make_profile(row_count=500, revenue=("q", 400, 0.0, 9.0)))
     assert "histogram" not in kinds(make_profile(row_count=500, rating=("nq", 5, 1, 5)))
     assert "histogram" not in kinds(make_profile(row_count=20, revenue=("q", 20, 0.0, 9.0)))
+
+
+def test_grouped_bar_aggregates_the_measure():
+    """As for `bar` and `pie`: one rect per (category, group), not one per row.
+    `stacked_bar` already aggregates; this keeps the pair consistent."""
+    cands, _ = enumerate_candidates(
+        make_profile(row_count=900, region=("n", 5), channel=("n", 3), revenue=("q", 800, 0.0, 9.0))
+    )
+    gb = next(c for c in cands if c.kind == "grouped_bar")
+    assert gb.vega["encoding"]["y"]["aggregate"] == "sum"

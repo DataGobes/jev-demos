@@ -44,7 +44,7 @@ intent = "which category earns the least profit"
 accept = ["bar:category+profit"]
 
 [identifier_trap]
-sql = "SELECT segment, customer_id, sum(revenue) AS revenue FROM orders JOIN customers USING (customer_id) GROUP BY ALL LIMIT 2000"
+sql = "SELECT segment, customer_id, sum(revenue) AS revenue FROM orders JOIN customers USING (customer_id) GROUP BY ALL"
 intent = "which customer segment spends the most"
 accept = ["bar:segment+revenue"]
 
@@ -96,6 +96,63 @@ intent = "how do customer segments break down within each country"
 accept = ["stacked_bar:country+segment+customers", "grouped_bar:country+segment+customers"]
 
 [order_size_profit]
-sql = "SELECT revenue, profit FROM orders LIMIT 3000"
+sql = "SELECT revenue, profit FROM orders"
 intent = "do bigger orders make more profit"
+accept = ["scatter:revenue+profit"]
+
+# --- extension (2026-09-22): 20 -> 30. Drafted by Claude, not the owner. Targets what the
+# 20-case set never exercised: the kpi path (none at all), a count-based line, a second
+# histogram, a numeric-guard trap (pie blocked by negative values despite "share" phrasing),
+# a larger grid for heatmap, a composition intent for stacked_bar, and scatter/ranking with
+# distractor columns. Every case was checked offline to be reachable before the first run.
+
+[total_revenue_kpi]
+sql = "SELECT sum(revenue) AS revenue, count(*) AS orders FROM orders"
+intent = "how much revenue have we made in total"
+accept = ["kpi:revenue"]
+
+[order_count_kpi]
+sql = "SELECT sum(revenue) AS revenue, count(*) AS orders FROM orders"
+intent = "how many orders have we had"
+accept = ["kpi:orders"]
+
+[price_distribution]
+sql = "SELECT price, rating FROM products"
+intent = "what price range do most products fall in"
+accept = ["histogram:price"]
+
+[orders_per_month]
+sql = "SELECT date_trunc('month', order_date) AS order_month, count(*) AS orders, sum(revenue) AS revenue FROM orders GROUP BY ALL"
+intent = "are we getting more orders each month"
+accept = ["line:orders"]
+
+[region_category_grid]
+sql = "SELECT region, category, sum(revenue) AS revenue FROM orders JOIN products USING (product_id) GROUP BY ALL"
+intent = "is there a region where one product category dominates"
+# Widened after Run 8: "dominates" is a composition read as much as a cell read, so the stacked form is a fair answer.
+accept = ["heatmap:revenue", "grouped_bar:revenue", "stacked_bar:region+category+revenue"]
+
+[category_channel_mix]
+sql = "SELECT category, channel, sum(revenue) AS revenue FROM orders JOIN products USING (product_id) GROUP BY ALL"
+intent = "what is the channel mix within each category"
+accept = ["stacked_bar:category+channel+revenue"]
+
+[negative_profit_trap]
+sql = "SELECT channel, profit FROM orders"
+intent = "what share of profit comes from each channel"
+accept = ["bar:channel+profit"]
+
+[country_ranking]
+sql = "SELECT country, sum(revenue) AS revenue, count(*) AS orders FROM orders JOIN customers USING (customer_id) GROUP BY ALL"
+intent = "rank the countries by revenue"
+accept = ["bar:country+revenue"]
+
+[segment_growth]
+sql = "SELECT signup_year, segment, count(*) AS customers FROM customers GROUP BY ALL"
+intent = "is one segment growing faster than the others"
+accept = ["multi_line:segment+customers"]
+
+[profit_vs_revenue_by_channel]
+sql = "SELECT revenue, profit, channel FROM orders"
+intent = "is the link between order size and profit the same in every channel"
 accept = ["scatter:revenue+profit"]
