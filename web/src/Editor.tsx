@@ -2,6 +2,7 @@ import { sql } from "@codemirror/lang-sql";
 import { EditorState } from "@codemirror/state";
 import { Decoration, EditorView, MatchDecorator, ViewPlugin, keymap, type DecorationSet, type ViewUpdate } from "@codemirror/view";
 import { basicSetup } from "codemirror";
+import { editorTheme, sqlHighlight } from "./editor-theme";
 import { useEffect, useRef } from "react";
 
 const matcher = new MatchDecorator({ regexp: /\bVISUALIZE\b/gi, decoration: Decoration.mark({ class: "cm-visualize" }) });
@@ -20,7 +21,11 @@ export function Editor({ value, onChange, onRun }: { value: string; onChange: (v
   useEffect(() => {
     view.current = new EditorView({ parent: host.current!, state: EditorState.create({ doc: value, extensions: [
       keymap.of([{ key: "Mod-Enter", run: () => { run.current(); return true; } }]),
-      basicSetup, sql(), visualizeKeyword,
+      basicSetup, sql(), visualizeKeyword, editorTheme, sqlHighlight,
+      // The VISUALIZE clause is the point of the demo, so no line may ever be
+      // clipped - full width fixes today's overflow, wrapping keeps it fixed on
+      // a narrower window or a projector.
+      EditorView.lineWrapping,
       EditorView.updateListener.of((u) => { if (u.docChanged) change.current(u.state.doc.toString()); }),
     ] }) });
     return () => view.current?.destroy();

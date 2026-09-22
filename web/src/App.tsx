@@ -43,17 +43,17 @@ export default function App() {
 
   return (
     <div className="app">
-      <aside>
-        <h1>Jev <code>VISUALIZE</code></h1>
-        <Editor value={sql} onChange={setSql} onRun={run} />
+      <header>
         <div className="controls">
+          <h1>Jev <code>VISUALIZE</code></h1>
           <select aria-label="examples" onChange={(e) => setSql(EXAMPLES[Number(e.target.value)].sql)}>
             {EXAMPLES.map((ex, i) => <option key={ex.label} value={i}>{ex.label}</option>)}
           </select>
-          <button onClick={run} disabled={s.running}>{s.running ? "Running…" : "Run ⌘↵"}</button>
+          <button className="run" onClick={run} disabled={s.running}>{s.running ? "Running…" : "Run ⌘↵"}</button>
         </div>
+        <Editor value={sql} onChange={setSql} onRun={run} />
         {s.error && <p className={`error stage-${s.error.stage}`} role="alert">{s.error.stage}: {s.error.message}</p>}
-      </aside>
+      </header>
       <main>
         {s.spec ? (
           <RowsContext.Provider value={s.rows}>

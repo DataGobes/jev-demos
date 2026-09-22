@@ -1,6 +1,7 @@
 import { useContext, useEffect, useRef, useState } from "react";
 import embed from "vega-embed";
 import { RowsContext } from "../rows";
+import { vegaTheme } from "../theme";
 
 export function Chart({ vega }: { vega: Record<string, unknown> }) {
   const rows = useContext(RowsContext);
@@ -13,7 +14,11 @@ export function Chart({ vega }: { vega: Record<string, unknown> }) {
     let cancelled = false;
     let finalize = () => {};
     const t0 = performance.now();
-    embed(ref.current, { ...vega, datasets: { rows } } as never, { actions: false, renderer: "canvas" })
+    // `height: "container"` lets the chart follow the panel's width-derived
+    // height (`.chart` carries the aspect-ratio) instead of the fixed 280px the
+    // backend emits, which left short panels padded and wide ones squat.
+    const spec = { ...vega, width: "container", height: "container", datasets: { rows } };
+    embed(ref.current, spec as never, { actions: false, renderer: "canvas", config: vegaTheme as never })
       .then((res) => {
         if (cancelled) {
           // The effect was cleaned up before embed() resolved: the view was
