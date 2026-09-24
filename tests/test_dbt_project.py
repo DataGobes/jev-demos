@@ -47,6 +47,14 @@ def test_semantic_tests_store_failures_and_summary(project):
         assert "jev_p" in cols, name
 
 
+def test_baseline_tables_exist(project):
+    r = dbt(project, "test", "--select", "tag:baseline")
+    assert r.returncode == 0, r.stdout[-3000:]  # severity warn
+    con = duckdb.connect(str(project / "jaffle_shop.duckdb"), read_only=True)
+    for name in SEMANTIC:
+        con.execute(f"select count(*) from main_dbt_test__audit.baseline_{name}").fetchone()
+
+
 def test_bad_threshold_is_a_compile_error(project, tmp_path):
     schema = project / "models" / "staging" / "schema.yml"
     original = schema.read_text()
