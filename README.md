@@ -123,13 +123,24 @@ No wording, threshold, data, or answer-key changes were made to get this result.
 ## Recording
 
 `scripts/record.sh [--cold] [--pack N]` types out each beat of the demo and waits for a keypress
-before running it: a clean `dbt build`, the `jev_expect` blocks in `schema.yml`, the semantic
-test run, a look at the flagged rows, the scorecard, then a rerun to show it's fully cached.
+before running it, clearing the screen first so every beat starts clean: a plain `dbt build`,
+the `jev_expect` blocks in `schema.yml` (via `scripts/show.py tests`), the semantic test run, a
+look at the flagged rows (`scripts/show.py rows`), the scorecard (`scripts/show.py score`), then
+a rerun to show it's fully cached.
+
+Terminal size: **90 columns x 30 rows**, a large font (so it reads on a muted phone clip). Each
+`scripts/show.py` view is laid out for that box — short lines, generous spacing, nothing
+truncated — so nothing scrolls off or wraps unreadably. `show.py score`'s two headline lines and
+compact per-test table are meant to be legible even shrunk down for a phone timeline.
 
 A cold pack=1 run (`--cold`, deletes `.jev_cache.sqlite` first) takes about 55 s of real wall time
-for ~1,300 live judgments (~$0.017) — a single take, no speed-ramping needed. Beat 3 can be
-recorded cold and shown at real speed; a cached rerun's near-instant latency must never be
-presented as live latency.
+for ~1,300 live judgments (~$0.017) — a single take, no speed-ramping needed. Beat 3 (the
+semantic test run) can now be recorded cold and shown at real speed: `record.sh` exports
+`JEV_PROGRESS=1`, so while the four tests are judging in the background, a live counter
+(`  Jev · 612 judgments · 24.1 s · $0.008 ⠋`) rewrites itself on the terminal a few times a
+second instead of sitting on a blank screen. It disappears on its own once judging finishes and
+dbt prints its own result lines. A cached rerun's near-instant latency must never be presented as
+live latency.
 
 Smoke-test the script in demo mode only — **never run it live**:
 

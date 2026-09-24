@@ -14,6 +14,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 TYPE_DELAY="${TYPE_DELAY:-0.03}"
+export JEV_PROGRESS=1
 
 # Preflight (not recorded): fresh models + baseline tables for the scorecard.
 # stdout is silenced but stderr is not, so a broken build still shows and fails the script.
@@ -28,6 +29,7 @@ type_cmd() {
 }
 beat() {
   read -rsn1
+  clear
   type_cmd "$1"
   eval "$1" || true
   echo
@@ -35,9 +37,9 @@ beat() {
 
 clear
 beat "dbt build --profiles-dir . --exclude tag:semantic tag:baseline"
-beat "grep --color=always -A10 'jev_expect:' models/staging/schema.yml"
+beat "python ../scripts/show.py tests"
 beat "dbt test --profiles-dir . --select tag:semantic"
-beat "python ../scripts/show_failures.py"
-beat "python ../scripts/score.py"
+beat "python ../scripts/show.py rows"
+beat "python ../scripts/show.py score"
 beat "dbt test --profiles-dir . --select tag:semantic"
 read -rsn1
