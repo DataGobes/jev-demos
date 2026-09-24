@@ -98,7 +98,10 @@ select * from judged where jev_p >= 0.8
 State is named JSON fields (the judged column first, then context columns). Rows with NULL in
 the judged column get `jev_p = NULL` and never fail (not_null owns that). The macro validates
 arguments at compile time (`fails_if` non-empty, `0 < threshold <= 1`, `criteria` keys) with
-`exceptions.raise_compiler_error`.
+`exceptions.raise_compiler_error`. The question JSON is emitted as a SQL literal with single
+quotes doubled by the macro itself — `dbt.string_literal` does not escape, and `customer's`
+would break the SQL. YAML `true:`/`false:` keys parse as booleans; the macro normalises them
+to the strings `"true"`/`"false"`.
 
 ## 5. UDF, scorer, backends
 
@@ -190,14 +193,15 @@ say so. Never edit data to make Jev win.
 `scripts/record.sh` — typewriter-types each command, waits for a keypress between beats.
 
 1. `dbt build --exclude tag:semantic tag:baseline` → all green. *"Every test green. Ship it?"*
-2. `git diff` of `schema.yml` adding the four `jev_expect` blocks. *"Tests written as sentences."*
+2. `grep --color -A10 jev_expect models/staging/schema.yml` — the four `jev_expect` blocks. *"Tests written as sentences."*
 3. `dbt test --select tag:semantic` → 4 × FAIL n + summary line. *"Structurally valid. Semantically wrong."*
 4. `duckdb` query on stored failures — best three rows with `jev_p`. *"Every flag comes with a probability."*
 5. `python scripts/score.py` scorecard, Jev vs regex baseline. *"vs. what you'd hand-write."*
 6. Optional: rerun 3 → fully cached, sub-second. *"Safe to run in CI."*
 
-Beat 2 needs the repo in a state where the `jev_expect` blocks show as a diff: `record.sh`
-works on a scratch copy and applies the blocks as a patch, never touching the committed repo.
+Beat 2 shows the committed blocks rather than a diff (a diff would need a maintained patch
+against a stripped copy — not worth it). `record.sh` preflight runs the baseline tests quietly so
+beat 5 has both sides; `--cold` deletes the judgment cache first for a real-latency take.
 
 Honesty: summary always shows LIVE/SIMULATED; beats 3–5 recorded only after the gate passes;
 numbers in the post are the numbers `score.py` printed.
