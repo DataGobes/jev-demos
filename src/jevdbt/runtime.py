@@ -14,6 +14,7 @@ from jevdbt.backend import make_backend
 from jevdbt.cache import Cache
 from jevdbt.scorer import Scorer
 from jevdbt.stats import Stats, format_summary
+from jevdbt.ticker import Ticker, ticker_enabled
 
 _MODES = {"auto", "live", "demo"}
 
@@ -52,10 +53,13 @@ def resolve_settings(config: Mapping[str, Any], env: Mapping[str, str]) -> Setti
 
 
 class Runtime:
-    def __init__(self, scorer: Scorer, stats: Stats, settings: Settings) -> None:
+    def __init__(
+        self, scorer: Scorer, stats: Stats, settings: Settings, ticker: Ticker | None = None
+    ) -> None:
         self.scorer = scorer
         self.stats = stats
         self.settings = settings
+        self.ticker = ticker
 
     @property
     def simulated(self) -> bool:
@@ -99,7 +103,11 @@ def build_runtime(settings: Settings) -> Runtime:
         concurrency=settings.concurrency,
         rpm=effective_rpm(settings),
     )
-    return Runtime(scorer, stats, settings)
+    ticker: Ticker | None = None
+    if ticker_enabled():
+        ticker = Ticker(stats)
+        ticker.start()
+    return Runtime(scorer, stats, settings, ticker)
 
 
 _runtime: Runtime | None = None
@@ -117,4 +125,6 @@ def get_runtime(config: Mapping[str, Any]) -> Runtime:
                 load_dotenv(find_dotenv(usecwd=True))
             _runtime = build_runtime(resolve_settings(config, os.environ))
             atexit.register(_runtime.scorer.close)
+            if _runtime.ticker is not None:
+                atexit.register(_runtime.ticker.stop)
         return _runtime

@@ -136,3 +136,41 @@ def test_rpm_pacing_spaces_request_starts():
     s.close()
     assert len(out) == 4
     assert elapsed >= 0.28 and elapsed < 2.0
+
+
+class SlowRecorder(Recorder):
+    """Like Recorder, but each chunk takes real wall time, so a poller on another thread can
+    observe `stats` mid-call -- proving judgments/sent/requests move chunk by chunk instead of
+    jumping from 0 to the total only once the whole score_many() call returns."""
+
+    async def judge(self, states, question):
+        time.sleep(0.05)
+        with self._lock:
+            self.chunks.append(list(states))
+        vals = [len(s) / 100 for s in states]
+        return BatchResult(vals, 10 * len(states))
+
+
+def test_stats_move_progressively_as_chunks_complete():
+    b, st = SlowRecorder(), Stats()
+    # concurrency=1 forces the 4 chunks to complete one at a time, ~50ms apart.
+    s = Scorer(b, st, pack=1, concurrency=1, rpm=0)
+    states = [f'{{"i":{i}}}' for i in range(4)]
+
+    seen: list[int] = []
+
+    def poll():
+        for _ in range(30):
+            seen.append(st.snapshot().judgments)
+            time.sleep(0.01)
+
+    poller = threading.Thread(target=poll)
+    poller.start()
+    s.score_many(states, Q)
+    poller.join()
+    s.close()
+
+    assert seen[-1] == 4  # final total is unchanged
+    # at least one poll caught a partial value -- neither the initial 0 nor the final 4 --
+    # proving the count grew during the wait rather than only at the very end.
+    assert any(0 < v < 4 for v in seen)

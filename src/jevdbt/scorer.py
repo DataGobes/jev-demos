@@ -82,18 +82,30 @@ class Scorer:
                 positions.setdefault(s, []).append(i)
         if not positions:
             return out
-        judgments = sum(len(v) for v in positions.values())
 
         resolved: dict[str, float | None] = {}
         if self.cache is not None:
             resolved.update(
                 self.cache.get_many(self._cache_model_key, question, list(positions))
             )
+        # Cache hits are resolved synchronously (no wait involved), so they're counted right
+        # away. The rest is counted chunk by chunk as each request comes back (see `_one`) so
+        # a live progress ticker watching `stats` sees judgments/sent grow during the wait,
+        # instead of jumping from 0 to the total only once every chunk has finished.
+        cache_hit_states = [s for s in positions if s in resolved]
+        if cache_hit_states:
+            self.stats.add(
+                judgments=sum(len(positions[s]) for s in cache_hit_states),
+                unique=len(cache_hit_states),
+            )
         missing = [s for s in positions if s not in resolved]
         if missing:
             chunks = [missing[i : i + self.pack] for i in range(0, len(missing), self.pack)]
+            chunk_judgments = [sum(len(positions[s]) for s in c) for c in chunks]
             assert self._loop is not None
-            future = asyncio.run_coroutine_threadsafe(self._run(chunks, question), self._loop)
+            future = asyncio.run_coroutine_threadsafe(
+                self._run(chunks, chunk_judgments, question), self._loop
+            )
             to_cache: dict[str, float] = {}
             for chunk, result in zip(chunks, future.result(), strict=True):
                 for s, v in zip(chunk, result.values, strict=True):
@@ -102,21 +114,33 @@ class Scorer:
                         to_cache[s] = v
             if self.cache is not None:
                 self.cache.put_many(self._cache_model_key, question, to_cache)
-        self.stats.add(judgments=judgments, unique=len(positions), sent=len(missing))
 
         for s, idxs in positions.items():
             for i in idxs:
                 out[i] = resolved.get(s)
         return out
 
-    async def _run(self, chunks: list[list[str]], question: Question) -> list[BatchResult]:
-        return await asyncio.gather(*(self._one(c, question) for c in chunks))
+    async def _run(
+        self, chunks: list[list[str]], chunk_judgments: list[int], question: Question
+    ) -> list[BatchResult]:
+        return await asyncio.gather(
+            *(
+                self._one(chunk, judgments, question)
+                for chunk, judgments in zip(chunks, chunk_judgments, strict=True)
+            )
+        )
 
-    async def _one(self, chunk: list[str], question: Question) -> BatchResult:
+    async def _one(self, chunk: list[str], judgments: int, question: Question) -> BatchResult:
         async with self._semaphore:
             await self._pacer.wait()
             result = await self.backend.judge(chunk, question)
-        self.stats.add(requests=1, input_tokens=result.input_tokens)
+        self.stats.add(
+            judgments=judgments,
+            unique=len(chunk),
+            sent=len(chunk),
+            requests=1,
+            input_tokens=result.input_tokens,
+        )
         if any(v is None for v in result.values):
             self.stats.add(errors=1)
         return result

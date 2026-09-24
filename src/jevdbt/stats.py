@@ -39,6 +39,7 @@ class Stats:
         self._c = dict(judgments=0, unique=0, sent=0, requests=0, input_tokens=0, errors=0)
         self._span_start: float | None = None
         self._span_end: float | None = None
+        self._in_flight = 0
 
     def add(self, **deltas: float) -> None:
         with self._lock:
@@ -46,6 +47,20 @@ class Stats:
                 if name not in self._c:
                     raise KeyError(name)
                 self._c[name] += delta
+
+    def call_started(self) -> None:
+        """Mark one `jev_noul` invocation as in flight (for the progress ticker)."""
+        with self._lock:
+            self._in_flight += 1
+
+    def call_finished(self) -> None:
+        with self._lock:
+            self._in_flight -= 1
+
+    @property
+    def in_flight(self) -> int:
+        with self._lock:
+            return self._in_flight
 
     def record_span(self, start: float, end: float) -> None:
         """Extend the tracked wall-clock span of jev_noul activity to cover [start, end].
@@ -67,7 +82,7 @@ class Stats:
             return StatsSnapshot(**self._c, wall_seconds=wall_seconds)
 
 
-def _cost(usd: float) -> str:
+def format_cost(usd: float) -> str:
     return "<$0.001" if usd < 0.001 else f"${usd:.3f}"
 
 
@@ -76,7 +91,7 @@ def format_summary(snap: StatsSnapshot, *, simulated: bool, model: str, pack: in
     line = (
         f"Jev · {snap.judgments:,} judgments · {snap.unique:,} unique · "
         f"{snap.cached_fraction:.0%} cached · {snap.requests:,} requests · "
-        f"{snap.wall_seconds:.1f} s · {_cost(snap.cost_usd)} · {mode} {model} pack={pack}"
+        f"{snap.wall_seconds:.1f} s · {format_cost(snap.cost_usd)} · {mode} {model} pack={pack}"
     )
     if snap.errors:
         line += f" · {snap.errors} errors"
