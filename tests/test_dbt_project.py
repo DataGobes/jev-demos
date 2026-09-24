@@ -1,3 +1,4 @@
+import json
 import os
 import shutil
 import subprocess
@@ -45,6 +46,10 @@ def test_semantic_tests_store_failures_and_summary(project):
         query = f"select * from main_dbt_test__audit.{name} limit 0"
         cols = [c[0] for c in con.execute(query).description]
         assert "jev_p" in cols, name
+    row = con.execute("select stats from main_dbt_test__audit.jev_last_run").fetchone()
+    stats = json.loads(row[0])
+    assert stats["judgments"] == 1300
+    assert "SIMULATED" in stats["summary"]
 
 
 def test_baseline_tables_exist(project):

@@ -43,7 +43,9 @@ Jev sees alongside the tested one; `threshold` is the probability above which a 
    a materialized CTE so the row-level probability, `jev_p`, is computed exactly once per row.
 3. The UDF batches rows by question, dedupes identical states, and hands misses to a `Scorer`
    that packs them into requests, calls TypeSafe's Jev model (`AsyncTypeSafeClient.system_one`)
-   under a concurrency and rate limit, and caches every result in `.jev_cache.sqlite`.
+   under a concurrency and rate limit, and caches every result in `.jev_cache.sqlite`. Cached
+   judgments are keyed by the model alias (`jev-latest`) and pack size, so clear the cache file
+   after a model update.
 4. `dbt test --select tag:semantic` runs the four tests; `store_failures: true` persists every
    row with `jev_p >= threshold` into `main_dbt_test__audit`, alongside a hand-written regex
    baseline (`tag:baseline`) run the same way.
@@ -57,12 +59,18 @@ Jev sees alongside the tested one; `threshold` is the probability above which a 
 uv sync
 uv run python scripts/make_seeds.py                 # deterministic seeds + golden key (seed=42)
 cd jaffle_shop
-uv run dbt build --profiles-dir . --exclude tag:semantic   # standard dbt tests: all green
+uv run dbt build --profiles-dir . --exclude tag:semantic   # standard tests pass; regex baseline
+                                                             # tests run too (severity warn),
+                                                             # stored for the scorecard below
 uv run dbt test --profiles-dir . --select tag:semantic     # the four jev_expect tests
 cd ..
 uv run python scripts/show_failures.py               # spot-check individual flagged rows
 uv run python scripts/score.py                        # scorecard: Jev vs. regex baseline
 ```
+
+Without `TYPESAFE_API_KEY`, that scorecard is a wiring check, not a result: every `jev_p` comes
+from `DemoBackend`'s hash noise, and `score.py` says so on screen with a SIMULATED banner and
+table title.
 
 Never use the machine's global `dbt` — it resolves to dbt Fusion, which cannot load Python
 adapter plugins (see "Why dbt-core, not Fusion" below). Always run `uv run dbt`, or activate

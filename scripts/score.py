@@ -14,6 +14,7 @@ See TESTS below for the four semantic tests scored, and the sibling
 import argparse
 import csv
 import datetime as dt
+import json
 import os
 import re
 import subprocess
@@ -97,6 +98,23 @@ def parse_summary(stdout: str) -> str | None:
     return line[line.index("Jev · ") :].strip()
 
 
+def read_last_run_summary(con: duckdb.DuckDBPyConnection) -> str | None:
+    """The summary line from `main_dbt_test__audit.jev_last_run`, written by the
+    `jev_summary` on-run-end macro, or None if it doesn't exist (project never ran, or the
+    dbt-core version predates it). Used when this script is called without --run, so the
+    gate + mode still show. It reflects the last dbt invocation that made judgments -- the
+    same invocation the stored-failure tables scored below were written by, since both are
+    written within that run.
+    """
+    try:
+        row = con.execute("select stats from main_dbt_test__audit.jev_last_run").fetchone()
+    except duckdb.CatalogException:
+        return None
+    if row is None or row[0] is None:
+        return None
+    return json.loads(row[0]).get("summary")
+
+
 GateResults = dict[str, tuple[Metrics, Metrics]]
 
 
@@ -120,6 +138,23 @@ def gate(results: GateResults, summary: str | None) -> tuple[bool, list[str]]:
                 f"{name}: Jev f1 {jev.f1:.2f} does not beat baseline f1 {baseline.f1:.2f}"
             )
     return (len(reasons) == 0, reasons)
+
+
+def scorecard_title(summary: str | None) -> str:
+    """SIMULATED (or uncaptured -- same honesty problem) runs get a title that says so."""
+    if summary is None or "SIMULATED" in summary:
+        return "SIMULATED backend vs regex baseline"
+    return "Jev vs regex baseline"
+
+
+def simulated_banner(summary: str | None) -> str | None:
+    """A banner to print above the table when the numbers behind it aren't from a live model."""
+    if summary is None or "SIMULATED" in summary:
+        return (
+            "SIMULATED — no API key: Jev columns are wiring checks (hash noise), "
+            "not model results"
+        )
+    return None
 
 
 def run_dbt(jaffle_dir: Path, *, pack: int | None, fresh: bool, mode: str | None) -> str:
@@ -202,8 +237,12 @@ def print_report(
 ) -> None:
     from rich.table import Table
 
-    table = Table(title="Jev vs regex baseline")
-    table.add_column("test")
+    banner = simulated_banner(summary)
+    if banner is not None:
+        console.print(f"[bold yellow]{banner}[/bold yellow]")
+
+    table = Table(title=scorecard_title(summary))
+    table.add_column("test", no_wrap=True)
     table.add_column("defects", justify="right")
     table.add_column("Jev P", justify="right")
     table.add_column("Jev R", justify="right")
@@ -315,6 +354,8 @@ def main(argv: list[str] | None = None) -> int:
     detail: dict[str, tuple[list[int], list[int]]] = {}
     con = duckdb.connect(str(db_path), read_only=True)
     try:
+        if summary is None:
+            summary = read_last_run_summary(con)
         for test_name, id_col in TESTS.items():
             gold = golden.get(test_name, {})
             audit = "main_dbt_test__audit"
