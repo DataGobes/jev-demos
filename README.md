@@ -17,3 +17,7 @@ without an API key in a clearly labelled `SIMULATED` mode; put `TYPESAFE_API_KEY
 demo folder's `.env` for live results.
 
 Built by [DataGobes](https://datagobes.dev).
+
+## License
+
+[MIT](LICENSE) — covers every demo in this repo.
