@@ -122,11 +122,15 @@ No wording, threshold, data, or answer-key changes were made to get this result.
 
 ## Recording
 
-`scripts/record.sh [--cold] [--pack N]` types out each beat of the demo and waits for a keypress
+`scripts/record.sh [--cold] [--pack N] [--no-captions]` types out each beat of the demo and waits for a keypress
 before running it, clearing the screen first so every beat starts clean: a plain `dbt build`,
 the `jev_expect` blocks in `schema.yml` (via `scripts/show.py tests`), the semantic test run, a
 look at the flagged rows (`scripts/show.py rows`), the scorecard (`scripts/show.py score`), then
 a rerun to show it's fully cached.
+
+Captions are built in, so the video only needs trimming. A title card opens the recording, each
+beat ends with a one-line caption bar under its output, and an end card shows the repo link.
+`--no-captions` turns all three off.
 
 Terminal size: **90 columns x 30 rows**, a large font (so it reads on a muted phone clip). Each
 `scripts/show.py` view is laid out for that box — short lines, generous spacing, nothing
@@ -145,7 +149,7 @@ live latency.
 Smoke-test the script in demo mode only — **never run it live**:
 
 ```bash
-JEV_MODE=demo DOTENV_DISABLE=1 TYPE_DELAY=0 yes '' | scripts/record.sh
+yes '' | JEV_MODE=demo DOTENV_DISABLE=1 TYPE_DELAY=0 scripts/record.sh
 ```
 
 This overwrites the stored-failure tables in `jaffle_shop/jaffle_shop.duckdb` with demo-mode
