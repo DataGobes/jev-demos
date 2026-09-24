@@ -115,3 +115,21 @@ These corrections do not change any precision/recall/F1 figures, golden-key labe
 result — only the reported timing and the cold/cached description of the two pack=1 runs. The
 underlying bug (summing instead of spanning) is fixed in `src/jevdbt/stats.py`; future runs report
 dbt-agreeing wall time.
+
+## 2026-09-24T21:12:55Z · live/pack=1
+
+Jev · 1,300 judgments · 1,057 unique · 0% cached · 1,057 requests · 53.9 s · $0.017 · LIVE jev-latest pack=1
+
+| test | defects | Jev P | Jev R | Jev hard-neg | regex P | regex R | regex hard-neg |
+|---|---|---|---|---|---|---|---|
+| customers_full_name_is_a_person | 25 | 0.96 | 0.96 | 1 | 0.71 | 0.60 | 6 |
+| returns_comment_matches_reason_code | 12 | 1.00 | 1.00 | 0 | 0.45 | 0.75 | 6 |
+| reviews_body_matches_stars | 24 | 1.00 | 1.00 | 0 | 0.39 | 0.92 | 8 |
+| tickets_body_has_no_pii | 14 | 1.00 | 1.00 | 0 | 0.48 | 0.86 | 13 |
+
+**Gate: PASS**
+
+- `customers_full_name_is_a_person`: hard negatives flagged = [406], defects missed = [174]
+- `returns_comment_matches_reason_code`: hard negatives flagged = [], defects missed = []
+- `reviews_body_matches_stars`: hard negatives flagged = [], defects missed = []
+- `tickets_body_has_no_pii`: hard negatives flagged = [], defects missed = []
