@@ -1,0 +1,176 @@
+test_name,id,label,note
+customers_full_name_is_a_person,8,hard_negative,short but genuine two-letter Chinese given name
+customers_full_name_is_a_person,13,hard_negative,fada diacritic in a genuine Irish given name
+customers_full_name_is_a_person,26,defect,email pasted as a first name
+customers_full_name_is_a_person,28,hard_negative,"hyphenated French given name, real surname"
+customers_full_name_is_a_person,38,defect,keyboard row typed as a name
+customers_full_name_is_a_person,41,defect,literal field labels typed as a name
+customers_full_name_is_a_person,67,defect,cartoon character used as a fake name
+customers_full_name_is_a_person,71,hard_negative,Inca is a real Peruvian surname
+customers_full_name_is_a_person,96,hard_negative,"hyphenated given name, genuinely Dutch"
+customers_full_name_is_a_person,99,hard_negative,"Wu is a short, real Chinese surname"
+customers_full_name_is_a_person,104,hard_negative,Al is a short but genuine given name
+customers_full_name_is_a_person,109,defect,repeated placeholder characters
+customers_full_name_is_a_person,113,defect,email address pasted into the name field
+customers_full_name_is_a_person,120,defect,placeholder test record
+customers_full_name_is_a_person,122,hard_negative,"mononym customer, no last name given"
+customers_full_name_is_a_person,127,hard_negative,Cocco is a real Italian surname
+customers_full_name_is_a_person,131,defect,cartoon character used as a fake name
+customers_full_name_is_a_person,144,hard_negative,"Bar is a real, uncommon Catalan surname"
+customers_full_name_is_a_person,159,hard_negative,Co is a real Chinese-Filipino surname
+customers_full_name_is_a_person,164,defect,placeholder text used as a name
+customers_full_name_is_a_person,168,hard_negative,"diacritic surname, genuinely Norwegian"
+customers_full_name_is_a_person,174,defect,"obvious joke name, not a real customer"
+customers_full_name_is_a_person,211,defect,Dutch word for unknown typed as a name
+customers_full_name_is_a_person,221,defect,dots typed as a placeholder
+customers_full_name_is_a_person,236,hard_negative,Foot is a real English surname
+customers_full_name_is_a_person,245,hard_negative,Nobody is a documented rare English surname
+customers_full_name_is_a_person,252,hard_negative,"Vietnamese mononym entry, no last name given"
+customers_full_name_is_a_person,260,defect,phone number typed as a first name
+customers_full_name_is_a_person,267,defect,keyboard mash entered as a name
+customers_full_name_is_a_person,273,hard_negative,"Coco is a genuine Dutch nickname, not an abbreviation"
+customers_full_name_is_a_person,279,defect,company name entered as a customer name
+customers_full_name_is_a_person,287,hard_negative,"Ng is a real, vowel-less Cantonese surname"
+customers_full_name_is_a_person,298,defect,"system account name, not a customer"
+customers_full_name_is_a_person,318,defect,keyboard mash across both fields
+customers_full_name_is_a_person,325,hard_negative,Xi Xi is a real Chinese given-and-family name pair
+customers_full_name_is_a_person,331,defect,phone number typed as a name
+customers_full_name_is_a_person,345,defect,cartoon character used as a fake name
+customers_full_name_is_a_person,355,hard_negative,"apostrophe surname, genuinely Irish"
+customers_full_name_is_a_person,379,defect,Dutch word for customer typed as a name
+customers_full_name_is_a_person,382,defect,digits typed as a name
+customers_full_name_is_a_person,385,hard_negative,"Oe is a short, real Japanese surname"
+customers_full_name_is_a_person,406,hard_negative,Test is a real Dutch/English surname
+customers_full_name_is_a_person,415,defect,company name split across the name fields
+customers_full_name_is_a_person,438,hard_negative,"apostrophe surname, genuinely Irish"
+customers_full_name_is_a_person,445,defect,not-applicable typed as a name
+customers_full_name_is_a_person,462,hard_negative,"diaeresis given name, genuinely Dutch"
+customers_full_name_is_a_person,477,hard_negative,Null is a rare but real German surname
+customers_full_name_is_a_person,480,defect,superhero fakes typed as a name
+customers_full_name_is_a_person,481,defect,random keyboard mash
+customers_full_name_is_a_person,494,hard_negative,diacritic ö in a common Swedish given name
+returns_comment_matches_reason_code,3,hard_negative,mentions changed mind only to deny it
+returns_comment_matches_reason_code,5,hard_negative,mentions quickly and one piece to rule out late and damaged
+returns_comment_matches_reason_code,35,hard_negative,mentions late only to rule it out
+returns_comment_matches_reason_code,40,hard_negative,"mentions changed mind, but lateness is the reason"
+returns_comment_matches_reason_code,44,defect,"clearly damaged, coded late"
+returns_comment_matches_reason_code,45,hard_negative,mentions correct order to dismiss wrong_item
+returns_comment_matches_reason_code,47,defect,"wrong item, coded late"
+returns_comment_matches_reason_code,48,defect,"wrong item, coded changed_mind"
+returns_comment_matches_reason_code,49,defect,"wrong item, coded damaged"
+returns_comment_matches_reason_code,66,defect,"changed mind, coded damaged"
+returns_comment_matches_reason_code,67,hard_negative,mentions wait time only to redirect to damage
+returns_comment_matches_reason_code,70,hard_negative,mentions wrong/broken only to dismiss them
+returns_comment_matches_reason_code,73,hard_negative,"mentions late, but damage is the actual issue"
+returns_comment_matches_reason_code,77,defect,"clearly late, coded changed_mind"
+returns_comment_matches_reason_code,78,hard_negative,mentions on time and undamaged to rule those out
+returns_comment_matches_reason_code,89,hard_negative,mentions damaged only to rule it out
+returns_comment_matches_reason_code,91,hard_negative,mentions late and wrong item only to rule out
+returns_comment_matches_reason_code,92,hard_negative,mentions wrong and late only to dismiss
+returns_comment_matches_reason_code,108,hard_negative,mentions changed mind and damaged to dismiss both
+returns_comment_matches_reason_code,111,defect,"late, coded wrong_item"
+returns_comment_matches_reason_code,113,hard_negative,explicitly flags wrong order as a red herring
+returns_comment_matches_reason_code,120,hard_negative,mentions damaged only to dismiss it
+returns_comment_matches_reason_code,121,hard_negative,mentions correct and quickly to rule those out
+returns_comment_matches_reason_code,127,hard_negative,mentions right and on time to rule those out
+returns_comment_matches_reason_code,129,defect,"clearly a late complaint, coded damaged"
+returns_comment_matches_reason_code,144,defect,"really damaged, coded changed_mind"
+returns_comment_matches_reason_code,145,defect,"changed mind, coded wrong_item"
+returns_comment_matches_reason_code,153,hard_negative,mentions late and smashed only to rule out
+returns_comment_matches_reason_code,180,defect,"changed mind, coded late"
+returns_comment_matches_reason_code,181,defect,"damaged, coded wrong_item"
+returns_comment_matches_reason_code,199,hard_negative,mentions damaged and late to dismiss both
+returns_comment_matches_reason_code,200,hard_negative,mentions on time and fine to rule those out
+reviews_body_matches_stars,5,hard_negative,"negation reads negative, actually positive, 4 stars"
+reviews_body_matches_stars,10,hard_negative,"negation reads negative, actually positive, 4 stars"
+reviews_body_matches_stars,11,defect,"enthusiastic praise, 2 stars"
+reviews_body_matches_stars,21,hard_negative,"sarcasm, correctly 1 star"
+reviews_body_matches_stars,31,hard_negative,"negation reads negative, actually positive, 4 stars"
+reviews_body_matches_stars,34,hard_negative,"mixed pros and cons, correctly 3 stars"
+reviews_body_matches_stars,41,defect,"positive text, 2 stars"
+reviews_body_matches_stars,45,defect,"scathing complaint, 4 stars"
+reviews_body_matches_stars,49,hard_negative,"negation reads negative, actually positive, 5 stars"
+reviews_body_matches_stars,58,hard_negative,"sarcasm, correctly 2 stars"
+reviews_body_matches_stars,64,defect,"glowing praise, 1 star"
+reviews_body_matches_stars,67,defect,"positive text, 2 stars"
+reviews_body_matches_stars,71,hard_negative,"sarcasm, correctly 1 star"
+reviews_body_matches_stars,72,hard_negative,"mixed pros and cons, correctly 3 stars"
+reviews_body_matches_stars,82,defect,"enthusiastic praise, 2 stars"
+reviews_body_matches_stars,89,defect,"harsh criticism, 5 stars"
+reviews_body_matches_stars,106,hard_negative,"mixed pros and cons, correctly 3 stars"
+reviews_body_matches_stars,113,hard_negative,"sarcastic praise, correctly 1 star"
+reviews_body_matches_stars,114,defect,"positive text, 2 stars"
+reviews_body_matches_stars,141,defect,"strongly negative, 4 stars"
+reviews_body_matches_stars,148,hard_negative,"mixed pros and cons, correctly 3 stars"
+reviews_body_matches_stars,154,hard_negative,"mixed pros and cons, correctly 3 stars"
+reviews_body_matches_stars,160,defect,"strongly negative, 4 stars"
+reviews_body_matches_stars,167,defect,"glowing text, 1 star"
+reviews_body_matches_stars,174,hard_negative,"mixed pros and cons, correctly 3 stars"
+reviews_body_matches_stars,178,defect,"disappointed text, 5 stars"
+reviews_body_matches_stars,186,defect,"furious complaint, 5 stars"
+reviews_body_matches_stars,201,defect,"enthusiastic praise, 2 stars"
+reviews_body_matches_stars,205,hard_negative,"negation reads negative, actually positive, 5 stars"
+reviews_body_matches_stars,214,defect,"furious text, 5 stars"
+reviews_body_matches_stars,219,hard_negative,"negation reads negative, actually positive, 5 stars"
+reviews_body_matches_stars,227,hard_negative,"sarcasm, correctly 2 stars"
+reviews_body_matches_stars,228,defect,"furious text, 5 stars"
+reviews_body_matches_stars,229,hard_negative,"negation reads negative, actually positive, 5 stars"
+reviews_body_matches_stars,260,hard_negative,"sarcasm, correctly 1 star"
+reviews_body_matches_stars,270,hard_negative,"sarcasm, correctly 1 star"
+reviews_body_matches_stars,272,hard_negative,"sarcasm, correctly 2 stars"
+reviews_body_matches_stars,277,hard_negative,"negation reads negative, actually positive, 5 stars"
+reviews_body_matches_stars,288,hard_negative,"negation reads negative, actually positive, 4 stars"
+reviews_body_matches_stars,291,defect,"glowing praise, 1 star"
+reviews_body_matches_stars,293,defect,"glowing text, 1 star"
+reviews_body_matches_stars,295,hard_negative,"sarcastic irony, correctly 2 stars"
+reviews_body_matches_stars,298,hard_negative,"sarcasm, correctly 1 star"
+reviews_body_matches_stars,304,defect,"angry complaint, 5 stars"
+reviews_body_matches_stars,305,hard_negative,"mixed pros and cons, correctly 3 stars"
+reviews_body_matches_stars,315,defect,"scathing text, 4 stars"
+reviews_body_matches_stars,320,defect,"revolted text, 4 stars"
+reviews_body_matches_stars,323,defect,"disgusted text, 5 stars"
+reviews_body_matches_stars,334,hard_negative,"sarcasm, correctly 2 stars"
+reviews_body_matches_stars,343,defect,"glowing text, 1 star"
+reviews_body_matches_stars,352,hard_negative,"mixed pros and cons, correctly 3 stars"
+reviews_body_matches_stars,371,defect,"glowing praise, 1 star"
+reviews_body_matches_stars,384,hard_negative,"negation reads negative, actually positive, 4 stars"
+reviews_body_matches_stars,391,hard_negative,"sarcasm, correctly 1 star"
+tickets_body_has_no_pii,3,hard_negative,"first name only, no other personal data"
+tickets_body_has_no_pii,6,defect,"full name, date of birth, postcode"
+tickets_body_has_no_pii,7,defect,personal email
+tickets_body_has_no_pii,9,hard_negative,"first name only, no other personal data"
+tickets_body_has_no_pii,33,defect,spaced IBAN format
+tickets_body_has_no_pii,38,defect,IBAN and full name
+tickets_body_has_no_pii,45,hard_negative,store's public phone number
+tickets_body_has_no_pii,48,hard_negative,"delivery-area postcode, not a customer address"
+tickets_body_has_no_pii,52,defect,home address
+tickets_body_has_no_pii,54,defect,IBAN and home address
+tickets_body_has_no_pii,55,hard_negative,"delivery-area postcode, not a customer address"
+tickets_body_has_no_pii,63,hard_negative,"delivery-area postcode, not a customer address"
+tickets_body_has_no_pii,64,hard_negative,"first name only, no other personal data"
+tickets_body_has_no_pii,80,hard_negative,"delivery-area postcode, not a customer address"
+tickets_body_has_no_pii,82,hard_negative,store's public phone number
+tickets_body_has_no_pii,85,hard_negative,store's public phone number
+tickets_body_has_no_pii,89,hard_negative,"store address, not personal"
+tickets_body_has_no_pii,91,hard_negative,"first name only, no other personal data"
+tickets_body_has_no_pii,95,defect,phone number
+tickets_body_has_no_pii,96,hard_negative,"first name only, no other personal data"
+tickets_body_has_no_pii,99,hard_negative,"store address, not personal"
+tickets_body_has_no_pii,105,hard_negative,store's public phone number
+tickets_body_has_no_pii,111,hard_negative,"first name only, no other personal data"
+tickets_body_has_no_pii,114,defect,home address
+tickets_body_has_no_pii,122,hard_negative,store's public phone number
+tickets_body_has_no_pii,127,defect,home address
+tickets_body_has_no_pii,138,hard_negative,"store address, not personal"
+tickets_body_has_no_pii,139,hard_negative,store's public phone number
+tickets_body_has_no_pii,142,defect,"literal date of birth, digits"
+tickets_body_has_no_pii,147,hard_negative,"store address, not personal"
+tickets_body_has_no_pii,157,defect,phone number
+tickets_body_has_no_pii,162,hard_negative,"store address, not personal"
+tickets_body_has_no_pii,163,hard_negative,"delivery-area postcode, not a customer address"
+tickets_body_has_no_pii,165,defect,personal email and IBAN
+tickets_body_has_no_pii,175,hard_negative,"delivery-area postcode, not a customer address"
+tickets_body_has_no_pii,177,hard_negative,"store address, not personal"
+tickets_body_has_no_pii,181,defect,date of birth and phone number
+tickets_body_has_no_pii,186,hard_negative,"store address, not personal"
+tickets_body_has_no_pii,192,defect,personal email
