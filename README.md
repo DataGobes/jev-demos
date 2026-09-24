@@ -1,9 +1,9 @@
 # jev-demo-4 — semantic dbt tests
 
 A `jaffle_shop` dbt project where four `jev_expect` tests, written as plain English sentences
-in `schema.yml`, catch rows that are structurally valid but semantically wrong — a junk customer
+in `schema.yml`, catch rows that pass every structural test but are still wrong — a junk customer
 name, a return comment that contradicts its reason code, a 5-star review that reads like a
-complaint, PII buried in a support ticket. Every flagged row carries a probability from
+complaint — or that leak something they shouldn't, like PII buried in a support ticket. Every flagged row carries a probability from
 TypeSafe's Jev model, scored against a hidden answer key and a hand-written regex/keyword
 baseline in the same project.
 
