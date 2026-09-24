@@ -42,9 +42,9 @@ IBAN_BANKS = ["ABNA", "INGB", "RABO", "TRIO"]
 EMAIL_DOMAINS = ["gmail.com", "outlook.com", "hotmail.nl"]
 STORE_ADDRESS = "Jaffle Shop, Oudegracht 118, Utrecht"
 
-RETURN_REASON_WEIGHTS = {"placed": 5, "shipped": 10, "completed": 80, "return_pending": 5}
-ORDER_STATUSES = list(RETURN_REASON_WEIGHTS)
-ORDER_STATUS_WEIGHTS = list(RETURN_REASON_WEIGHTS.values())
+ORDER_STATUS_WEIGHTS = {"placed": 5, "shipped": 10, "completed": 80, "return_pending": 5}
+ORDER_STATUSES = list(ORDER_STATUS_WEIGHTS)
+_ORDER_STATUS_WEIGHT_VALUES = list(ORDER_STATUS_WEIGHTS.values())
 
 SLOT_RE = re.compile(r"\{(\w+)\}")
 
@@ -208,7 +208,7 @@ def _build_orders(customers: list[dict], rng: random.Random, n: int = 1500) -> l
         if row["id"] in returned_ids:
             row["status"] = "returned"
         else:
-            row["status"] = rng.choices(ORDER_STATUSES, weights=ORDER_STATUS_WEIGHTS)[0]
+            row["status"] = rng.choices(ORDER_STATUSES, weights=_ORDER_STATUS_WEIGHT_VALUES)[0]
     return rows
 
 
