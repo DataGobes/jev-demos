@@ -13,4 +13,5 @@ __pycache__/
 jaffle_shop/target/
 jaffle_shop/logs/
 jaffle_shop/dbt_packages/
+jaffle_shop/.user.yml
 logs/

@@ -1,0 +1,15 @@
+jaffle_shop:
+  target: dev
+  outputs:
+    dev:
+      type: duckdb
+      path: jaffle_shop.duckdb
+      threads: 4
+      plugins:
+        - module: jevdbt.plugin
+          config:
+            mode: auto        # live when TYPESAFE_API_KEY is set, else SIMULATED
+            pack: 1           # override with JEV_PACK; only record at a pack size that passed the gate
+            concurrency: 32
+            rpm: 1200
+            model: jev-latest

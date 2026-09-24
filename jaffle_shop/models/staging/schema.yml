@@ -1,0 +1,108 @@
+version: 2
+
+models:
+  - name: stg_customers
+    columns:
+      - name: customer_id
+        data_tests: [unique, not_null]
+      - name: email
+        data_tests: [unique, not_null]
+      - name: full_name
+        data_tests:
+          - not_null
+          - jev_expect:
+              name: customers_full_name_is_a_person
+              arguments:
+                fails_if: "`full_name` is not a real individual person's name: it is a placeholder, test value, keyboard mash, company or organisation name, email address, or otherwise not a person."
+                context: [email]
+                threshold: 0.7
+                criteria:
+                  "true": "Clearly not a real person's name"
+                  "false": "Plausibly a real person's name, including unusual, very short, single-word, or non-Western names"
+              config: {severity: error, store_failures: true, tags: [semantic]}
+
+  - name: stg_orders
+    columns:
+      - name: order_id
+        data_tests: [unique, not_null]
+      - name: customer_id
+        data_tests:
+          - not_null
+          - relationships: {arguments: {to: ref('stg_customers'), field: customer_id}}
+      - name: status
+        data_tests:
+          - accepted_values: {arguments: {values: [placed, shipped, completed, return_pending, returned]}}
+
+  - name: stg_returns
+    columns:
+      - name: return_id
+        data_tests: [unique, not_null]
+      - name: order_id
+        data_tests:
+          - unique
+          - relationships: {arguments: {to: ref('stg_orders'), field: order_id}}
+      - name: reason_code
+        data_tests:
+          - not_null
+          - accepted_values: {arguments: {values: [damaged, wrong_item, late, changed_mind, other]}}
+      - name: comment
+        data_tests:
+          - not_null
+          - jev_expect:
+              name: returns_comment_matches_reason_code
+              arguments:
+                fails_if: "The customer's `comment` describes a different main reason for the return than `reason_code` (damaged, wrong_item, late, changed_mind, other)."
+                context: [reason_code]
+                threshold: 0.8
+                criteria:
+                  "true": "The stated main reason plainly belongs to another code"
+                  "false": "Consistent with the code, or too vague to tell; code 'other' fits anything unusual"
+              config: {severity: error, store_failures: true, tags: [semantic]}
+
+  - name: stg_reviews
+    columns:
+      - name: review_id
+        data_tests: [unique, not_null]
+      - name: order_id
+        data_tests:
+          - unique
+          - relationships: {arguments: {to: ref('stg_orders'), field: order_id}}
+      - name: stars
+        data_tests:
+          - not_null
+          - accepted_values: {arguments: {values: [1, 2, 3, 4, 5], quote: false}}
+      - name: body
+        data_tests:
+          - not_null
+          - jev_expect:
+              name: reviews_body_matches_stars
+              arguments:
+                fails_if: "The overall sentiment of the review `body` clearly contradicts its `stars` rating (1 = very bad, 5 = excellent)."
+                context: [stars]
+                threshold: 0.8
+                criteria:
+                  "true": "A glowing text with 1-2 stars, or an angry/negative text with 4-5 stars"
+                  "false": "Sentiment roughly matches the stars, including sarcasm that matches a low rating and mixed 3-star reviews"
+              config: {severity: error, store_failures: true, tags: [semantic]}
+
+  - name: stg_tickets
+    columns:
+      - name: ticket_id
+        data_tests: [unique, not_null]
+      - name: customer_id
+        data_tests:
+          - relationships: {arguments: {to: ref('stg_customers'), field: customer_id}}
+      - name: subject
+        data_tests: [not_null]
+      - name: body
+        data_tests:
+          - not_null
+          - jev_expect:
+              name: tickets_body_has_no_pii
+              arguments:
+                fails_if: "The ticket `body` contains personal data that could identify or contact a specific private person, such as a home address, personal phone number, personal email address, bank account number (IBAN), or date of birth."
+                threshold: 0.5
+                criteria:
+                  "true": "Contains at least one such personal detail about a private person"
+                  "false": "No such detail; order numbers, the shop's own address or phone, and a first name alone are not personal data"
+              config: {severity: error, store_failures: true, tags: [semantic]}
