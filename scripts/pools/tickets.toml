@@ -12,11 +12,11 @@ text = "My order {order_no} is showing as delivered but I never got it."
 
 [[clean]]
 subject = "Missing item"
-text = "The fries were missing from order {order_no}."
+text = "The fries were missing from order {order_no}, quite anoying tbh."
 
 [[clean]]
 subject = "Order issue"
-text = "Order {order_no} arrived with the wrong sauce."
+text = "Order {order_no} arived with the wrong sauce."
 
 [[clean]]
 subject = "Cold food"
@@ -24,7 +24,7 @@ text = "The {product} in order {order_no} arrived completely cold."
 
 [[clean]]
 subject = "Order issue"
-text = "Still waiting on order {order_no}, it's been over an hour."
+text = "Still waiting on order {order_no} here, it's been well over an hour now and the tracking hasn't updated in ages, starting to wonder if it actually left the kitchen at all, would appreciate someone taking a look when they get a chance."
 
 [[clean]]
 subject = "Missing item"
@@ -84,7 +84,7 @@ text = "Please look into order {order_no}, the tracking link is broken."
 
 [[clean]]
 subject = "Wrong item"
-text = "Order {order_no} had bacon in it despite the vegetarian tag."
+text = "Ordered {order_no} with the vegetarian tag specifically selected at checkout, but when it arrived there was clearly bacon in there, which is obviously a problem for me, please could someone check what happened on your end."
 
 [[clean]]
 subject = "Missing item"
@@ -108,7 +108,7 @@ text = "I ordered two of the same thing in {order_no} and got two different item
 
 [[clean]]
 subject = "Missing item"
-text = "The extra cheese I paid for on order {order_no} wasn't there."
+text = "Paid extra for additional cheese on order {order_no} today and when it arrived there really wasn't any more than the standard amount, not a huge deal money wise but wanted to flag it in case it's a wider issue with the app."
 
 [[clean]]
 subject = "Order issue"
@@ -128,11 +128,11 @@ text = "Is the bread used for the toasties gluten free, or just the filling opti
 
 [[clean]]
 subject = "Allergen question"
-text = "Can you confirm if the vegan option is also dairy free?"
+text = "Can you confirm if the vegan option is also diary free?"
 
 [[clean]]
 subject = "Allergen question"
-text = "I have a shellfish allergy, is any seafood prepared in the same kitchen?"
+text = "I have a pretty serious shellfish allergy so before I order I just wanted to check whether any seafood gets prepared in the same kitchen as the rest of the menu, even trace amounts can be an issue for me so any info would help a lot."
 
 [[clean]]
 subject = "Allergen question"
@@ -144,7 +144,7 @@ text = "Are your sauces made with mustard? Need to know for an allergy."
 
 [[clean]]
 subject = "Allergen question"
-text = "Is there a nut-free prep area for allergy orders?"
+text = "Is having nut-free area for prepare allergy orders, please tell me?"
 
 [[clean]]
 subject = "Allergen question"
@@ -156,7 +156,7 @@ text = "Can I get the allergen list for the full menu please?"
 
 [[clean]]
 subject = "Allergen question"
-text = "Is the cheese used lactose free or regular?"
+text = "Is the cheese used lactos free or regular?"
 
 [[clean]]
 subject = "Allergen question"
@@ -208,7 +208,7 @@ text = "Are you open on public holidays?"
 
 [[clean]]
 subject = "Opening hours"
-text = "What are your delivery hours for the weekend?"
+text = "What is delivery hours for weekend, please advise."
 
 [[clean]]
 subject = "Opening hours"
@@ -220,7 +220,7 @@ text = "Is the kitchen open past 9pm on weekdays?"
 
 [[clean]]
 subject = "Opening hours"
-text = "What time does delivery start in the morning?"
+text = "What time does delivery start in the morening?"
 
 [[clean]]
 subject = "Opening hours"
@@ -228,7 +228,7 @@ text = "Are you open for lunch on a {day}?"
 
 [[clean]]
 subject = "Opening hours"
-text = "Do opening hours change during the summer?"
+text = "Just wondering if your opening hours change at all during the summer months, planning a few orders around a work trip and want to make sure I'm not turning up to a closed kitchen by mistake."
 
 [[clean]]
 subject = "Opening hours"
@@ -240,7 +240,7 @@ text = "What time is last orders for delivery?"
 
 [[clean]]
 subject = "Opening hours"
-text = "Are you closed on Sundays or just certain hours?"
+text = "Are you closed on Sundays or just certain hourse?"
 
 [[clean]]
 subject = "Opening hours"
@@ -276,11 +276,11 @@ text = "I was charged twice for order {order_no}, please refund the duplicate."
 
 [[clean]]
 subject = "Refund"
-text = "Can order {order_no} be refunded instead of redelivered?"
+text = "Can order {order_no} be refunded instead of redeliverd?"
 
 [[clean]]
 subject = "Refund"
-text = "Still haven't received my refund for {order_no} from last week."
+text = "Still haven't seen my refund come through for {order_no} from last week now, checked my bank statement a couple times just in case but nothing's shown up yet, could someone please look into where that's got to."
 
 [[clean]]
 subject = "Refund"
@@ -308,7 +308,7 @@ text = "Requesting a refund since order {order_no} arrived completely cold."
 
 [[clean]]
 subject = "Refund"
-text = "Do refunds go back to the original payment method automatically?"
+text = "Do refunds go back to the orignal payment method automatically?"
 
 [[clean]]
 subject = "Refund"
@@ -364,7 +364,7 @@ text = "How many stamps do I need for a free {product}?"
 
 [[clean]]
 subject = "Loyalty program"
-text = "Does the loyalty card work with delivery orders too?"
+text = "Just wondering whether the loyalty card actually works with delivery orders too, or if it's only for when I come in and pick something up myself, been collecting stamps for a while now and want to make sure I'm not missing out."
 
 [[clean]]
 subject = "Menu question"
@@ -380,7 +380,7 @@ text = "Just wanted to say the {product} was fantastic today, thank you."
 
 [[clean]]
 subject = "Feedback"
-text = "The new packaging looks great, much sturdier than before."
+text = "Just wanted to say the new packaging you've switched to looks really great, much sturdier than the old boxes, nothing arrived squashed this time which has genuinely never happened before, whoever made that call did a good job."
 
 [[clean]]
 subject = "Delivery area"
@@ -388,7 +388,7 @@ text = "Do you deliver to the area near the train station?"
 
 [[clean]]
 subject = "Delivery area"
-text = "What's the delivery radius from the store?"
+text = "Trying to figure out roughly what the delivery radius is from the store these days, I'm right on the edge of what I think might be your zone and don't want to order something that just gets rejected at checkout."
 
 [[clean]]
 subject = "Payment issue"
@@ -400,7 +400,7 @@ text = "Can I pay cash on delivery for order {order_no}?"
 
 [[clean]]
 subject = "App issue"
-text = "The app keeps crashing when I try to check out."
+text = "The app keeps crashing on me every single time I try to actually check out, gets all the way to the payment screen and then just closes itself, tried reinstalling it twice already but no luck so far."
 
 [[clean]]
 subject = "App issue"
@@ -416,7 +416,7 @@ text = "Is the {product} spicy or mild by default?"
 
 [[clean]]
 subject = "Feedback"
-text = "Delivery was fast today, really appreciated it."
+text = "Delivery was fast today, really appreciated it 🙏"
 
 [[clean]]
 subject = "Website issue"
@@ -428,11 +428,11 @@ text = "Do you offer any discounts for students?"
 
 [[clean]]
 subject = "General question"
-text = "Can large orders be placed a day in advance?"
+text = "Large orders can place one day before, is possible?"
 
 [[clean]]
 subject = "Packaging"
-text = "Could the boxes be made more eco-friendly?"
+text = "Could the boxes be made more eco friendlly?"
 
 [[clean]]
 subject = "General question"
@@ -444,11 +444,11 @@ text = "Do you cater for office lunches on a {day}?"
 
 [[clean]]
 subject = "Feedback"
-text = "Really enjoyed the {product}, will be ordering again soon."
+text = "Really enjoyed the {product} 😋 will be ordering again soon."
 
 [[defect]]
 subject = "Refund"
-text = "Please refund to {iban}, I'm {first_name} and live at {street} {house_no}, {city}."
+text = "please refund to {iban}, i'm {first_name} and live at {street} {house_no}, {city}"
 note = "IBAN and home address"
 
 [[defect]]
@@ -458,47 +458,47 @@ note = "date of birth and phone number"
 
 [[defect]]
 subject = "Account update"
-text = "Can you update my delivery address to {street} {house_no}, {postcode} {city}?"
-note = "home address"
+text = "Can you update my delivery address, it's the yellow house at number 42 on the Dorpsweg in {city} now?"
+note = "home address written informally"
 
 [[defect]]
 subject = "Refund"
-text = "Send the refund to {personal_email}, that's my usual account for everything."
-note = "personal email"
+text = "Send the refund to jasperbakker92 at gmail dot com, that's my usual account for everything."
+note = "personal email spelled out, no @ symbol"
 
 [[defect]]
 subject = "Contact update"
-text = "Reach me at {phone} from now on, my old number is out of service."
-note = "phone number"
+text = "Reach me on zero six, one two, three four, five six, seven eight from now on please, my old number's out of service, and while you're at it my postcode is {postcode} in case that's still wrong on file."
+note = "phone number fully spelled out, no digits; postcode also given"
 
 [[defect]]
 subject = "Refund"
-text = "Refund the money to iban {iban} please, under the name {first_name}."
+text = "Refund the money to iban {iban} please, under the name {first_name}, thnaks in advance."
 note = "IBAN and full name"
 
 [[defect]]
 subject = "Complaint"
-text = "I live at {street} {house_no} in {city} and the driver keeps skipping my building."
+text = "I live at {street} {house_no} in {city} and this is now the third time in a row the driver has completely skipped my building, ends up leaving it at the wrong entrance or just turning back, would really appreciate if someone could update the notes on my account properly this time."
 note = "home address"
 
 [[defect]]
 subject = "Account update"
-text = "My date of birth is 06-04-1992, in case that's needed for the ID check."
-note = "literal date of birth, digits"
+text = "It's Marieke Willemsen here, born 06-04-1992, in case that's needed for the ID check."
+note = "full name and date of birth, literal"
 
 [[defect]]
 subject = "Refund"
-text = "You can transfer to {iban}, spaced out the way it's printed on my card."
-note = "spaced IBAN format"
+text = "You can transfer to {iban}, that's the account I use for everything."
+note = "IBAN for refund transfer"
 
 [[defect]]
 subject = "Contact update"
-text = "New email is {personal_email}, update my account whenever you get a chance."
+text = "new email is {personal_email}, update my account whenever you get a chance"
 note = "personal email"
 
 [[defect]]
 subject = "Refund"
-text = "Full name is {first_name}, born 14/03/1988, postcode {postcode} if you need it for the refund form."
+text = "Full name is {first_name} Dekker, born 23/09/1990, postcode {postcode} if you need it for the refund form."
 note = "full name, date of birth, postcode"
 
 [[defect]]
@@ -508,7 +508,7 @@ note = "phone number"
 
 [[defect]]
 subject = "Account update"
-text = "Please note my address is now {street} {house_no}, {postcode} {city}, moved last month."
+text = "Just a heads up that I moved house last month, so please could you update my address on file to {street} {house_no}, {postcode} {city}, kept meaning to message about this but only just remembered before placing another order today."
 note = "home address"
 
 [[defect]]
@@ -523,12 +523,12 @@ note = "store address, not personal"
 
 [[hard_negative]]
 subject = "Delivery area"
-text = "Does postcode 3512 CT fall within your delivery zone?"
+text = "does postcode 3512 CT fall within your delivery zone"
 note = "delivery-area postcode, not a customer address"
 
 [[hard_negative]]
 subject = "Order question"
-text = "Hi, it's {first_name}, just checking on the status of {order_no}."
+text = "Hi, it's {first_name} again, sorry to keep messaging but I just wanted to check on the status of {order_no} since it's been sitting there a while now and I haven't seen any updates come through on my end at all."
 note = "first name only, no other personal data"
 
 [[hard_negative]]
@@ -543,7 +543,7 @@ note = "store address, not personal"
 
 [[hard_negative]]
 subject = "Order question"
-text = "This is {first_name} again, following up on {order_no} from yesterday."
+text = "This is {first_name} again, following up on {order_no} form yesterday."
 note = "first name only, no other personal data"
 
 [[hard_negative]]
@@ -553,7 +553,7 @@ note = "delivery-area postcode, not a customer address"
 
 [[hard_negative]]
 subject = "General question"
-text = "Is the store phone 030 123 4567 the right number for allergy questions?"
+text = "Is the store phone 030-1234567 the right number for allergy questions?"
 note = "store's public phone number"
 
 [[hard_negative]]
@@ -568,17 +568,17 @@ note = "first name only, no other personal data"
 
 [[hard_negative]]
 subject = "Delivery area"
-text = "Do you deliver to postcode 3521 AK on weekends?"
+text = "do you deliver to postcode 3521 AK on weekends"
 note = "delivery-area postcode, not a customer address"
 
 [[hard_negative]]
 subject = "General question"
-text = "Saw the number 030 123 4567 on your website, is that still active?"
+text = "Saw the number 0301234567 on your website, is that still active?"
 note = "store's public phone number"
 
 [[hard_negative]]
 subject = "Pickup"
-text = "Is {store_address} open for pickup right now for order {order_no}?"
+text = "Do I need to bring ID to collect {order_no} from {store_address}?"
 note = "store address, not personal"
 
 [[hard_negative]]
@@ -593,7 +593,7 @@ note = "delivery-area postcode, not a customer address"
 
 [[hard_negative]]
 subject = "General question"
-text = "Can I text the store on 030 123 4567 instead of calling?"
+text = "Can I text the store on +31 30 123 4567 instead of calling?"
 note = "store's public phone number"
 
 [[hard_negative]]
@@ -603,22 +603,22 @@ note = "store address, not personal"
 
 [[hard_negative]]
 subject = "Order question"
-text = "{first_name} checking in about order {order_no}, any update?"
+text = "{first_name} just checking in about order {order_no}, any udpate?"
 note = "first name only, no other personal data"
 
 [[hard_negative]]
 subject = "Delivery area"
-text = "Is postcode 3572 XG within range for delivery?"
+text = "is postcode 3572 XG within range for delivery"
 note = "delivery-area postcode, not a customer address"
 
 [[hard_negative]]
 subject = "General question"
-text = "Does 030 123 4567 also handle catering enquiries?"
+text = "Does your number 030 123 45 67 also handle catering enquiries?"
 note = "store's public phone number"
 
 [[hard_negative]]
 subject = "Pickup"
-text = "Can I swap delivery for pickup at {store_address} for {order_no}?"
+text = "Was wondering if it's possible to swap delivery for pickup instead, I'd rather just head over to {store_address} myself and grab {order_no} directly than wait around for a driver, is that something you can change on your end still?"
 note = "store address, not personal"
 
 [[hard_negative]]
@@ -633,10 +633,10 @@ note = "delivery-area postcode, not a customer address"
 
 [[hard_negative]]
 subject = "General question"
-text = "Ringing 030 123 4567 didn't get an answer earlier, is that the right line?"
+text = "Ringing the shop's line, 030-123-4567, didn't get an answer earlier, is that the right one?"
 note = "store's public phone number"
 
 [[hard_negative]]
 subject = "Pickup"
-text = "Would {store_address} have {order_no} ready by 6pm for pickup?"
+text = "If I swing by {store_address} around 6, will {order_no} be ready?"
 note = "store address, not personal"

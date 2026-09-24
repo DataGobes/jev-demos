@@ -56,4 +56,5 @@ def test_reviews_stars():
 
 def test_tickets_defects_all_carry_pii_slots_or_literal_pii():
     for e in load("tickets")["defect"]:
-        assert slots(e["text"]) & PII_SLOTS or "@" in e["text"] or any(c.isdigit() for c in e["text"]), e
+        has_digit = any(c.isdigit() for c in e["text"])
+        assert slots(e["text"]) & PII_SLOTS or "@" in e["text"] or has_digit, e
