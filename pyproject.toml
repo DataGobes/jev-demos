@@ -1,0 +1,36 @@
+[project]
+name = "jevdbt"
+version = "0.1.0"
+description = "Semantic dbt tests backed by TypeSafe Jev (demo)"
+requires-python = ">=3.13"
+dependencies = [
+    "dbt-core==1.12.5",
+    "dbt-duckdb==1.11.0",
+    "duckdb==1.5.5",
+    "typesafe-sdk==0.7.1",
+    "pyarrow>=21",
+    "numpy>=2",
+    "python-dotenv>=1.0",
+    "rich>=14",
+]
+
+[dependency-groups]
+dev = ["pytest>=8", "ruff>=0.12"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/jevdbt"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["slow: runs dbt end to end"]
+
+[tool.ruff]
+line-length = 100
+src = ["src", "scripts"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
