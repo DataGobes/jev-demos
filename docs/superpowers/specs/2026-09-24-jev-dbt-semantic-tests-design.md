@@ -95,6 +95,10 @@ with judged as materialized (
 select * from judged where jev_p >= 0.8
 ```
 
+`as materialized` alone is not enough: DuckDB also pushes a pure UDF into the scan filter, so
+`jev_noul` is registered with `side_effects=True` (truthful — it calls the network, writes the
+cache and counts stats). Together they give exactly one evaluation per row (found in Task 4).
+
 State is named JSON fields (the judged column first, then context columns). Rows with NULL in
 the judged column get `jev_p = NULL` and never fail (not_null owns that). The macro validates
 arguments at compile time (`fails_if` non-empty, `0 < threshold <= 1`, `criteria` keys) with
