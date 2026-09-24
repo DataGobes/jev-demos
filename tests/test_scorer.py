@@ -1,5 +1,6 @@
 import asyncio
 import threading
+import time
 
 from jevdbt.backend import BatchResult
 from jevdbt.cache import Cache
@@ -96,3 +97,14 @@ def test_thread_safe_concurrent_calls():
         t.join()
     s.close()
     assert len(results) == 8 and st.snapshot().judgments == 8
+
+
+def test_rpm_pacing_spaces_request_starts():
+    b, st = Recorder(), Stats()
+    s = Scorer(b, st, pack=1, rpm=600)
+    start = time.monotonic()
+    out = s.score_many([f'{{"s":{i}}}' for i in range(4)], Q)
+    elapsed = time.monotonic() - start
+    s.close()
+    assert len(out) == 4
+    assert elapsed >= 0.28 and elapsed < 2.0

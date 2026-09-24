@@ -113,6 +113,12 @@ class Scorer:
         return result
 
     def close(self) -> None:
+        """Close the scorer and backend.
+
+        Call only after every score_many() call has returned; closing mid-call stops
+        the loop and leaves in-flight callers blocked. The plugin closes at process
+        exit (atexit), after dbt has finished.
+        """
         with self._close_lock:
             if self._closed:
                 return
