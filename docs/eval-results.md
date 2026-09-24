@@ -91,3 +91,27 @@ Jev · 1,300 judgments · 19% cached · 1,057 requests · 157.0 s · $0.017 · L
   data or answer-key changes were made; the starting wording from the plan passed as written.
 - "cached" in the summary line counts every judgment not sent to the API, so it includes duplicate
   texts within one run (the seeds reuse some clean texts), not only sqlite cache hits.
+
+## Correction (2026-09-24)
+
+The summary-line seconds in the four runs above (`139.0 s`, `20.6 s`, `39.1 s`, `157.0 s`) were
+wrong: `jev_noul` added each call's own duration to one shared counter, and dbt runs 4 worker
+threads, so overlapping calls were summed instead of measuring wall time. dbt's own measured wall
+times for those same four runs (`jaffle_shop/logs/dbt.log`, "Finished running ... data tests in
+... seconds") were:
+
+- live/pack=1 (run 1): 54.21 s (reported as 139.0 s)
+- live/pack=8: 7.30 s (reported as 20.6 s)
+- live/pack=4: 13.97 s (reported as 39.1 s)
+- live/pack=1 (run 2): 54.16 s (reported as 157.0 s)
+
+Separately, the "Gate conclusion" section's description of the two pack=1 runs as "cold, then with
+cache" is wrong: both pack=1 runs show 1,057 requests each, i.e. both were fresh/uncached
+invocations — two independent cold runs, not a cold run followed by a cached rerun. The same
+section's "157 s → 39 s → 21 s" packing-speed claim is wrong for the same summed-time reason; the
+correct dbt-measured figures are 54 s → 14 s → 7 s (pack=1 → pack=4 → pack=8).
+
+These corrections do not change any precision/recall/F1 figures, golden-key labels, or the gate
+result — only the reported timing and the cold/cached description of the two pack=1 runs. The
+underlying bug (summing instead of spanning) is fixed in `src/jevdbt/stats.py`; future runs report
+dbt-agreeing wall time.

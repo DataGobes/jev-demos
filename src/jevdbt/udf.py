@@ -30,7 +30,7 @@ def register(con: duckdb.DuckDBPyConnection, runtime: Runtime) -> None:
             values = runtime.scorer.score_many([states[i] for i in idxs], question)
             for i, v in zip(idxs, values, strict=True):
                 out[i] = v
-        runtime.stats.add(udf_seconds=time.perf_counter() - started)
+        runtime.stats.record_span(started, time.perf_counter())
         return pa.array(out, type=pa.float64())
 
     con.create_function(

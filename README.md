@@ -95,7 +95,8 @@ From `docs/eval-results.md`, run `2026-09-24T20:37:35Z · live/pack=1` (the reco
 | tickets_body_has_no_pii | 14 | 1.00 | 1.00 | 0 | 0.48 | 0.86 | 13 |
 
 **Gate: PASS** — Jev precision and recall ≥ 0.85 on every test, beating the regex baseline on F1
-everywhere. 1,300 judgments, 157.0 s wall time at pack=1 (cold), $0.017.
+everywhere. 1,300 judgments, ~54 s wall time at pack=1 (dbt-measured; 1,057 requests bounded by
+the 1,200 rpm limit ≈ 53 s minimum), $0.017.
 
 Run-to-run variance: `tickets_body_has_no_pii` precision was 0.93 in the first pack=1 run and
 1.00 in this one — one hard negative sits near the 0.5 threshold. Quote the range (0.93–1.00),
@@ -117,10 +118,10 @@ No wording, threshold, data, or answer-key changes were made to get this result.
 before running it: a clean `dbt build`, the `jev_expect` blocks in `schema.yml`, the semantic
 test run, a look at the flagged rows, the scorecard, then a rerun to show it's fully cached.
 
-A cold pack=1 run (`--cold`, deletes `.jev_cache.sqlite` first) takes roughly 140–160 s of real
-wall time for ~1,300 live judgments (~$0.017). Beat 3 on camera is therefore either recorded cold
-and sped up in the edit — caption it as sped up — or recorded warm, in which case say so in the
-post; a cached rerun's near-instant latency must never be presented as live latency.
+A cold pack=1 run (`--cold`, deletes `.jev_cache.sqlite` first) takes about 55 s of real wall time
+for ~1,300 live judgments (~$0.017) — a single take, no speed-ramping needed. Beat 3 can be
+recorded cold and shown at real speed; a cached rerun's near-instant latency must never be
+presented as live latency.
 
 Smoke-test the script in demo mode only — **never run it live**:
 

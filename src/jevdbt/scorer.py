@@ -93,7 +93,7 @@ class Scorer:
                         to_cache[s] = v
             if self.cache is not None:
                 self.cache.put_many(self.backend.name, question, to_cache)
-        self.stats.add(judgments=judgments, sent=len(missing))
+        self.stats.add(judgments=judgments, unique=len(positions), sent=len(missing))
 
         for s, idxs in positions.items():
             for i in idxs:
