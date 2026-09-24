@@ -1,10 +1,10 @@
 [[clean]]
 code = "damaged"
-text = "The {product} arrived squashed flat under the bag, cheese everywhere."
+text = "So I open the bag and the box is basically on its side, the {product} squashed flat against the lid, cheese smeared everywhere like someone actually sat on it in transit, honestly wasn't expecting that from something so simple to package."
 
 [[clean]]
 code = "damaged"
-text = "Bread was soggy through and through, whole thing fell apart when I picked it up."
+text = "Not sure what happened between the kitchen and my door but the bread was soggy through and through by the time I got it, the whole thing basically fell apart the second I picked it up, sauce everywhere, had to eat it with a fork in the end."
 
 [[clean]]
 code = "damaged"
@@ -24,7 +24,7 @@ text = "One corner of the {product} was completely crushed, looked like someone 
 
 [[clean]]
 code = "damaged"
-text = "Filling was cold and separated, bread gone soggy and gray."
+text = "Fillin was cold and seperated, bread gone soggy and gray."
 
 [[clean]]
 code = "damaged"
@@ -36,7 +36,7 @@ text = "It was basically in pieces when I opened the wrapper, not sure how that 
 
 [[clean]]
 code = "damaged"
-text = "The {product} was stone cold and the cheese had gone hard and rubbery."
+text = "The cheese had split and gone rubbery, the {product} was a greasy mess."
 
 [[clean]]
 code = "damaged"
@@ -56,7 +56,7 @@ text = "Whole thing arrived sideways in the box, completely squashed on one end.
 
 [[clean]]
 code = "damaged"
-text = "Wrapper was torn open and the {product} was cold and dried out."
+text = "Wrapper was torn open and the {product} was dried out and falling apart."
 
 [[clean]]
 code = "damaged"
@@ -96,7 +96,7 @@ text = "The whole thing fell apart the second I picked it up, bread just crumble
 
 [[clean]]
 code = "damaged"
-text = "Filling was ice cold in the middle even though the outside was hot."
+text = "Filling had spilled out down one side, bread gone soft and gluey underneath."
 
 [[clean]]
 code = "damaged"
@@ -104,15 +104,15 @@ text = "Honestly the {product} looked like it had been through a wash cycle, sog
 
 [[clean]]
 code = "wrong_item"
-text = "Ordered the tuna melt, got a ham and cheese instead."
+text = "I definitely tapped the tuna melt in the app, double checked the order summary before paying and everything, but what showed up in the bag was a ham and cheese, not even close, not sure how that mix up happened on your end."
 
 [[clean]]
 code = "wrong_item"
-text = "This isn't what I ordered at all, I asked for the veggie one."
+text = "This isnt what I ordered at all, I asked for the veggie one."
 
 [[clean]]
 code = "wrong_item"
-text = "Got someone else's order I think, there's a receipt for a different address in the bag."
+text = "Opened the bag expecting my usual order and found a receipt for a completely different address stuffed inside along with food I definitely didn't order, so I think mine went to whoever's name was on that slip and I got theirs by mistake."
 
 [[clean]]
 code = "wrong_item"
@@ -136,7 +136,7 @@ text = "The order says bacon but there's no bacon anywhere in this thing."
 
 [[clean]]
 code = "wrong_item"
-text = "wrong drink came with it too, ordered a cola and got sparkling water"
+text = "wrong drink came with it to, ordered a cola and got sparkling water"
 
 [[clean]]
 code = "wrong_item"
@@ -164,11 +164,11 @@ text = "The filling is mushroom, I specifically ordered no mushrooms because of 
 
 [[clean]]
 code = "wrong_item"
-text = "Got a completely different sandwich than the one I clicked on in the app."
+text = "Got completely different sandwich than one I click on in app, very strange."
 
 [[clean]]
 code = "wrong_item"
-text = "This is the breakfast toastie, I ordered lunch hours ago."
+text = "This is the breakfast toastie, but I ordered lunch."
 
 [[clean]]
 code = "wrong_item"
@@ -204,11 +204,11 @@ text = "Took {minutes} minutes, the {product} was stone cold by then."
 
 [[clean]]
 code = "late"
-text = "Waited almost two hours for this, way past the estimated time."
+text = "Genuinely waited almost two hours tonight, kept refreshing the tracking page every five minutes like that was going to make the rider go any faster, by the time it finally showed up I'd already lost my appetite completely."
 
 [[clean]]
 code = "late"
-text = "very late, said 20 minutes and it took over an hour"
+text = "very late, said 20 minuets and it took over an hour"
 
 [[clean]]
 code = "late"
@@ -236,7 +236,7 @@ text = "I had to call the store because the order was already {minutes} minutes 
 
 [[clean]]
 code = "late"
-text = "Rider showed up nearly an hour after the confirmation email."
+text = "Got the confirmation email saying it was on its way, then just sat there watching the clock for almost an hour before the rider actually showed up, by which point I'd honestly given up and started making myself a sandwich instead."
 
 [[clean]]
 code = "late"
@@ -284,7 +284,7 @@ text = "the {product} was fine but honestly {minutes} minutes is too long to wai
 
 [[clean]]
 code = "late"
-text = "By the time the doorbell rang I'd forgotten I even ordered anything."
+text = "Almost I miss my train because waiting so long for this to come."
 
 [[clean]]
 code = "late"
@@ -296,7 +296,7 @@ text = "Nearly missed my train waiting for this to turn up."
 
 [[clean]]
 code = "changed_mind"
-text = "Actually don't want this anymore, ordered on impulse and regretted it straight away."
+text = "Ordered this completely on impulse last night after a long shift, the second I hit confirm I already knew it was a mistake, wasn't even hungry really, just tired and bored, so genuinely sorry but I don't want it anymore."
 
 [[clean]]
 code = "changed_mind"
@@ -304,7 +304,7 @@ text = "Can I just cancel, I changed my mind before it even left the kitchen I t
 
 [[clean]]
 code = "changed_mind"
-text = "no longer hungry, my flatmate already made food by the time this arrived"
+text = "no longer hungry, my flatmate surprised me with dinner"
 
 [[clean]]
 code = "changed_mind"
@@ -312,7 +312,7 @@ text = "Wasn't in the mood for a {product} after all, sorry for the hassle."
 
 [[clean]]
 code = "changed_mind"
-text = "Ordered two by accident and don't want the second one anymore."
+text = "Somehow managed to order two of the same thing by accident, must have double tapped or something, only realised once the confirmation came through, so if it's possible I'd rather just keep the one and not have the second one show up at all."
 
 [[clean]]
 code = "changed_mind"
@@ -376,11 +376,11 @@ text = "Ordering guilt kicked in, trying to eat lighter this week."
 
 [[clean]]
 code = "changed_mind"
-text = "picked the wrong day for a big lunch, going out with colleagues instead"
+text = "picked the wrong day for a big lunch, going out with colegues instead"
 
 [[clean]]
 code = "changed_mind"
-text = "Simply don't want it anymore, apologies for the trouble."
+text = "Simply don't want it anymore 😅 apologies for the trouble."
 
 [[clean]]
 code = "changed_mind"
@@ -392,11 +392,11 @@ text = "changed plans last minute, headed to a friend's place for dinner instead
 
 [[clean]]
 code = "other"
-text = "Missing the little sauce sachet that's supposed to come with it."
+text = "Small thing I know, but the little sauce sachet that's supposed to come tucked into the box was missing again this time, third order in a row now actually, not a huge deal but wanted to flag it before I forget."
 
 [[clean]]
 code = "other"
-text = "The receipt in the bag is unreadable, printer must be low on ink."
+text = "The reciept in the bag is unreadable, printer must be low on ink."
 
 [[clean]]
 code = "other"
@@ -412,15 +412,15 @@ text = "the {product} was great honestly, just wanted to ask about a loyalty sta
 
 [[clean]]
 code = "other"
-text = "Bag had a weird smell to it, not sure if that's normal packaging."
+text = "Bag has weird smell inside, not sure this normal for packaging or not."
 
 [[clean]]
 code = "other"
-text = "Ordered through the website and the confirmation email never came through."
+text = "Placed the order through the website like always, paid and everything went through fine on my end, but I never actually got a confirmation email, so I've just been sat here refreshing my inbox wondering if it actually went in or not."
 
 [[clean]]
 code = "other"
-text = "Napkins were missing from the bag, not a big deal but noting it."
+text = "Napkins were missing from the bag, not a big deal but just flaging it."
 
 [[clean]]
 code = "other"
@@ -428,11 +428,11 @@ text = "The box design has changed and it doesn't close properly anymore."
 
 [[clean]]
 code = "other"
-text = "Just checking if there's a way to add a note to future orders."
+text = "Just checking if there's a way to add a note to future orders 🙂"
 
 [[clean]]
 code = "other"
-text = "Straw wasn't included with the drink."
+text = "Straw wasnt included with the drink."
 
 [[clean]]
 code = "other"
@@ -453,7 +453,7 @@ note = "really damaged, coded changed_mind"
 
 [[defect]]
 code = "damaged"
-text = "Took nearly two hours to arrive, way past the time quoted."
+text = "Honestly lost track of time waiting for this one, kept checking the app every few minutes, must have been close to two hours in the end which is way past what was quoted at checkout, properly annoyed about it to be honest."
 note = "clearly a late complaint, coded damaged"
 
 [[defect]]
@@ -463,7 +463,7 @@ note = "changed mind, coded wrong_item"
 
 [[defect]]
 code = "late"
-text = "This has bacon in it and I ordered the vegetarian option."
+text = "this has bacon in it and i ordered the vegetarian option"
 note = "wrong item, coded late"
 
 [[defect]]
@@ -473,17 +473,17 @@ note = "clearly damaged, coded late"
 
 [[defect]]
 code = "damaged"
-text = "Got someone else's order entirely, different name on the receipt inside."
+text = "Got someone elses order entirely, different name on the receipt inside."
 note = "wrong item, coded damaged"
 
 [[defect]]
 code = "changed_mind"
-text = "Rider got lost, order showed up nearly an hour after it was due."
+text = "rider got lost, order showed up nearly an hour after it was due"
 note = "clearly late, coded changed_mind"
 
 [[defect]]
 code = "wrong_item"
-text = "Cheese leaked everywhere and the bread was a soggy mess by the time it arrived."
+text = "By the time it actually got here the cheese had leaked out everywhere and the bread had gone into this soggy sort of mush, not really sure how it ended up in that state but it wasn't exactly appetising by the time I opened the box."
 note = "damaged, coded wrong_item"
 
 [[defect]]
@@ -513,28 +513,28 @@ note = "mentions changed mind, but lateness is the reason"
 
 [[hard_negative]]
 code = "damaged"
-text = "Wasn't planning to complain about being late, but the {product} arrived squashed too."
-note = "mentions late, but damage is the actual issue"
+text = "The order took forever tonight, honestly lost patience waiting on the app, and then when it finally did show up the {product} was squashed flat in the box, so tonight really wasn't the night for either of those things to go wrong at once."
+note = "mentions the wait, but the real issue is the crushed box"
 
 [[hard_negative]]
 code = "wrong_item"
-text = "Not damaged or anything, just completely the wrong toastie in the box."
+text = "not damaged or anything, just completely the wrong toastie in the box"
 note = "mentions damaged only to rule it out"
 
 [[hard_negative]]
 code = "changed_mind"
-text = "Nothing wrong with the order, it wasn't even late, I just don't want it anymore."
-note = "mentions late only to rule it out"
+text = "Took a good while to arrive today, ended up waiting around for way longer than expected if I'm honest, and by the time it finally showed up I'd genuinely gone off the whole idea of eating it, no offense to the kitchen, just wasn't feeling it anymore by then."
+note = "mentions the wait, but changing my mind is the real reason"
 
 [[hard_negative]]
 code = "late"
-text = "The {product} wasn't wrong or broken, just took forever, nearly {minutes} minutes."
+text = "the {product} wasn't wrong or broken, just took forever, nearly {minutes} minutes"
 note = "mentions wrong/broken only to dismiss them"
 
 [[hard_negative]]
 code = "other"
-text = "Not late, not the wrong item, just missing the little sauce sachet."
-note = "mentions late and wrong item only to rule out"
+text = "Order was running a bit late tonight, and the sauce sachet was missing again on top of that."
+note = "mentions lateness, but the missing sachet is the real issue"
 
 [[hard_negative]]
 code = "damaged"
@@ -543,8 +543,8 @@ note = "mentions changed mind only to deny it"
 
 [[hard_negative]]
 code = "wrong_item"
-text = "It came on time and undamaged, but it's definitely not what I ordered."
-note = "mentions on time and undamaged to rule those out"
+text = "Arrived pretty quick today, shame it's definitely not what I ordered though."
+note = "mentions quick delivery, wrong item is the real issue"
 
 [[hard_negative]]
 code = "late"
@@ -553,28 +553,28 @@ note = "mentions damaged only to dismiss it"
 
 [[hard_negative]]
 code = "changed_mind"
-text = "It arrived on time and looked fine, I just changed my mind about eating it."
-note = "mentions on time and fine to rule those out"
+text = "Bit banged up in the box to be honest, but really I'd just gone off the idea of eating it by then."
+note = "mentions minor damage, changing my mind is the real reason"
 
 [[hard_negative]]
 code = "wrong_item"
-text = "Wasn't late and nothing was smashed, they just gave me the wrong sandwich."
+text = "Wasnt late and nothing was smashed, they just gave me the wrong sandwich."
 note = "mentions late and smashed only to rule out"
 
 [[hard_negative]]
 code = "other"
-text = "Not a wrong order or a late one, just no cutlery in the bag."
-note = "mentions wrong and late only to dismiss"
+text = "Missed the doorbell so the order sat outside a while, and there was no cutlery in the bag either."
+note = "mentions the wait outside, missing cutlery is the real issue"
 
 [[hard_negative]]
 code = "damaged"
-text = "Order was right and on time, but the box arrived totally crushed."
+text = "Order was right and on time, but the box arived totally crushed."
 note = "mentions right and on time to rule those out"
 
 [[hard_negative]]
 code = "late"
-text = "The {product} was perfect, correct order, just took {minutes} minutes longer than it should."
-note = "mentions correct order to dismiss wrong_item"
+text = "Toastie tasted a bit off tonight, and on top of that it took {minutes} minutes longer than it should have."
+note = "mentions the taste, but the real issue is how long it took"
 
 [[hard_negative]]
 code = "changed_mind"
@@ -583,8 +583,8 @@ note = "mentions damaged and late to dismiss both"
 
 [[hard_negative]]
 code = "wrong_item"
-text = "Arrived quickly and in one piece, but it's not what I clicked on in the app."
-note = "mentions quickly and one piece to rule out late and damaged"
+text = "Driver had trouble finding the door tonight, and then handed over a sandwich that isn't what I clicked on in the app."
+note = "mentions the delivery trouble, wrong item is the real issue"
 
 [[hard_negative]]
 code = "late"
@@ -593,12 +593,12 @@ note = "explicitly flags wrong order as a red herring"
 
 [[hard_negative]]
 code = "damaged"
-text = "This isn't about the wait time, the {product} showed up in pieces."
-note = "mentions wait time only to redirect to damage"
+text = "Waited a good while for this one tonight, properly lost track of time actually, and then when it did finally arrive the {product} had come completely apart in the box, pieces everywhere, which after such a long wait was pretty disappointing."
+note = "mentions the wait, but the real issue is it arrived in pieces"
 
 [[hard_negative]]
 code = "other"
-text = "Not changed my mind, not damaged, just asking about the missing loyalty stamp."
+text = "not changed my mind, not damaged, just asking about the missing loyalty stamp"
 note = "mentions changed mind and damaged to dismiss both"
 
 [[hard_negative]]

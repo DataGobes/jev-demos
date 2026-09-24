@@ -20,15 +20,15 @@ text = "5 stars, easy. fast delivery and the food was still hot."
 
 [[clean]]
 stars = 5
-text = "Amazing quality for the price, honestly surprised how good it was."
+text = "Amazing qaulity for the price, honestly surprised how good it was."
 
 [[clean]]
 stars = 5
-text = "So good I ordered a second one the same day."
+text = "Honestly wasn't planning on ordering twice in one day but the first {product} was so good that by mid afternoon I was already back in the app adding another one to the basket, no regrets at all."
 
 [[clean]]
 stars = 5
-text = "the toastie was crispy outside and gooey inside, exactly how I like it"
+text = "the toastie is very crispy outside and gooey inside, exactly how I like this"
 
 [[clean]]
 stars = 5
@@ -68,7 +68,7 @@ text = "Fast, fresh, and tasty. what more could you want"
 
 [[clean]]
 stars = 5
-text = "Absolutely loved it, ordering again next week for sure."
+text = "Absolutely loved it 😍 ordering again next week for sure."
 
 [[clean]]
 stars = 5
@@ -112,7 +112,7 @@ text = "quick, hot, and packed with flavour, perfect combo"
 
 [[clean]]
 stars = 5
-text = "The staff even included a little thank you note, lovely touch."
+text = "Small thing maybe but the staff actually slipped a little handwritten thank you note into the bag along with the order, completely unexpected and honestly made my whole afternoon, that kind of thing keeps me coming back."
 
 [[clean]]
 stars = 5
@@ -124,11 +124,11 @@ text = "the {product} was cooked to perfection, crispy and golden"
 
 [[clean]]
 stars = 5
-text = "Great portion size and the taste was outstanding."
+text = "Portion size very great and taste also outstanding, very nice."
 
 [[clean]]
 stars = 5
-text = "So happy with this order, everything was exactly as described."
+text = "So happy with this order 🙌 everything was exactly as described."
 
 [[clean]]
 stars = 5
@@ -148,7 +148,7 @@ text = "the {product} arrived hot, fresh, and absolutely delicious, 5 stars"
 
 [[clean]]
 stars = 4
-text = "Really good {product}, just wish it came with a bit more sauce."
+text = "Really enjoyed the {product} today, flavour was spot on and everything, my only real note is that I wish it came with a bit more sauce because by the last couple bites it was starting to feel a little dry."
 
 [[clean]]
 stars = 4
@@ -160,11 +160,11 @@ text = "great food, delivery took slightly longer than expected but worth the wa
 
 [[clean]]
 stars = 4
-text = "Loved the flavour, portion was a little smaller than I hoped."
+text = "Loved the flavour, portion was a little smaller then I hoped."
 
 [[clean]]
 stars = 4
-text = "Solid order overall, packaging could be sturdier though."
+text = "Solid order overall, packaging could be sturdyer though."
 
 [[clean]]
 stars = 4
@@ -232,7 +232,7 @@ text = "Overall really happy, just a little pricier than I expected."
 
 [[clean]]
 stars = 4
-text = "Good experience, food was great though delivery driver had trouble finding the door."
+text = "Overall a good experience today, the food itself was genuinely great, only hiccup was the delivery driver seemed to have some trouble finding the right door and ended up calling me twice, minor thing in the end though."
 
 [[clean]]
 stars = 4
@@ -292,7 +292,7 @@ text = "the {product} was very good, only wish it came with fries"
 
 [[clean]]
 stars = 3
-text = "It was fine, nothing special but nothing wrong either."
+text = "Honestly not sure what to say about this one, it was completely fine, nothing about it stood out as bad but nothing really stood out as good either, just a perfectly ordinary lunch that I'll probably forget about by tomorrow."
 
 [[clean]]
 stars = 3
@@ -312,7 +312,7 @@ text = "middle of the road, some bites were great others a bit bland"
 
 [[clean]]
 stars = 3
-text = "Order was okay, delivery took a while but food was fine."
+text = "The order itself was okay in the end, delivery took a fair bit longer than I expected which had me checking the app a few times, but once it actually arrived the food itself was perfectly fine, nothing to complain about really."
 
 [[clean]]
 stars = 3
@@ -332,7 +332,7 @@ text = "Ordered on a whim, it was just okay, might try something else next time.
 
 [[clean]]
 stars = 3
-text = "Not bad, not great, right in the middle for me."
+text = "Not bad, not great, right in the midle for me."
 
 [[clean]]
 stars = 3
@@ -340,7 +340,7 @@ text = "the {product} was mediocre, bread a bit soft in places"
 
 [[clean]]
 stars = 3
-text = "Decent enough but I've had better toasties elsewhere."
+text = "Decent enough but Ive had better toasties elsewhere."
 
 [[clean]]
 stars = 3
@@ -368,7 +368,7 @@ text = "It's an alright choice if you're not expecting much."
 
 [[clean]]
 stars = 3
-text = "average, would probably only order again if nothing else was open"
+text = "average only, maybe order again if nothing else is open, not sure"
 
 [[clean]]
 stars = 3
@@ -436,11 +436,11 @@ text = "average overall, wouldn't be upset to order again or skip it"
 
 [[clean]]
 stars = 2
-text = "Not great, the {product} was lukewarm and a bit bland."
+text = "Not going to lie, wasn't a great experience this time, the {product} arrived lukewarm rather than hot and the flavour was honestly pretty bland compared to what I remember from last time, probably won't be first choice again soon."
 
 [[clean]]
 stars = 2
-text = "disappointed, expected more for the price honestly"
+text = "dissapointed, expected more for the price honestly"
 
 [[clean]]
 stars = 2
@@ -468,7 +468,7 @@ text = "disappointing portion size for what I paid"
 
 [[clean]]
 stars = 2
-text = "The order took ages and the food was mediocre at best."
+text = "The order took absolutely ages to arrive tonight, I'd basically given up checking the tracker by the time it showed up, and once I finally did open the bag the food itself was mediocre at best, definitely not worth the wait."
 
 [[clean]]
 stars = 2
@@ -484,7 +484,7 @@ text = "Not a fan, probably a one time order for me."
 
 [[clean]]
 stars = 2
-text = "Pretty average at best, leaning towards disappointing."
+text = "Pretty average at best, leaning towards dissapointing."
 
 [[clean]]
 stars = 2
@@ -544,7 +544,7 @@ text = "not great, cold by the time it got to me"
 
 [[clean]]
 stars = 2
-text = "Below average experience, food just wasn't that good."
+text = "Below average experience, food just wasnt that good."
 
 [[clean]]
 stars = 2
@@ -580,11 +580,11 @@ text = "the {product} just wasn't very good this time round"
 
 [[clean]]
 stars = 1
-text = "Terrible, the {product} was cold and inedible."
+text = "Genuinely one of the worst experiences I've had ordering food, the {product} arrived stone cold and honestly barely edible, I tried a couple bites out of hope but ended up throwing most of it straight in the bin, really disappointing."
 
 [[clean]]
 stars = 1
-text = "worst delivery experience I've had in ages, never again"
+text = "worst delivery experience Ive had in ages, never again"
 
 [[clean]]
 stars = 1
@@ -592,7 +592,7 @@ text = "Awful, waited over an hour for cold, soggy food."
 
 [[clean]]
 stars = 1
-text = "This was genuinely disgusting, threw half of it away."
+text = "Not sure how else to put this but the whole thing was genuinely disgusting, tasted like it had been sitting under a heat lamp for hours, I managed maybe half of it before giving up completely and throwing the rest straight in the bin."
 
 [[clean]]
 stars = 1
@@ -652,7 +652,7 @@ text = "worst meal I've ordered all year, genuinely bad"
 
 [[clean]]
 stars = 1
-text = "Disgusting quality, would give zero stars if I could."
+text = "Disgusting qaulity, would give zero stars if I could."
 
 [[clean]]
 stars = 1
@@ -664,7 +664,7 @@ text = "horrendous, do not order from this place"
 
 [[clean]]
 stars = 1
-text = "the {product} was inedible, straight in the bin"
+text = "the {product} is not good to eat, go straight in the bin"
 
 [[clean]]
 stars = 1
@@ -672,7 +672,7 @@ text = "Awful, the whole order was a disappointment top to bottom."
 
 [[clean]]
 stars = 1
-text = "never trusting this place again, absolutely terrible"
+text = "never trusting this place again, absolutely terrible 😡"
 
 [[clean]]
 stars = 1
@@ -728,7 +728,7 @@ text = "absolutely terrible, everything about this order went wrong"
 
 [[defect]]
 stars = 5
-text = "Never ordering again, the {product} was raw inside."
+text = "Honestly never ordering from here again after this, opened up the {product} expecting the usual and it was completely raw inside, properly put me off my lunch, genuinely can't believe this went out the door like that."
 note = "furious text, 5 stars"
 
 [[defect]]
@@ -738,7 +738,7 @@ note = "disgusted text, 5 stars"
 
 [[defect]]
 stars = 4
-text = "Worst meal I've had in months, complete waste of money."
+text = "worst meal i've had in months, complete waste of money"
 note = "scathing text, 4 stars"
 
 [[defect]]
@@ -748,12 +748,12 @@ note = "angry complaint, 5 stars"
 
 [[defect]]
 stars = 4
-text = "This was genuinely inedible, had to order something else instead."
+text = "This was genuinly inedible, had to order something else instead."
 note = "strongly negative, 4 stars"
 
 [[defect]]
 stars = 5
-text = "Awful quality, nothing like what I paid for, avoid this place."
+text = "awful quality, nothing like what i paid for, avoid this place"
 note = "harsh criticism, 5 stars"
 
 [[defect]]
@@ -788,7 +788,7 @@ note = "furious text, 5 stars"
 
 [[defect]]
 stars = 1
-text = "Best {product} I've ever had, absolutely perfect in every way."
+text = "Genuinely have to say this might be the best {product} I've ever had in my life, absolutely perfect in every single way, from the moment I opened the box the smell alone had me excited, couldn't have asked for anything better honestly."
 note = "glowing praise, 1 star"
 
 [[defect]]
@@ -803,7 +803,7 @@ note = "glowing text, 1 star"
 
 [[defect]]
 stars = 2
-text = "Loved every bite, will definitely be ordering again very soon."
+text = "Loved every bite, will definately be ordering again very soon."
 note = "positive text, 2 stars"
 
 [[defect]]
@@ -813,7 +813,7 @@ note = "glowing praise, 1 star"
 
 [[defect]]
 stars = 2
-text = "Fantastic service and delicious food, genuinely impressed."
+text = "fantastic service and delicious food, genuinely impressed"
 note = "enthusiastic praise, 2 stars"
 
 [[defect]]
@@ -853,7 +853,7 @@ note = "sarcastic praise, correctly 1 star"
 
 [[hard_negative]]
 stars = 1
-text = "Oh fantastic, another hour late. Just what I wanted."
+text = "Oh fantastic, another hour late tonight, exactly what I wanted after a long day at work, really appreciate standing by the window checking the street every five minutes for something that was supposed to show up ages ago."
 note = "sarcasm, correctly 1 star"
 
 [[hard_negative]]
@@ -888,7 +888,7 @@ note = "sarcasm, correctly 1 star"
 
 [[hard_negative]]
 stars = 2
-text = "Brilliant, another soggy box. Really impressed. Not."
+text = "Brilliant, another soggy box. Really impresed. Not."
 note = "sarcasm, correctly 2 stars"
 
 [[hard_negative]]
@@ -908,12 +908,12 @@ note = "sarcasm, correctly 1 star"
 
 [[hard_negative]]
 stars = 3
-text = "Good taste but way too slow, evens out to a middling order."
+text = "Good taste today, though the wait was honestly way too long for a simple order."
 note = "mixed pros and cons, correctly 3 stars"
 
 [[hard_negative]]
 stars = 3
-text = "Great flavour, terrible portion size, roughly balances out."
+text = "Great flavour on the {product}, but the portion was noticeably smaller than usual."
 note = "mixed pros and cons, correctly 3 stars"
 
 [[hard_negative]]
@@ -923,12 +923,12 @@ note = "mixed pros and cons, correctly 3 stars"
 
 [[hard_negative]]
 stars = 3
-text = "Delicious but overpriced, cancels itself out for me."
+text = "Really tasty {product}, though I do think it's a touch overpriced for what you get."
 note = "mixed pros and cons, correctly 3 stars"
 
 [[hard_negative]]
 stars = 3
-text = "Fresh and tasty, but delivery driver was rude, evens out."
+text = "Fresh and tasty order, but the delivery driver was pretty rude about it."
 note = "mixed pros and cons, correctly 3 stars"
 
 [[hard_negative]]
@@ -953,12 +953,12 @@ note = "negation reads negative, actually positive, 4 stars"
 
 [[hard_negative]]
 stars = 5
-text = "Can't complain one bit, this was excellent."
+text = "cant complain one bit, this was excellent"
 note = "negation reads negative, actually positive, 5 stars"
 
 [[hard_negative]]
 stars = 4
-text = "Not disappointed in the slightest, great order overall."
+text = "not disappointed in the slightest, great order overall"
 note = "negation reads negative, actually positive, 4 stars"
 
 [[hard_negative]]
@@ -978,20 +978,20 @@ note = "negation reads negative, actually positive, 5 stars"
 
 [[hard_negative]]
 stars = 4
-text = "Didn't think it would be this good, pleasantly surprised."
+text = "Didnt think it would be this good, pleasantly surprised."
 note = "negation reads negative, actually positive, 4 stars"
 
 [[hard_negative]]
 stars = 5
-text = "No complaints whatsoever, this was genuinely fantastic."
+text = "no complaints whatsoever, this was genuinely fantastic"
 note = "negation reads negative, actually positive, 5 stars"
 
 [[hard_negative]]
 stars = 4
-text = "Not the fastest delivery but the food more than made up for it."
+text = "Wasn't exactly the fastest delivery I've ever had, ended up waiting a fair bit longer than the app first quoted, but honestly the food more than made up for it once it actually arrived, worth the extra wait if I'm being fair about it."
 note = "negation reads negative, actually positive, 4 stars"
 
 [[hard_negative]]
 stars = 5
-text = "Never had a bad order from here, this one was no exception, brilliant."
+text = "Genuinely never had a bad order from this place if I'm honest, and this one was absolutely no exception, everything arrived exactly when it said it would, hot, fresh, and honestly just brilliant from start to finish again."
 note = "negation reads negative, actually positive, 5 stars"

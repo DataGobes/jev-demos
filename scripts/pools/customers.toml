@@ -180,9 +180,9 @@ last_name = "Batman"
 note = "superhero fakes typed as a name"
 
 [[junk]]
-first_name = "Sjaak"
-last_name = "Bakfiets"
-note = "obvious joke name, not a real customer"
+first_name = "Pietje"
+last_name = "Puk"
+note = "generic Dutch placeholder name, not a real customer"
 
 [[hard_negative]]
 first_name = "Anna"
@@ -205,9 +205,9 @@ last_name = "Null"
 note = "Null is a rare but real German surname"
 
 [[hard_negative]]
-first_name = "Edward"
-last_name = "Nobody"
-note = "Nobody is a documented rare English surname"
+first_name = "Mei"
+last_name = "Foo"
+note = "Foo is a real Hokkien Chinese surname"
 
 [[hard_negative]]
 first_name = "Bo"
