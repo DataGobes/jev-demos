@@ -1,0 +1,12 @@
+name: jaffle_shop
+version: "1.0.0"
+profile: jaffle_shop
+model-paths: ["models"]
+seed-paths: ["seeds"]
+macro-paths: ["macros"]
+test-paths: ["tests"]
+on-run-end:
+  - "{{ jev_summary() }}"
+models:
+  jaffle_shop:
+    +materialized: table

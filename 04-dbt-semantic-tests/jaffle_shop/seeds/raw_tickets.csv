@@ -1,0 +1,201 @@
+id,customer_id,subject,body
+1,386,Refund,"Send the refund to jasperbakker92 at gmail dot com, that's my usual account for everything."
+2,139,Delivery area,Do you deliver to the area near the train station?
+3,358,Refund,Refund status for order #98931 still shows as pending.
+4,318,Order issue,"Still waiting on order #50850 here, it's been well over an hour now and the tracking hasn't updated in ages, starting to wonder if it actually left the kitchen at all, would appreciate someone taking a look when they get a chance."
+5,57,Order issue,Two items from order #65790 were swapped with another order I think.
+6,188,Opening hours,Are you closed on Sundays or just certain hourse?
+7,188,Order issue,"Can someone check the status of order #28183, it's not moving."
+8,71,Refund,Is there a time limit on requesting refunds after delivery?
+9,172,Menu question,Are there any seasonal items coming to the menu soon?
+10,123,Order question,"This is Kevin again, following up on #17933 form yesterday."
+11,165,Cold food,The banana nutella jaffle in order #48640 arrived completely cold.
+12,33,Refund,"Full name is Krzysztof Dekker, born 23/09/1990, postcode 5778 QD if you need it for the refund form."
+13,241,Website issue,The website menu isn't loading properly on mobile.
+14,364,Refund,"Refund needed for #88479, the app charged me but the order failed."
+15,189,Refund,"I was charged twice for order #13711, please refund the duplicate."
+16,201,Account update,"Just a heads up that I moved house last month, so please could you update my address on file to Dorpsweg 74, 1124 DW Amsterdam, kept meaning to message about this but only just remembered before placing another order today."
+17,255,Refund,"Refund for order #23804 please, the box arrived empty."
+18,214,Allergen question,Does the pulled jackfruit jaffle contain any nuts?
+19,278,Order question,"Elif here, order #75670 still hasn't updated in the app."
+20,150,Wrong item,Received a different toastie than what I ordered in #31038.
+21,331,Missing item,Sauce sachet was missing from order #56955 again.
+22,249,Refund,"Requesting a refund for #98877, allergens weren't respected."
+23,156,Missing item,Straw and lid weren't included with order #92424.
+24,117,Cold food,The vegan chili jaffle in order #54025 arrived completely cold.
+25,146,Order issue,The app shows order #72928 as cancelled but I was still charged.
+26,147,Menu question,Is the ham & cheese jaffle spicy or mild by default?
+27,499,Refund,"Can the refund for #22231 be expedited, it's been over a week?"
+28,22,Allergen question,Does the banana nutella jaffle contain soy?
+29,295,Allergen question,"Is the bread used for the toasties gluten free, or just the filling option?"
+30,65,Order issue,Order #74523 never left the 'preparing' stage in the app.
+31,288,Feedback,"Just wanted to say the pulled jackfruit jaffle was fantastic today, thank you."
+32,18,Refund,Can you refund the delivery fee for order #55257? It was over an hour late.
+33,277,Allergen question,Does the ham & cheese jaffle contain egg in any part of it?
+34,274,General question,Do you offer any discounts for students?
+35,155,Refund,"You can transfer to NL10 TRIO 7275 2088 54, that's the account I use for everything."
+36,149,Order issue,Order #92975 only had one of the two items I ordered.
+37,353,Opening hours,Do you close earlier on a Monday evening?
+38,375,Opening hours,What are the holiday opening hours this year?
+39,246,Refund,"Can the refund for #02814 be expedited, it's been over a week?"
+40,13,Refund,"Refund the money to iban NL69INGB7515093983 please, under the name Fang, thnaks in advance."
+41,101,Delivery area,does postcode 3512 CT fall within your delivery zone
+42,12,Refund,"Refund for order #18718 please, the box arrived empty."
+43,202,Order issue,My order #37599 is showing as delivered but I never got it.
+44,262,Opening hours,Is there a lunch break when the kitchen is closed?
+45,484,Refund,"Refund requested, order #05626 was cancelled by the store itself."
+46,190,Missing item,Straw and lid weren't included with order #65045.
+47,180,General question,Does your number 030 123 45 67 also handle catering enquiries?
+48,158,Allergen question,Does the vegan chili jaffle contain soy?
+49,448,Order issue,Order #81376 shows delivered but the driver never rang the bell.
+50,412,Delivery area,is postcode 3572 XG within range for delivery
+51,227,Wrong item,"Ordered #42662 with the vegetarian tag specifically selected at checkout, but when it arrived there was clearly bacon in there, which is obviously a problem for me, please could someone check what happened on your end."
+52,428,Refund,"I'd like a refund, order #99123 was the wrong size entirely."
+53,156,Refund,"Refund for order #78519 please, the box arrived empty."
+54,388,App issue,"The app keeps crashing on me every single time I try to actually check out, gets all the way to the payment screen and then just closes itself, tried reinstalling it twice already but no luck so far."
+55,193,Account update,"Can you update my delivery address, it's the yellow house at number 42 on the Dorpsweg in Utrecht now?"
+56,4,Wrong item,The vegan chili jaffle in order #46287 isn't what's on the receipt.
+57,364,Refund,"please refund to NL92INGB2648704947, i'm Oluwaseun and live at Dorpsweg 7, Amsterdam"
+58,135,Delivery area,Curious if postcode 3531 HK is in your delivery zone.
+59,154,Opening hours,What are the holiday opening hours this year?
+60,490,Order issue,Order #71462 arrived but half the bag was empty.
+61,252,Cold food,Order #30147 took so long the food was stone cold.
+62,497,Opening hours,Are you open on public holidays?
+63,35,Allergen question,Is the cheese used lactos free or regular?
+64,307,Wrong item,Got a pulled jackfruit jaffle in order #59796 when I ordered something else entirely.
+65,445,Missing item,Order #47158 was missing the side salad I paid extra for.
+66,376,Opening hours,Are you open for lunch on a Friday?
+67,9,Allergen question,Does the banana nutella jaffle contain soy?
+68,84,Order question,"Fleur just checking in about order #25725, any udpate?"
+69,84,App issue,Can't seem to apply my discount code at checkout.
+70,28,Refund,"Refund please for order #45650, duplicate charge on my card statement."
+71,149,Refund,Can I get store credit instead of a refund for #48183?
+72,393,Allergen question,Are the sauces cross contaminated with peanuts at all?
+73,322,Refund,"Refund needed for #21928, the app charged me but the order failed."
+74,166,Feedback,"Delivery was fast today, really appreciated it 🙏"
+75,447,Refund,Requesting a refund since order #54451 arrived completely cold.
+76,274,Missing item,No napkins or cutlery came with order #95202.
+77,266,Allergen question,"I need to avoid sesame entirely, which items should I skip?"
+78,145,Allergen question,Are your sauces made with mustard? Need to know for an allergy.
+79,191,Opening hours,Do you close earlier on a Sunday evening?
+80,249,Refund,"Refund needed for #65213, the app charged me but the order failed."
+81,80,Missing item,"Paid extra for additional cheese on order #83389 today and when it arrived there really wasn't any more than the standard amount, not a huge deal money wise but wanted to flag it in case it's a wider issue with the app."
+82,354,App issue,Can't seem to apply my discount code at checkout.
+83,426,Menu question,Do you offer a catering menu for larger groups?
+84,488,Feedback,Really enjoyed the apple cinnamon jaffle 😋 will be ordering again soon.
+85,434,Delivery area,Is 3584 EA covered by your delivery drivers?
+86,273,Payment issue,"The app won't let me pay with iDEAL, is that a known issue?"
+87,365,General question,"Ringing the shop's line, 030-123-4567, didn't get an answer earlier, is that the right one?"
+88,283,Delivery area,"Trying to figure out roughly what the delivery radius is from the store these days, I'm right on the edge of what I think might be your zone and don't want to order something that just gets rejected at checkout."
+89,360,Damaged order,The cheese & tomato jaffle in order #67112 was squashed flat.
+90,473,General question,Is the store phone 030-1234567 the right number for allergy questions?
+91,9,Order issue,Two items from order #75452 were swapped with another order I think.
+92,419,Order issue,"Can someone check the status of order #79852, it's not moving."
+93,364,Refund,"I was charged twice for order #40132, please refund the duplicate."
+94,439,Pickup,"Can I pick up #23423 at Jaffle Shop, Oudegracht 118, Utrecht instead?"
+95,67,Opening hours,Is the shop open right now or has it closed for the day?
+96,41,Order question,"Hey it's Miguel, order #11076 seems stuck in the queue."
+97,22,Cold food,The ham & cheese jaffle in order #10890 arrived completely cold.
+98,241,Allergen question,Are celery or mustard used in any of the standard sauces?
+99,61,Order issue,Order #40140 arived with the wrong sauce.
+100,387,Contact update,"Reach me on zero six, one two, three four, five six, seven eight from now on please, my old number's out of service, and while you're at it my postcode is 1193 SG in case that's still wrong on file."
+101,95,Order question,"Hi, it's Tomasz again, sorry to keep messaging but I just wanted to check on the status of #01249 since it's been sitting there a while now and I haven't seen any updates come through on my end at all."
+102,179,Feedback,"Just wanted to say the banana nutella jaffle was fantastic today, thank you."
+103,83,General question,Do you offer any discounts for students?
+104,438,Pickup,"Was wondering if it's possible to swap delivery for pickup instead, I'd rather just head over to Jaffle Shop, Oudegracht 118, Utrecht myself and grab #89389 directly than wait around for a driver, is that something you can change on your end still?"
+105,35,Missing item,Straw and lid weren't included with order #19083.
+106,367,Feedback,Really enjoyed the ham & cheese jaffle 😋 will be ordering again soon.
+107,494,Damaged order,The box for order #42801 arrived crushed.
+108,474,Opening hours,"Just wondering if your opening hours change at all during the summer months, planning a few orders around a work trip and want to make sure I'm not turning up to a closed kitchen by mistake."
+109,110,Order issue,My order #87592 is showing as delivered but I never got it.
+110,226,General question,Can I call the store directly on 030 123 4567 about my order?
+111,345,Missing item,"The fries were missing from order #12566, quite anoying tbh."
+112,110,Packaging,Could the boxes be made more eco friendlly?
+113,264,Refund,"Refund please for order #36151, duplicate charge on my card statement."
+114,239,Missing item,"Paid extra for additional cheese on order #18275 today and when it arrived there really wasn't any more than the standard amount, not a huge deal money wise but wanted to flag it in case it's a wider issue with the app."
+115,361,Opening hours,Is the shop open right now or has it closed for the day?
+116,148,Order question,"Just Mila, wondering if #15716 shipped yet."
+117,146,General question,"Large orders can place one day before, is possible?"
+118,234,Refund,Can order #94738 be refunded instead of redeliverd?
+119,209,Missing item,Sauce sachet was missing from order #46317 again.
+120,481,Complaint,"I live at Stationsplein 95d in Groningen and this is now the third time in a row the driver has completely skipped my building, ends up leaving it at the wrong entrance or just turning back, would really appreciate if someone could update the notes on my account properly this time."
+121,54,Opening hours,"Just wondering if your opening hours change at all during the summer months, planning a few orders around a work trip and want to make sure I'm not turning up to a closed kitchen by mistake."
+122,203,Menu question,Is the vegan chili jaffle spicy or mild by default?
+123,268,Order issue,The app shows order #11266 as cancelled but I was still charged.
+124,356,Refund,"Requesting a refund, the apple cinnamon jaffle in #12153 was inedible."
+125,174,Opening hours,Are you open on public holidays?
+126,103,Order issue,Order #96136 only had one of the two items I ordered.
+127,372,Menu question,Are there any seasonal items coming to the menu soon?
+128,256,Opening hours,What are the holiday opening hours this year?
+129,143,Allergen question,Is the cheese used lactos free or regular?
+130,392,Allergen question,"I'm coeliac, which items on the menu are safe for me?"
+131,366,General question,"Saw the number 0301234567 on your website, is that still active?"
+132,393,Allergen question,"I'm coeliac, which items on the menu are safe for me?"
+133,298,Loyalty program,How many stamps do I need for a free apple cinnamon jaffle?
+134,140,App issue,Can't seem to apply my discount code at checkout.
+135,388,Opening hours,Is there a lunch break when the kitchen is closed?
+136,405,Missing drink,Order #65796 came without the iced coffee.
+137,249,Allergen question,Does the apple cinnamon jaffle contain any nuts?
+138,143,Menu question,Is the ham & cheese jaffle spicy or mild by default?
+139,394,Cold food,Everything in order #71147 was lukewarm at best.
+140,255,Refund,Can you refund the delivery fee for order #32010? It was over an hour late.
+141,426,Order issue,Order #17026 shows delivered but the driver never rang the bell.
+142,310,Pickup,"What time can I collect #52499 from Jaffle Shop, Oudegracht 118, Utrecht today?"
+143,50,General question,Can I text the store on +31 30 123 4567 instead of calling?
+144,390,Feedback,"Just wanted to say the cheese & tomato jaffle was fantastic today, thank you."
+145,339,Order issue,Order #87734 only had one of the two items I ordered.
+146,339,Account update,"It's Marieke Willemsen here, born 06-04-1992, in case that's needed for the ID check."
+147,255,Allergen question,"Is the bread used for the toasties gluten free, or just the filling option?"
+148,252,Refund,Refund for #84858 hasn't shown up on my statement yet.
+149,280,Refund,"Please refund order #00616, I cancelled before it was prepared."
+150,231,Wrong item,"Ordered #56770 with the vegetarian tag specifically selected at checkout, but when it arrived there was clearly bacon in there, which is obviously a problem for me, please could someone check what happened on your end."
+151,17,Pickup,"Do I need to bring ID to collect #28427 from Jaffle Shop, Oudegracht 118, Utrecht?"
+152,221,Order issue,"Please look into order #24671, the tracking link is broken."
+153,292,Feedback,"Delivery was fast today, really appreciated it 🙏"
+154,346,Refund,Refund for #78897 hasn't shown up on my statement yet.
+155,244,Order issue,Order #82806 arived with the wrong sauce.
+156,135,Wrong item,"Ordered #79695 with the vegetarian tag specifically selected at checkout, but when it arrived there was clearly bacon in there, which is obviously a problem for me, please could someone check what happened on your end."
+157,393,Allergen question,Does the menu clearly mark which items are gluten free?
+158,146,Wrong item,The banana nutella jaffle in order #00902 isn't what's on the receipt.
+159,429,Order issue,My order #55905 is showing as delivered but I never got it.
+160,195,Payment issue,Can I pay cash on delivery for order #16556?
+161,180,Delivery issue,"Call me at 06 0333 4911 instead of texting, easier for me to answer."
+162,59,Refund,Refund status for order #52085 still shows as pending.
+163,20,Order issue,Order #76986 arived with the wrong sauce.
+164,137,Wrong item,I ordered two of the same thing in #07905 and got two different items.
+165,194,Menu question,Do you offer a catering menu for larger groups?
+166,293,Pickup,"If I swing by Jaffle Shop, Oudegracht 118, Utrecht around 6, will #65917 be ready?"
+167,52,Delivery area,Does your delivery radius reach postcode 3511 LN?
+168,354,Refund,Can you refund the delivery fee for order #35785? It was over an hour late.
+169,86,Refund,You can email the confirmation to vikram.gonzalez@outlook.com once the refund for the IBAN NL37ABNA8344049639 goes through.
+170,48,Cold food,The pulled jackfruit jaffle in order #91954 arrived completely cold.
+171,35,Order issue,Order #98763 only had one of the two items I ordered.
+172,178,Refund,Refund status for order #14846 still shows as pending.
+173,340,Opening hours,Are you closed on Sundays or just certain hourse?
+174,277,Order issue,Order #53664 says out for delivery for the last 40 minutes.
+175,320,Refund,"Please process a refund, #87820 never left the kitchen apparently."
+176,322,Menu question,Is the pulled jackfruit jaffle spicy or mild by default?
+177,265,Refund,Can order #29737 be refunded instead of redeliverd?
+178,138,Refund,"Refund for order #89690 please, the box arrived empty."
+179,268,Refund,"Still haven't seen my refund come through for #35723 from last week now, checked my bank statement a couple times just in case but nothing's shown up yet, could someone please look into where that's got to."
+180,78,Delivery area,do you deliver to postcode 3521 AK on weekends
+181,383,Wrong item,The pulled jackfruit jaffle in order #46651 isn't what's on the receipt.
+182,325,Pickup,"Parking near Jaffle Shop, Oudegracht 118, Utrecht for pickup of #36442, is there any?"
+183,132,Refund,Can you refund the delivery fee for order #93631? It was over an hour late.
+184,77,General question,Do you offer any discounts for students?
+185,99,App issue,Can't seem to apply my discount code at checkout.
+186,15,Delivery issue,"My name is Yan, born 14 March 1988, you can reach me on 06-47786603 if there's an update."
+187,140,App issue,Can't seem to apply my discount code at checkout.
+188,70,Feedback,"Just wanted to say the cheese & tomato jaffle was fantastic today, thank you."
+189,133,Refund,"Requesting a refund, the banana nutella jaffle in #82070 was inedible."
+190,29,Opening hours,Are you open for lunch on a Sunday?
+191,460,Pickup,"Can someone else collect #15941 from Jaffle Shop, Oudegracht 118, Utrecht on my behalf?"
+192,462,Opening hours,"What is delivery hours for weekend, please advise."
+193,490,Opening hours,Is the kitchen open past 9pm on weekdays?
+194,209,Allergen question,"Is having nut-free area for prepare allergy orders, please tell me?"
+195,460,Damaged order,The banana nutella jaffle in order #16231 was squashed flat.
+196,293,Order issue,Order #81898 shows delivered but the driver never rang the bell.
+197,129,Contact update,"new email is emily.sahin@gmail.com, update my account whenever you get a chance"
+198,308,Missing drink,Order #15596 came without the iced coffee.
+199,413,Refund,Is there a time limit on requesting refunds after delivery?
+200,384,Missing item,Sauce sachet was missing from order #36321 again.

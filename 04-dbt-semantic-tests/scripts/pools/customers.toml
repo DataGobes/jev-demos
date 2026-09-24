@@ -1,0 +1,310 @@
+first_names = [
+  # NL
+  "Sanne", "Daan", "Lotte", "Sven", "Femke", "Bram", "Anouk", "Thijs", "Nienke", "Willem",
+  "Mila", "Jasper", "Eva", "Stijn", "Fleur", "Bas", "Iris", "Ruben", "Noor", "Max",
+  "Lieke", "Tim", "Julia", "Niels", "Sara", "Koen", "Anne", "Joost", "Marloes", "Pieter",
+  # TR
+  "Mehmet", "Ayse", "Emre", "Elif", "Burak", "Zeynep", "Can", "Fatma", "Deniz", "Yasemin",
+  "Kerem", "Selin", "Onur", "Ebru",
+  # MA
+  "Youssef", "Fatima", "Karim", "Amina", "Hassan", "Nadia", "Rachid", "Samira", "Omar", "Leila",
+  "Anas", "Imane", "Zakaria", "Salma",
+  # CN
+  "Wei", "Mei", "Jun", "Li", "Yan", "Feng", "Xin", "Hui", "Tao", "Ying",
+  "Qiang", "Jing", "Hao", "Fang",
+  # IN
+  "Priya", "Raj", "Arjun", "Anjali", "Vikram", "Neha", "Rohan", "Kavita", "Sanjay", "Divya",
+  "Amit", "Pooja", "Rahul", "Sunita",
+  # PL
+  "Kasia", "Piotr", "Magda", "Tomasz", "Ola", "Marek", "Agnieszka", "Pawel", "Ewa", "Krzysztof",
+  "Jacek", "Zofia",
+  # ES
+  "Carlos", "Maria", "Javier", "Lucia", "Diego", "Carmen", "Pablo", "Elena", "Alejandro", "Isabel",
+  "Miguel", "Sofia", "Andres", "Marta",
+  # NG
+  "Chinedu", "Ngozi", "Emeka", "Amaka", "Tunde", "Folake", "Oluwaseun", "Chioma", "Ifeoma", "Adaeze",
+  "Kayode", "Blessing", "Chidi", "Uche",
+  # US / English
+  "John", "Emily", "Michael", "Sarah", "David", "Jessica", "Chris", "Ashley", "Matt", "Amanda",
+  "Brian", "Nicole", "Kevin", "Rachel", "Laura",
+]
+
+last_names = [
+  # NL, with tussenvoegsels
+  "de Vries", "van Dijk", "Bakker", "Jansen", "Visser", "Smit", "Meijer", "de Boer", "Mulder", "de Groot",
+  "Bos", "Vos", "Peters", "Hendriks", "van der Berg", "van Leeuwen", "de Jong", "van der Meer", "Dekker", "Kok",
+  # TR
+  "Yilmaz", "Kaya", "Demir", "Sahin", "Celik", "Yildiz", "Aydin", "Ozturk", "Aydogan", "Arslan",
+  "Dogan", "Koc", "Kurt", "Ozdemir",
+  # MA
+  "El Amrani", "Benali", "Chakir", "Idrissi", "Bouzid", "El Fassi", "Ziani", "Moussaoui", "Haddaoui", "Bennani",
+  "Tazi", "Rifai", "Amrani", "Ouazzani",
+  # CN
+  "Wang", "Li", "Zhang", "Liu", "Chen", "Yang", "Huang", "Zhao", "Wu", "Zhou",
+  "Xu", "Sun", "Ma", "Zhu",
+  # IN
+  "Sharma", "Patel", "Kumar", "Singh", "Gupta", "Reddy", "Rao", "Nair", "Iyer", "Mehta",
+  "Joshi", "Verma", "Chopra", "Menon",
+  # PL
+  "Kowalski", "Nowak", "Wojcik", "Kaminski", "Lewandowski", "Zielinski", "Szymanski", "Wozniak", "Kozlowski", "Jankowski",
+  "Mazur", "Krawczyk",
+  # ES
+  "Garcia", "Martinez", "Rodriguez", "Fernandez", "Lopez", "Gonzalez", "Perez", "Sanchez", "Ramirez", "Torres",
+  "Flores", "Rivera", "Gomez", "Diaz",
+  # NG
+  "Okafor", "Adeyemi", "Balogun", "Eze", "Nwosu", "Okoro", "Afolabi", "Adebayo", "Chukwu", "Ibrahim",
+  "Musa", "Abubakar", "Yusuf", "Nwachukwu",
+  # US / English
+  "Smith", "Johnson", "Williams", "Brown", "Jones", "Miller", "Davis", "Wilson", "Taylor", "Anderson",
+  "Thomas", "Moore", "Clark", "Walker", "Hall",
+]
+
+[[junk]]
+first_name = "test"
+last_name = "test"
+note = "placeholder test record"
+
+[[junk]]
+first_name = "asdf"
+last_name = "asdf"
+note = "keyboard mash entered as a name"
+
+[[junk]]
+first_name = "qwerty"
+last_name = "uiop"
+note = "keyboard row typed as a name"
+
+[[junk]]
+first_name = "xxxx"
+last_name = "xxxx"
+note = "repeated placeholder characters"
+
+[[junk]]
+first_name = "n/a"
+last_name = "n/a"
+note = "not-applicable typed as a name"
+
+[[junk]]
+first_name = "Mickey"
+last_name = "Mouse"
+note = "cartoon character used as a fake name"
+
+[[junk]]
+first_name = "Donald"
+last_name = "Duck"
+note = "cartoon character used as a fake name"
+
+[[junk]]
+first_name = "Bugs"
+last_name = "Bunny"
+note = "cartoon character used as a fake name"
+
+[[junk]]
+first_name = "info@jaffleshop.nl"
+last_name = ""
+note = "email address pasted into the name field"
+
+[[junk]]
+first_name = "klant@gmail.com"
+last_name = "support"
+note = "email pasted as a first name"
+
+[[junk]]
+first_name = "Jaffle Shop Utrecht B.V."
+last_name = ""
+note = "company name entered as a customer name"
+
+[[junk]]
+first_name = "Toastie Express Catering"
+last_name = "Ltd"
+note = "company name split across the name fields"
+
+[[junk]]
+first_name = "0612345678"
+last_name = ""
+note = "phone number typed as a name"
+
+[[junk]]
+first_name = "+31 6 9876 5432"
+last_name = "klant"
+note = "phone number typed as a first name"
+
+[[junk]]
+first_name = "asdkjhasd"
+last_name = "lkjhqwe"
+note = "random keyboard mash"
+
+[[junk]]
+first_name = "........"
+last_name = "........"
+note = "dots typed as a placeholder"
+
+[[junk]]
+first_name = "admin"
+last_name = "admin"
+note = "system account name, not a customer"
+
+[[junk]]
+first_name = "Klant"
+last_name = "Klant"
+note = "Dutch word for customer typed as a name"
+
+[[junk]]
+first_name = "Onbekend"
+last_name = "Onbekend"
+note = "Dutch word for unknown typed as a name"
+
+[[junk]]
+first_name = "asdasdasd"
+last_name = "zxczxczxc"
+note = "keyboard mash across both fields"
+
+[[junk]]
+first_name = "123456"
+last_name = "123456"
+note = "digits typed as a name"
+
+[[junk]]
+first_name = "lorem"
+last_name = "ipsum"
+note = "placeholder text used as a name"
+
+[[junk]]
+first_name = "First"
+last_name = "Last"
+note = "literal field labels typed as a name"
+
+[[junk]]
+first_name = "Superman"
+last_name = "Batman"
+note = "superhero fakes typed as a name"
+
+[[junk]]
+first_name = "Pietje"
+last_name = "Puk"
+note = "generic Dutch placeholder name, not a real customer"
+
+[[hard_negative]]
+first_name = "Anna"
+last_name = "Test"
+note = "Test is a real Dutch/English surname"
+
+[[hard_negative]]
+first_name = "Frank"
+last_name = "Bar"
+note = "Bar is a real, uncommon Catalan surname"
+
+[[hard_negative]]
+first_name = "Peter"
+last_name = "Foot"
+note = "Foot is a real English surname"
+
+[[hard_negative]]
+first_name = "Sofie"
+last_name = "Null"
+note = "Null is a rare but real German surname"
+
+[[hard_negative]]
+first_name = "Mei"
+last_name = "Foo"
+note = "Foo is a real Hokkien Chinese surname"
+
+[[hard_negative]]
+first_name = "Bo"
+last_name = "Li"
+note = "short but genuine two-letter Chinese given name"
+
+[[hard_negative]]
+first_name = "Wei"
+last_name = "Ng"
+note = "Ng is a real, vowel-less Cantonese surname"
+
+[[hard_negative]]
+first_name = "Xi"
+last_name = "Xi"
+note = "Xi Xi is a real Chinese given-and-family name pair"
+
+[[hard_negative]]
+first_name = "Miguel"
+last_name = "Co"
+note = "Co is a real Chinese-Filipino surname"
+
+[[hard_negative]]
+first_name = "Sara"
+last_name = "Cocco"
+note = "Cocco is a real Italian surname"
+
+[[hard_negative]]
+first_name = "Coco"
+last_name = "Jansen"
+note = "Coco is a genuine Dutch nickname, not an abbreviation"
+
+[[hard_negative]]
+first_name = "Fernando"
+last_name = "Inca"
+note = "Inca is a real Peruvian surname"
+
+[[hard_negative]]
+first_name = "Anne"
+last_name = "O'Neill"
+note = "apostrophe surname, genuinely Irish"
+
+[[hard_negative]]
+first_name = "Liam"
+last_name = "O'Brien"
+note = "apostrophe surname, genuinely Irish"
+
+[[hard_negative]]
+first_name = "Karin"
+last_name = "Ødegaard"
+note = "diacritic surname, genuinely Norwegian"
+
+[[hard_negative]]
+first_name = "Zoë"
+last_name = "Verhoeven"
+note = "diaeresis given name, genuinely Dutch"
+
+[[hard_negative]]
+first_name = "Anne-Marie"
+last_name = "de Groot"
+note = "hyphenated given name, genuinely Dutch"
+
+[[hard_negative]]
+first_name = "Jean-Paul"
+last_name = "Dubois"
+note = "hyphenated French given name, real surname"
+
+[[hard_negative]]
+first_name = "Kofi"
+last_name = ""
+note = "mononym customer, no last name given"
+
+[[hard_negative]]
+first_name = "Ngoc"
+last_name = ""
+note = "Vietnamese mononym entry, no last name given"
+
+[[hard_negative]]
+first_name = "Siobhán"
+last_name = "Kelly"
+note = "fada diacritic in a genuine Irish given name"
+
+[[hard_negative]]
+first_name = "Björn"
+last_name = "Eriksson"
+note = "diacritic ö in a common Swedish given name"
+
+[[hard_negative]]
+first_name = "Ed"
+last_name = "Wu"
+note = "Wu is a short, real Chinese surname"
+
+[[hard_negative]]
+first_name = "Al"
+last_name = "Amin"
+note = "Al is a short but genuine given name"
+
+[[hard_negative]]
+first_name = "Yui"
+last_name = "Oe"
+note = "Oe is a short, real Japanese surname"

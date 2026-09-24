@@ -1,0 +1,17 @@
+.env
+.env.*
+!.env.example
+.venv/
+__pycache__/
+*.duckdb
+*.duckdb.wal
+.jev_cache.sqlite
+.DS_Store
+.superpowers/
+.pytest_cache/
+.ruff_cache/
+jaffle_shop/target/
+jaffle_shop/logs/
+jaffle_shop/dbt_packages/
+jaffle_shop/.user.yml
+logs/
