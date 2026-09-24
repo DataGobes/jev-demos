@@ -14,7 +14,7 @@ a regex baseline. Spec: `docs/superpowers/specs/2026-09-24-jev-dbt-semantic-test
 - Lint: `uv run ruff check`
 - Failure viewer: `uv run python scripts/show_failures.py`
 - Scorecard: `uv run python scripts/score.py` · fresh live run appended to `docs/eval-results.md`: `uv run python scripts/score.py --run --fresh --mode live --append`
-- Recording: `scripts/record.sh [--cold] [--pack N]` · smoke-test in demo mode only, never live: `JEV_MODE=demo DOTENV_DISABLE=1 TYPE_DELAY=0 yes '' | scripts/record.sh`
+- Recording: `scripts/record.sh [--cold] [--pack N] [--no-captions]` (captions, title and end card built in) · smoke-test in demo mode only, never live: `yes '' | JEV_MODE=demo DOTENV_DISABLE=1 TYPE_DELAY=0 scripts/record.sh`
 
 ## Rules
 - Never read, print, or log `.env` or `TYPESAFE_API_KEY`. The key stays inside the plugin process.
