@@ -468,8 +468,8 @@ note = "personal email spelled out, no @ symbol"
 
 [[defect]]
 subject = "Contact update"
-text = "Reach me on zero six one two, or just text 0612345678 if that's easier, my old number is out of service."
-note = "phone number spelled out and literal"
+text = "Reach me on zero six, one two, three four, five six, seven eight from now on please, my old number's out of service, and while you're at it my postcode is {postcode} in case that's still wrong on file."
+note = "phone number fully spelled out, no digits; postcode also given"
 
 [[defect]]
 subject = "Refund"

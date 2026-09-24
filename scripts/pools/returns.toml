@@ -24,7 +24,7 @@ text = "One corner of the {product} was completely crushed, looked like someone 
 
 [[clean]]
 code = "damaged"
-text = "Fillin was cold and seperated, bread gone soggy and gray."
+text = "Fillin was seperated and soggy, bread had gone a grayish colour too."
 
 [[clean]]
 code = "damaged"
@@ -284,7 +284,7 @@ text = "the {product} was fine but honestly {minutes} minutes is too long to wai
 
 [[clean]]
 code = "late"
-text = "Almost I miss my train because waiting so long for this to come."
+text = "Today the wait is very long, my lunch break already finish before the delivery is coming."
 
 [[clean]]
 code = "late"
@@ -513,8 +513,8 @@ note = "mentions changed mind, but lateness is the reason"
 
 [[hard_negative]]
 code = "damaged"
-text = "The order took forever tonight, honestly lost patience waiting on the app, and then when it finally did show up the {product} was squashed flat in the box, so tonight really wasn't the night for either of those things to go wrong at once."
-note = "mentions the wait, but the real issue is the crushed box"
+text = "Order took a fair while to get here tonight, but honestly that wasn't really the problem, the real letdown was opening the box and finding the {product} completely squashed flat inside."
+note = "mentions the wait, but the crushed box is the real issue"
 
 [[hard_negative]]
 code = "wrong_item"
@@ -523,8 +523,8 @@ note = "mentions damaged only to rule it out"
 
 [[hard_negative]]
 code = "changed_mind"
-text = "Took a good while to arrive today, ended up waiting around for way longer than expected if I'm honest, and by the time it finally showed up I'd genuinely gone off the whole idea of eating it, no offense to the kitchen, just wasn't feeling it anymore by then."
-note = "mentions the wait, but changing my mind is the real reason"
+text = "Ordered on a whim after a rough afternoon, then a colleague turned up with pizza not ten minutes later, so I'd already changed my mind and eaten something else well before this one was even due to arrive."
+note = "changed mind before it was even late, changing mind is the real reason"
 
 [[hard_negative]]
 code = "late"
@@ -533,8 +533,8 @@ note = "mentions wrong/broken only to dismiss them"
 
 [[hard_negative]]
 code = "other"
-text = "Order was running a bit late tonight, and the sauce sachet was missing again on top of that."
-note = "mentions lateness, but the missing sachet is the real issue"
+text = "Order took a little longer than usual tonight, but that's not really why I'm messaging, the sauce sachet was missing from the bag again and that's the annoying part."
+note = "mentions the wait, but the missing sachet is the real issue"
 
 [[hard_negative]]
 code = "damaged"
@@ -593,8 +593,8 @@ note = "explicitly flags wrong order as a red herring"
 
 [[hard_negative]]
 code = "damaged"
-text = "Waited a good while for this one tonight, properly lost track of time actually, and then when it did finally arrive the {product} had come completely apart in the box, pieces everywhere, which after such a long wait was pretty disappointing."
-note = "mentions the wait, but the real issue is it arrived in pieces"
+text = "Took a little while to arrive tonight, but that wasn't really the issue, the real problem was opening the box to find the {product} had come completely apart, pieces everywhere."
+note = "mentions the wait, but arriving in pieces is the real issue"
 
 [[hard_negative]]
 code = "other"
