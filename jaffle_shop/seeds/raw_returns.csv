@@ -1,9 +1,9 @@
 id,order_id,reason_code,comment
-1,914,other,"The receipt in the bag is unreadable, printer must be low on ink."
+1,914,other,"The reciept in the bag is unreadable, printer must be low on ink."
 2,1357,changed_mind,"Ordered for a friend who cancelled on me, don't need it now."
 3,494,damaged,"I didn't change my mind, the vegan chili jaffle just arrived completely crushed."
-4,727,changed_mind,"picked the wrong day for a big lunch, going out with colleagues instead"
-5,386,wrong_item,"Arrived quickly and in one piece, but it's not what I clicked on in the app."
+4,727,changed_mind,"picked the wrong day for a big lunch, going out with colegues instead"
+5,386,wrong_item,"Driver had trouble finding the door tonight, and then handed over a sandwich that isn't what I clicked on in the app."
 6,361,wrong_item,"The filling is mushroom, I specifically ordered no mushrooms because of an allergy."
 7,733,wrong_item,"The filling is mushroom, I specifically ordered no mushrooms because of an allergy."
 8,633,changed_mind,"I ordered too much food, can I return the extra cheese & tomato jaffle."
@@ -11,7 +11,7 @@ id,order_id,reason_code,comment
 10,1484,changed_mind,Was going to treat myself but decided against it after ordering.
 11,1022,wrong_item,Paid for the chicken satay wrap and received a plain cheese toastie.
 12,154,damaged,"The whole thing fell apart the second I picked it up, bread just crumbled."
-13,1457,changed_mind,"picked the wrong day for a big lunch, going out with colleagues instead"
+13,1457,changed_mind,"picked the wrong day for a big lunch, going out with colegues instead"
 14,1292,late,"way too slow tonight, everyone on my street got their food before me"
 15,217,wrong_item,I ordered two of the same item and got two completely different ones.
 16,133,wrong_item,"asked for no onions and got a completely different sandwich, no onions or otherwise"
@@ -19,35 +19,35 @@ id,order_id,reason_code,comment
 18,305,damaged,"Bag was soaked through, banana nutella jaffle inside was a soggy mush."
 19,409,wrong_item,I ordered #90824 and this has completely different toppings than what I picked.
 20,1111,late,Nearly missed my train waiting for this to turn up.
-21,360,wrong_item,"wrong drink came with it too, ordered a cola and got sparkling water"
-22,512,changed_mind,"Simply don't want it anymore, apologies for the trouble."
+21,360,wrong_item,"wrong drink came with it to, ordered a cola and got sparkling water"
+22,512,changed_mind,Simply don't want it anymore 😅 apologies for the trouble.
 23,508,late,Nearly missed my train waiting for this to turn up.
 24,173,other,"not really a complaint, just wondering if the cheese & tomato jaffle recipe changed recently"
 25,477,changed_mind,My partner already picked up food on the way home so I don't need this.
 26,808,damaged,"Bag was soaked through, banana nutella jaffle inside was a soggy mush."
 27,292,late,"delivery tracker just froze for ages, no updates for like 40 minutes"
-28,406,other,"Bag had a weird smell to it, not sure if that's normal packaging."
+28,406,other,"Bag has weird smell inside, not sure this normal for packaging or not."
 29,982,wrong_item,Ordered vegan and this one very much has cheese in it.
 30,1159,damaged,"Whole thing arrived sideways in the box, completely squashed on one end."
 31,926,damaged,There was a huge grease stain through the box and the toastie underneath was falling apart.
 32,264,damaged,"The whole thing fell apart the second I picked it up, bread just crumbled."
-33,1193,wrong_item,Got a completely different sandwich than the one I clicked on in the app.
-34,206,wrong_item,"This isn't what I ordered at all, I asked for the veggie one."
-35,1116,changed_mind,"Nothing wrong with the order, it wasn't even late, I just don't want it anymore."
+33,1193,wrong_item,"Got completely different sandwich than one I click on in app, very strange."
+34,206,wrong_item,"This isnt what I ordered at all, I asked for the veggie one."
+35,1116,changed_mind,"Ordered on a whim after a rough afternoon, then a colleague turned up with pizza not ten minutes later, so I'd already changed my mind and eaten something else well before this one was even due to arrive."
 36,1163,changed_mind,"Wasn't thinking straight when I ordered this at 1am, don't want it now."
 37,485,late,The app said it was delivered 63 minutes ago but it just showed up now.
-38,268,late,"very late, said 20 minutes and it took over an hour"
-39,249,late,"very late, said 20 minutes and it took over an hour"
+38,268,late,"very late, said 20 minuets and it took over an hour"
+39,249,late,"very late, said 20 minuets and it took over an hour"
 40,101,late,Honestly I'd changed my mind by the time it showed up 62 min late.
-41,705,damaged,"Bread was soggy through and through, whole thing fell apart when I picked it up."
+41,705,damaged,"Not sure what happened between the kitchen and my door but the bread was soggy through and through by the time I got it, the whole thing basically fell apart the second I picked it up, sauce everywhere, had to eat it with a fork in the end."
 42,1213,damaged,"burnt black on one side, inedible tbh"
-43,354,other,Straw wasn't included with the drink.
+43,354,other,Straw wasnt included with the drink.
 44,304,late,The box was crushed flat and the banana nutella jaffle inside was falling apart.
-45,564,late,"The cheese & tomato jaffle was perfect, correct order, just took 133 minutes longer than it should."
-46,1264,other,Ordered through the website and the confirmation email never came through.
-47,1114,late,This has bacon in it and I ordered the vegetarian option.
+45,564,late,"Toastie tasted a bit off tonight, and on top of that it took 37 minutes longer than it should have."
+46,1264,other,"Placed the order through the website like always, paid and everything went through fine on my end, but I never actually got a confirmation email, so I've just been sat here refreshing my inbox wondering if it actually went in or not."
+47,1114,late,this has bacon in it and i ordered the vegetarian option
 48,729,changed_mind,Ordered a large and this is obviously the small size.
-49,384,damaged,"Got someone else's order entirely, different name on the receipt inside."
+49,384,damaged,"Got someone elses order entirely, different name on the receipt inside."
 50,345,other,"the pulled jackfruit jaffle was great honestly, just wanted to ask about a loyalty stamp that didn't register"
 51,511,late,It arrived so late the banana nutella jaffle had gone cold and a bit hard.
 52,785,late,"Took 105 minutes, the apple cinnamon jaffle was stone cold by then."
@@ -55,64 +55,64 @@ id,order_id,reason_code,comment
 54,369,damaged,"Honestly the apple cinnamon jaffle looked like it had been through a wash cycle, soggy mess."
 55,725,damaged,"Box arrived crushed, apple cinnamon jaffle folded in half and stuck to the lid."
 56,441,wrong_item,"wrong toastie showed up, mine had avocado and this has none"
-57,1321,wrong_item,"wrong drink came with it too, ordered a cola and got sparkling water"
+57,1321,wrong_item,"wrong drink came with it to, ordered a cola and got sparkling water"
 58,1127,other,"not really a complaint, just wondering if the apple cinnamon jaffle recipe changed recently"
-59,1029,other,"Bag had a weird smell to it, not sure if that's normal packaging."
+59,1029,other,"Bag has weird smell inside, not sure this normal for packaging or not."
 60,246,late,The tracking said 'arriving soon' for a solid half hour straight.
-61,1197,damaged,"Filling was cold and separated, bread gone soggy and gray."
+61,1197,damaged,"Fillin was seperated and soggy, bread had gone a grayish colour too."
 62,947,damaged,"Box arrived crushed, ham & cheese jaffle folded in half and stuck to the lid."
 63,1435,wrong_item,"The filling is mushroom, I specifically ordered no mushrooms because of an allergy."
 64,821,late,"Took 47 minutes, the cheese & tomato jaffle was stone cold by then."
-65,1291,changed_mind,Ordered two by accident and don't want the second one anymore.
+65,1291,changed_mind,"Somehow managed to order two of the same thing by accident, must have double tapped or something, only realised once the confirmation came through, so if it's possible I'd rather just keep the one and not have the second one show up at all."
 66,357,damaged,"Got invited out last minute, don't need the vegan chili jaffle anymore."
-67,888,damaged,"This isn't about the wait time, the banana nutella jaffle showed up in pieces."
-68,71,other,"The receipt in the bag is unreadable, printer must be low on ink."
+67,888,damaged,"Took a little while to arrive tonight, but that wasn't really the issue, the real problem was opening the box to find the banana nutella jaffle had come completely apart, pieces everywhere."
+68,71,other,"The reciept in the bag is unreadable, printer must be low on ink."
 69,1176,other,"not really a complaint, just wondering if the ham & cheese jaffle recipe changed recently"
-70,1098,late,"The ham & cheese jaffle wasn't wrong or broken, just took forever, nearly 68 minutes."
-71,535,wrong_item,"This is the breakfast toastie, I ordered lunch hours ago."
+70,1098,late,"the ham & cheese jaffle wasn't wrong or broken, just took forever, nearly 68 minutes"
+71,535,wrong_item,"This is the breakfast toastie, but I ordered lunch."
 72,189,late,"way too slow tonight, everyone on my street got their food before me"
-73,40,damaged,"Wasn't planning to complain about being late, but the banana nutella jaffle arrived squashed too."
+73,40,damaged,"Order took a fair while to get here tonight, but honestly that wasn't really the problem, the real letdown was opening the box and finding the banana nutella jaffle completely squashed flat inside."
 74,83,changed_mind,"I ordered too much food, can I return the extra apple cinnamon jaffle."
-75,196,late,By the time the doorbell rang I'd forgotten I even ordered anything.
+75,196,late,"Today the wait is very long, my lunch break already finish before the delivery is coming."
 76,833,late,It arrived so late the ham & cheese jaffle had gone cold and a bit hard.
-77,64,changed_mind,"Rider got lost, order showed up nearly an hour after it was due."
-78,1190,wrong_item,"It came on time and undamaged, but it's definitely not what I ordered."
+77,64,changed_mind,"rider got lost, order showed up nearly an hour after it was due"
+78,1190,wrong_item,"Arrived pretty quick today, shame it's definitely not what I ordered though."
 79,928,wrong_item,Order number on the receipt doesn't even match mine.
 80,735,late,It arrived so late the ham & cheese jaffle had gone cold and a bit hard.
-81,844,damaged,The banana nutella jaffle was stone cold and the cheese had gone hard and rubbery.
+81,844,damaged,"The cheese had split and gone rubbery, the banana nutella jaffle was a greasy mess."
 82,1085,damaged,"The banana nutella jaffle looked like it had been dropped, all squashed to one side."
 83,669,damaged,The edges were burnt to a crisp while the middle was still doughy.
-84,504,other,Straw wasn't included with the drink.
+84,504,other,Straw wasnt included with the drink.
 85,605,wrong_item,Order number on the receipt doesn't even match mine.
 86,909,wrong_item,"Got the gluten free option even though I never asked for that, and I don't need it."
 87,736,wrong_item,I ordered #19693 and this has completely different toppings than what I picked.
 88,1429,other,"not really a complaint, just wondering if the pulled jackfruit jaffle recipe changed recently"
-89,115,wrong_item,"Not damaged or anything, just completely the wrong toastie in the box."
+89,115,wrong_item,"not damaged or anything, just completely the wrong toastie in the box"
 90,187,wrong_item,"wrong toastie showed up, mine had avocado and this has none"
-91,58,other,"Not late, not the wrong item, just missing the little sauce sachet."
-92,1317,other,"Not a wrong order or a late one, just no cutlery in the bag."
+91,58,other,"Order took a little longer than usual tonight, but that's not really why I'm messaging, the sauce sachet was missing from the bag again and that's the annoying part."
+92,1317,other,"Missed the doorbell so the order sat outside a while, and there was no cutlery in the bag either."
 93,127,wrong_item,"asked for no onions and got a completely different sandwich, no onions or otherwise"
 94,1346,late,so late I'd already made myself something else to eat
-95,921,late,Rider showed up nearly an hour after the confirmation email.
+95,921,late,"Got the confirmation email saying it was on its way, then just sat there watching the clock for almost an hour before the rider actually showed up, by which point I'd honestly given up and started making myself a sandwich instead."
 96,939,wrong_item,"wrong toastie showed up, mine had avocado and this has none"
 97,449,late,"Cold food because the delivery took forever, nearly 44 minutes total."
 98,104,late,The order sat 'preparing' in the app for ages before it even left the shop.
 99,120,damaged,"burnt black on one side, inedible tbh"
 100,680,wrong_item,"This has ham in it, I ordered the vegetarian option."
-101,983,other,"Bag had a weird smell to it, not sure if that's normal packaging."
+101,983,other,"Bag has weird smell inside, not sure this normal for packaging or not."
 102,356,damaged,"cheese was burnt onto the wrapper, had to scrape it off before I could eat it"
 103,809,late,It arrived so late the pulled jackfruit jaffle had gone cold and a bit hard.
 104,251,damaged,"Bag was soaked through, banana nutella jaffle inside was a soggy mush."
-105,531,late,By the time the doorbell rang I'd forgotten I even ordered anything.
-106,153,changed_mind,"Simply don't want it anymore, apologies for the trouble."
-107,1077,late,"Waited almost two hours for this, way past the estimated time."
-108,654,other,"Not changed my mind, not damaged, just asking about the missing loyalty stamp."
-109,1306,late,By the time the doorbell rang I'd forgotten I even ordered anything.
-110,574,late,By the time the doorbell rang I'd forgotten I even ordered anything.
+105,531,late,"Today the wait is very long, my lunch break already finish before the delivery is coming."
+106,153,changed_mind,Simply don't want it anymore 😅 apologies for the trouble.
+107,1077,late,"Genuinely waited almost two hours tonight, kept refreshing the tracking page every five minutes like that was going to make the rider go any faster, by the time it finally showed up I'd already lost my appetite completely."
+108,654,other,"not changed my mind, not damaged, just asking about the missing loyalty stamp"
+109,1306,late,"Today the wait is very long, my lunch break already finish before the delivery is coming."
+110,574,late,"Today the wait is very long, my lunch break already finish before the delivery is coming."
 111,927,wrong_item,"By the time it arrived my lunch break was already over, took forever."
 112,186,changed_mind,"Talked myself out of it, wanted something healthier in the end."
 113,1139,late,I know it sounds like a wrong order complaint but it's actually just very late.
-114,721,other,Ordered through the website and the confirmation email never came through.
+114,721,other,"Placed the order through the website like always, paid and everything went through fine on my end, but I never actually got a confirmation email, so I've just been sat here refreshing my inbox wondering if it actually went in or not."
 115,456,wrong_item,"The bag had two coffees and no food at all, where's my order."
 116,557,damaged,The edges were burnt to a crisp while the middle was still doughy.
 117,78,late,"Delivery estimate kept pushing back every ten minutes, total joke."
@@ -125,9 +125,9 @@ id,order_id,reason_code,comment
 124,734,changed_mind,"changed my mind, wanted the soup instead but the order already went through"
 125,533,changed_mind,"just not feeling it anymore, sorry, the order itself was fine"
 126,1428,other,"the vegan chili jaffle was great honestly, just wanted to ask about a loyalty stamp that didn't register"
-127,784,damaged,"Order was right and on time, but the box arrived totally crushed."
+127,784,damaged,"Order was right and on time, but the box arived totally crushed."
 128,1009,damaged,The edges were burnt to a crisp while the middle was still doughy.
-129,652,damaged,"Took nearly two hours to arrive, way past the time quoted."
+129,652,damaged,"Honestly lost track of time waiting for this one, kept checking the app every few minutes, must have been close to two hours in the end which is way past what was quoted at checkout, properly annoyed about it to be honest."
 130,25,damaged,"Bit into it and it was raw dough in the middle, not cooked through at all."
 131,805,changed_mind,"Not hungry anymore after all, ate a big breakfast."
 132,632,wrong_item,"The bag had two coffees and no food at all, where's my order."
@@ -135,30 +135,30 @@ id,order_id,reason_code,comment
 134,1441,other,"Packaging was fine, food was fine, just wanted to flag the app crashed at checkout."
 135,796,wrong_item,This looks nothing like the photo on the menu for what I ordered.
 136,1198,changed_mind,"just not feeling it anymore, sorry, the order itself was fine"
-137,945,wrong_item,"wrong drink came with it too, ordered a cola and got sparkling water"
-138,128,other,Missing the little sauce sachet that's supposed to come with it.
+137,945,wrong_item,"wrong drink came with it to, ordered a cola and got sparkling water"
+138,128,other,"Small thing I know, but the little sauce sachet that's supposed to come tucked into the box was missing again this time, third order in a row now actually, not a huge deal but wanted to flag it before I forget."
 139,282,damaged,"Bread was stale and hard, must have been sitting around before it got toasted."
 140,1444,late,Ordered on my Tuesday lunch break and it arrived after I was back at my desk.
 141,812,changed_mind,"I ordered too much food, can I return the extra vegan chili jaffle."
 142,546,changed_mind,"Ordering guilt kicked in, trying to eat lighter this week."
-143,598,changed_mind,Ordered two by accident and don't want the second one anymore.
+143,598,changed_mind,"Somehow managed to order two of the same thing by accident, must have double tapped or something, only realised once the confirmation came through, so if it's possible I'd rather just keep the one and not have the second one show up at all."
 144,967,changed_mind,The pulled jackfruit jaffle arrived burnt black on one side.
 145,323,wrong_item,"Honestly I just don't want it anymore, wasn't in the mood after ordering."
 146,1017,late,The order sat 'preparing' in the app for ages before it even left the shop.
 147,327,damaged,The box was fine but the pulled jackfruit jaffle inside had a big tear right through the middle.
 148,874,damaged,"Bread was stale and hard, must have been sitting around before it got toasted."
 149,955,wrong_item,Paid for the chicken satay wrap and received a plain cheese toastie.
-150,509,other,Just checking if there's a way to add a note to future orders.
+150,509,other,Just checking if there's a way to add a note to future orders 🙂
 151,1005,wrong_item,"Definitely not my order, this box has someone else's name on the receipt inside."
 152,1223,late,"Rider got lost apparently, ended up taking way longer than it should have."
-153,1201,wrong_item,"Wasn't late and nothing was smashed, they just gave me the wrong sandwich."
+153,1201,wrong_item,"Wasnt late and nothing was smashed, they just gave me the wrong sandwich."
 154,1406,damaged,The edges were burnt to a crisp while the middle was still doughy.
-155,440,changed_mind,"Simply don't want it anymore, apologies for the trouble."
+155,440,changed_mind,Simply don't want it anymore 😅 apologies for the trouble.
 156,248,wrong_item,"I ordered the spicy version and this is definitely not spicy, wrong filling altogether."
 157,1212,damaged,"Toastie came out wrong, all the filling on one half and just bread on the other."
 158,646,damaged,"It was basically in pieces when I opened the wrapper, not sure how that happens."
 159,61,changed_mind,"changed my mind, wanted the soup instead but the order already went through"
-160,337,changed_mind,"Simply don't want it anymore, apologies for the trouble."
+160,337,changed_mind,Simply don't want it anymore 😅 apologies for the trouble.
 161,763,other,Asking about allergen info that wasn't listed on the order page.
 162,576,changed_mind,"changed my mind, wanted the soup instead but the order already went through"
 163,993,late,"Took 108 minutes, the cheese & tomato jaffle was stone cold by then."
@@ -169,21 +169,21 @@ id,order_id,reason_code,comment
 168,194,late,Nearly missed my train waiting for this to turn up.
 169,949,damaged,"Box arrived crushed, apple cinnamon jaffle folded in half and stuck to the lid."
 170,1323,changed_mind,"Talked myself out of it, wanted something healthier in the end."
-171,1180,wrong_item,"Ordered the tuna melt, got a ham and cheese instead."
+171,1180,wrong_item,"I definitely tapped the tuna melt in the app, double checked the order summary before paying and everything, but what showed up in the bag was a ham and cheese, not even close, not sure how that mix up happened on your end."
 172,613,changed_mind,"Got invited out last minute, don't need the pulled jackfruit jaffle anymore, my bad."
 173,1214,damaged,"Filling had leaked all over the box, bread was a soggy grey colour."
 174,125,other,Asking about allergen info that wasn't listed on the order page.
 175,1154,late,Ordered on my Wednesday lunch break and it arrived after I was back at my desk.
-176,573,other,"The receipt in the bag is unreadable, printer must be low on ink."
-177,1128,damaged,"Filling was cold and separated, bread gone soggy and gray."
+176,573,other,"The reciept in the bag is unreadable, printer must be low on ink."
+177,1128,damaged,"Fillin was seperated and soggy, bread had gone a grayish colour too."
 178,1236,wrong_item,Paid for the chicken satay wrap and received a plain cheese toastie.
 179,180,changed_mind,"Can I just cancel, I changed my mind before it even left the kitchen I think."
 180,891,late,"Decided to cook at home instead, please cancel the order."
-181,279,wrong_item,Cheese leaked everywhere and the bread was a soggy mess by the time it arrived.
+181,279,wrong_item,"By the time it actually got here the cheese had leaked out everywhere and the bread had gone into this soggy sort of mush, not really sure how it ended up in that state but it wasn't exactly appetising by the time I opened the box."
 182,426,late,Nearly missed my train waiting for this to turn up.
 183,174,wrong_item,This looks nothing like the photo on the menu for what I ordered.
 184,644,late,The app said it was delivered 39 minutes ago but it just showed up now.
-185,274,wrong_item,"Ordered the tuna melt, got a ham and cheese instead."
+185,274,wrong_item,"I definitely tapped the tuna melt in the app, double checked the order summary before paying and everything, but what showed up in the bag was a ham and cheese, not even close, not sure how that mix up happened on your end."
 186,1093,changed_mind,"Wasn't in the mood for a pulled jackfruit jaffle after all, sorry for the hassle."
 187,1387,changed_mind,"Wasn't in the mood for a apple cinnamon jaffle after all, sorry for the hassle."
 188,829,late,"Rider got lost apparently, ended up taking way longer than it should have."
@@ -194,8 +194,8 @@ id,order_id,reason_code,comment
 193,416,wrong_item,The order says bacon but there's no bacon anywhere in this thing.
 194,672,wrong_item,"wrong toastie showed up, mine had avocado and this has none"
 195,209,changed_mind,"changed plans last minute, headed to a friend's place for dinner instead"
-196,1052,late,"Waited almost two hours for this, way past the estimated time."
+196,1052,late,"Genuinely waited almost two hours tonight, kept refreshing the tracking page every five minutes like that was going to make the rider go any faster, by the time it finally showed up I'd already lost my appetite completely."
 197,479,changed_mind,"double booked myself a lunch meeting, can't eat this now"
 198,287,late,The app said it was delivered 133 minutes ago but it just showed up now.
 199,54,changed_mind,"Not damaged, not late, I simply don't want the banana nutella jaffle anymore."
-200,554,changed_mind,"It arrived on time and looked fine, I just changed my mind about eating it."
+200,554,changed_mind,"Bit banged up in the box to be honest, but really I'd just gone off the idea of eating it by then."
