@@ -82,6 +82,11 @@ class Runtime:
         )
 
 
+def effective_rpm(settings: Settings) -> int:
+    """The rpm pacer only protects a real backend; demo mode has none, so it never waits."""
+    return settings.rpm if settings.mode == "live" else 0
+
+
 def build_runtime(settings: Settings) -> Runtime:
     stats = Stats()
     cache = Cache(settings.cache_path) if settings.cache_path else None
@@ -92,7 +97,7 @@ def build_runtime(settings: Settings) -> Runtime:
         cache,
         pack=settings.pack,
         concurrency=settings.concurrency,
-        rpm=settings.rpm,
+        rpm=effective_rpm(settings),
     )
     return Runtime(scorer, stats, settings)
 
