@@ -12,6 +12,7 @@ dependencies = [
     "numpy>=2",
     "python-dotenv>=1.0",
     "rich>=14",
+    "pyyaml>=6",
 ]
 
 [dependency-groups]

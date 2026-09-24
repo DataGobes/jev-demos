@@ -477,6 +477,7 @@ dependencies = [
     { name = "numpy" },
     { name = "pyarrow" },
     { name = "python-dotenv" },
+    { name = "pyyaml" },
     { name = "rich" },
     { name = "typesafe-sdk" },
 ]
@@ -495,6 +496,7 @@ requires-dist = [
     { name = "numpy", specifier = ">=2" },
     { name = "pyarrow", specifier = ">=21" },
     { name = "python-dotenv", specifier = ">=1.0" },
+    { name = "pyyaml", specifier = ">=6" },
     { name = "rich", specifier = ">=14" },
     { name = "typesafe-sdk", specifier = "==0.7.1" },
 ]
