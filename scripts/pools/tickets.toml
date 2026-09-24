@@ -1,0 +1,642 @@
+[[clean]]
+subject = "Missing drink"
+text = "Order {order_no} came without the iced coffee."
+
+[[clean]]
+subject = "Wrong item"
+text = "Received a different toastie than what I ordered in {order_no}."
+
+[[clean]]
+subject = "Order issue"
+text = "My order {order_no} is showing as delivered but I never got it."
+
+[[clean]]
+subject = "Missing item"
+text = "The fries were missing from order {order_no}."
+
+[[clean]]
+subject = "Order issue"
+text = "Order {order_no} arrived with the wrong sauce."
+
+[[clean]]
+subject = "Cold food"
+text = "The {product} in order {order_no} arrived completely cold."
+
+[[clean]]
+subject = "Order issue"
+text = "Still waiting on order {order_no}, it's been over an hour."
+
+[[clean]]
+subject = "Missing item"
+text = "No napkins or cutlery came with order {order_no}."
+
+[[clean]]
+subject = "Order issue"
+text = "Order {order_no} only had one of the two items I ordered."
+
+[[clean]]
+subject = "Wrong item"
+text = "Got a {product} in order {order_no} when I ordered something else entirely."
+
+[[clean]]
+subject = "Order issue"
+text = "The app shows order {order_no} as cancelled but I was still charged."
+
+[[clean]]
+subject = "Damaged order"
+text = "The box for order {order_no} arrived crushed."
+
+[[clean]]
+subject = "Order issue"
+text = "Can someone check the status of order {order_no}, it's not moving."
+
+[[clean]]
+subject = "Missing item"
+text = "Order {order_no} was missing the side salad I paid extra for."
+
+[[clean]]
+subject = "Order issue"
+text = "Order {order_no} says out for delivery for the last 40 minutes."
+
+[[clean]]
+subject = "Wrong item"
+text = "The {product} in order {order_no} isn't what's on the receipt."
+
+[[clean]]
+subject = "Order issue"
+text = "Two items from order {order_no} were swapped with another order I think."
+
+[[clean]]
+subject = "Missing item"
+text = "Sauce sachet was missing from order {order_no} again."
+
+[[clean]]
+subject = "Order issue"
+text = "Order {order_no} shows delivered but the driver never rang the bell."
+
+[[clean]]
+subject = "Cold food"
+text = "Everything in order {order_no} was lukewarm at best."
+
+[[clean]]
+subject = "Order issue"
+text = "Please look into order {order_no}, the tracking link is broken."
+
+[[clean]]
+subject = "Wrong item"
+text = "Order {order_no} had bacon in it despite the vegetarian tag."
+
+[[clean]]
+subject = "Missing item"
+text = "Straw and lid weren't included with order {order_no}."
+
+[[clean]]
+subject = "Order issue"
+text = "Order {order_no} seems to have been sent to the wrong building entirely."
+
+[[clean]]
+subject = "Damaged order"
+text = "The {product} in order {order_no} was squashed flat."
+
+[[clean]]
+subject = "Order issue"
+text = "Order {order_no} never left the 'preparing' stage in the app."
+
+[[clean]]
+subject = "Wrong item"
+text = "I ordered two of the same thing in {order_no} and got two different items."
+
+[[clean]]
+subject = "Missing item"
+text = "The extra cheese I paid for on order {order_no} wasn't there."
+
+[[clean]]
+subject = "Order issue"
+text = "Order {order_no} arrived but half the bag was empty."
+
+[[clean]]
+subject = "Cold food"
+text = "Order {order_no} took so long the food was stone cold."
+
+[[clean]]
+subject = "Allergen question"
+text = "Does the {product} contain any nuts?"
+
+[[clean]]
+subject = "Allergen question"
+text = "Is the bread used for the toasties gluten free, or just the filling option?"
+
+[[clean]]
+subject = "Allergen question"
+text = "Can you confirm if the vegan option is also dairy free?"
+
+[[clean]]
+subject = "Allergen question"
+text = "I have a shellfish allergy, is any seafood prepared in the same kitchen?"
+
+[[clean]]
+subject = "Allergen question"
+text = "Does the {product} contain egg in any part of it?"
+
+[[clean]]
+subject = "Allergen question"
+text = "Are your sauces made with mustard? Need to know for an allergy."
+
+[[clean]]
+subject = "Allergen question"
+text = "Is there a nut-free prep area for allergy orders?"
+
+[[clean]]
+subject = "Allergen question"
+text = "Does the vegetarian toastie contain any traces of gluten?"
+
+[[clean]]
+subject = "Allergen question"
+text = "Can I get the allergen list for the full menu please?"
+
+[[clean]]
+subject = "Allergen question"
+text = "Is the cheese used lactose free or regular?"
+
+[[clean]]
+subject = "Allergen question"
+text = "Does {order_no} include anything with sesame in it?"
+
+[[clean]]
+subject = "Allergen question"
+text = "I'm coeliac, which items on the menu are safe for me?"
+
+[[clean]]
+subject = "Allergen question"
+text = "Are the sauces cross contaminated with peanuts at all?"
+
+[[clean]]
+subject = "Allergen question"
+text = "Does the {product} contain soy?"
+
+[[clean]]
+subject = "Allergen question"
+text = "Just checking if the kids menu items contain any nuts."
+
+[[clean]]
+subject = "Allergen question"
+text = "Is the bread vegan by default or does it contain milk?"
+
+[[clean]]
+subject = "Allergen question"
+text = "Can the {product} be made without dairy for an allergy?"
+
+[[clean]]
+subject = "Allergen question"
+text = "Are celery or mustard used in any of the standard sauces?"
+
+[[clean]]
+subject = "Allergen question"
+text = "Does the menu clearly mark which items are gluten free?"
+
+[[clean]]
+subject = "Allergen question"
+text = "I need to avoid sesame entirely, which items should I skip?"
+
+[[clean]]
+subject = "Opening hours"
+text = "What time do you open on a {day}?"
+
+[[clean]]
+subject = "Opening hours"
+text = "Are you open on public holidays?"
+
+[[clean]]
+subject = "Opening hours"
+text = "What are your delivery hours for the weekend?"
+
+[[clean]]
+subject = "Opening hours"
+text = "Do you close earlier on a {day} evening?"
+
+[[clean]]
+subject = "Opening hours"
+text = "Is the kitchen open past 9pm on weekdays?"
+
+[[clean]]
+subject = "Opening hours"
+text = "What time does delivery start in the morning?"
+
+[[clean]]
+subject = "Opening hours"
+text = "Are you open for lunch on a {day}?"
+
+[[clean]]
+subject = "Opening hours"
+text = "Do opening hours change during the summer?"
+
+[[clean]]
+subject = "Opening hours"
+text = "Is the shop open right now or has it closed for the day?"
+
+[[clean]]
+subject = "Opening hours"
+text = "What time is last orders for delivery?"
+
+[[clean]]
+subject = "Opening hours"
+text = "Are you closed on Sundays or just certain hours?"
+
+[[clean]]
+subject = "Opening hours"
+text = "Do you open earlier for breakfast on weekends?"
+
+[[clean]]
+subject = "Opening hours"
+text = "What are the holiday opening hours this year?"
+
+[[clean]]
+subject = "Opening hours"
+text = "Is there a lunch break when the kitchen is closed?"
+
+[[clean]]
+subject = "Opening hours"
+text = "Could you confirm your hours for next {day}?"
+
+[[clean]]
+subject = "Refund"
+text = "Can I get a refund for order {order_no}, it never arrived?"
+
+[[clean]]
+subject = "Refund"
+text = "Requesting a refund, the {product} in {order_no} was inedible."
+
+[[clean]]
+subject = "Refund"
+text = "How long do refunds usually take to process?"
+
+[[clean]]
+subject = "Refund"
+text = "I was charged twice for order {order_no}, please refund the duplicate."
+
+[[clean]]
+subject = "Refund"
+text = "Can order {order_no} be refunded instead of redelivered?"
+
+[[clean]]
+subject = "Refund"
+text = "Still haven't received my refund for {order_no} from last week."
+
+[[clean]]
+subject = "Refund"
+text = "Refund request for order {order_no}, item was missing entirely."
+
+[[clean]]
+subject = "Refund"
+text = "Is a partial refund possible if only part of the order was wrong?"
+
+[[clean]]
+subject = "Refund"
+text = "Please refund order {order_no}, I cancelled before it was prepared."
+
+[[clean]]
+subject = "Refund"
+text = "Refund for {order_no} hasn't shown up on my statement yet."
+
+[[clean]]
+subject = "Refund"
+text = "Can you refund the delivery fee for order {order_no}? It was over an hour late."
+
+[[clean]]
+subject = "Refund"
+text = "Requesting a refund since order {order_no} arrived completely cold."
+
+[[clean]]
+subject = "Refund"
+text = "Do refunds go back to the original payment method automatically?"
+
+[[clean]]
+subject = "Refund"
+text = "Refund needed for {order_no}, the app charged me but the order failed."
+
+[[clean]]
+subject = "Refund"
+text = "Can I get store credit instead of a refund for {order_no}?"
+
+[[clean]]
+subject = "Refund"
+text = "Refund status for order {order_no} still shows as pending."
+
+[[clean]]
+subject = "Refund"
+text = "I'd like a refund, order {order_no} was the wrong size entirely."
+
+[[clean]]
+subject = "Refund"
+text = "Please process a refund, {order_no} never left the kitchen apparently."
+
+[[clean]]
+subject = "Refund"
+text = "Refund for order {order_no} please, the box arrived empty."
+
+[[clean]]
+subject = "Refund"
+text = "How do I request a refund through the app for {order_no}?"
+
+[[clean]]
+subject = "Refund"
+text = "Refund requested, order {order_no} was cancelled by the store itself."
+
+[[clean]]
+subject = "Refund"
+text = "Can the refund for {order_no} be expedited, it's been over a week?"
+
+[[clean]]
+subject = "Refund"
+text = "Requesting a refund for {order_no}, allergens weren't respected."
+
+[[clean]]
+subject = "Refund"
+text = "Refund please for order {order_no}, duplicate charge on my card statement."
+
+[[clean]]
+subject = "Refund"
+text = "Is there a time limit on requesting refunds after delivery?"
+
+[[clean]]
+subject = "Loyalty program"
+text = "How many stamps do I need for a free {product}?"
+
+[[clean]]
+subject = "Loyalty program"
+text = "Does the loyalty card work with delivery orders too?"
+
+[[clean]]
+subject = "Menu question"
+text = "Are there any seasonal items coming to the menu soon?"
+
+[[clean]]
+subject = "Menu question"
+text = "Is the {product} available as a combo with a drink?"
+
+[[clean]]
+subject = "Feedback"
+text = "Just wanted to say the {product} was fantastic today, thank you."
+
+[[clean]]
+subject = "Feedback"
+text = "The new packaging looks great, much sturdier than before."
+
+[[clean]]
+subject = "Delivery area"
+text = "Do you deliver to the area near the train station?"
+
+[[clean]]
+subject = "Delivery area"
+text = "What's the delivery radius from the store?"
+
+[[clean]]
+subject = "Payment issue"
+text = "The app won't let me pay with iDEAL, is that a known issue?"
+
+[[clean]]
+subject = "Payment issue"
+text = "Can I pay cash on delivery for order {order_no}?"
+
+[[clean]]
+subject = "App issue"
+text = "The app keeps crashing when I try to check out."
+
+[[clean]]
+subject = "App issue"
+text = "Can't seem to apply my discount code at checkout."
+
+[[clean]]
+subject = "Menu question"
+text = "Do you offer a catering menu for larger groups?"
+
+[[clean]]
+subject = "Menu question"
+text = "Is the {product} spicy or mild by default?"
+
+[[clean]]
+subject = "Feedback"
+text = "Delivery was fast today, really appreciated it."
+
+[[clean]]
+subject = "Website issue"
+text = "The website menu isn't loading properly on mobile."
+
+[[clean]]
+subject = "General question"
+text = "Do you offer any discounts for students?"
+
+[[clean]]
+subject = "General question"
+text = "Can large orders be placed a day in advance?"
+
+[[clean]]
+subject = "Packaging"
+text = "Could the boxes be made more eco-friendly?"
+
+[[clean]]
+subject = "General question"
+text = "Is there a way to leave delivery instructions for the driver?"
+
+[[clean]]
+subject = "General question"
+text = "Do you cater for office lunches on a {day}?"
+
+[[clean]]
+subject = "Feedback"
+text = "Really enjoyed the {product}, will be ordering again soon."
+
+[[defect]]
+subject = "Refund"
+text = "Please refund to {iban}, I'm {first_name} and live at {street} {house_no}, {city}."
+note = "IBAN and home address"
+
+[[defect]]
+subject = "Delivery issue"
+text = "My name is {first_name}, born 14 March 1988, you can reach me on {phone} if there's an update."
+note = "date of birth and phone number"
+
+[[defect]]
+subject = "Account update"
+text = "Can you update my delivery address to {street} {house_no}, {postcode} {city}?"
+note = "home address"
+
+[[defect]]
+subject = "Refund"
+text = "Send the refund to {personal_email}, that's my usual account for everything."
+note = "personal email"
+
+[[defect]]
+subject = "Contact update"
+text = "Reach me at {phone} from now on, my old number is out of service."
+note = "phone number"
+
+[[defect]]
+subject = "Refund"
+text = "Refund the money to iban {iban} please, under the name {first_name}."
+note = "IBAN and full name"
+
+[[defect]]
+subject = "Complaint"
+text = "I live at {street} {house_no} in {city} and the driver keeps skipping my building."
+note = "home address"
+
+[[defect]]
+subject = "Account update"
+text = "My date of birth is 06-04-1992, in case that's needed for the ID check."
+note = "literal date of birth, digits"
+
+[[defect]]
+subject = "Refund"
+text = "You can transfer to {iban}, spaced out the way it's printed on my card."
+note = "spaced IBAN format"
+
+[[defect]]
+subject = "Contact update"
+text = "New email is {personal_email}, update my account whenever you get a chance."
+note = "personal email"
+
+[[defect]]
+subject = "Refund"
+text = "Full name is {first_name}, born 14/03/1988, postcode {postcode} if you need it for the refund form."
+note = "full name, date of birth, postcode"
+
+[[defect]]
+subject = "Delivery issue"
+text = "Call me at {phone} instead of texting, easier for me to answer."
+note = "phone number"
+
+[[defect]]
+subject = "Account update"
+text = "Please note my address is now {street} {house_no}, {postcode} {city}, moved last month."
+note = "home address"
+
+[[defect]]
+subject = "Refund"
+text = "You can email the confirmation to {personal_email} once the refund for the IBAN {iban} goes through."
+note = "personal email and IBAN"
+
+[[hard_negative]]
+subject = "Pickup"
+text = "Can I pick up {order_no} at {store_address} instead?"
+note = "store address, not personal"
+
+[[hard_negative]]
+subject = "Delivery area"
+text = "Does postcode 3512 CT fall within your delivery zone?"
+note = "delivery-area postcode, not a customer address"
+
+[[hard_negative]]
+subject = "Order question"
+text = "Hi, it's {first_name}, just checking on the status of {order_no}."
+note = "first name only, no other personal data"
+
+[[hard_negative]]
+subject = "General question"
+text = "Can I call the store directly on 030 123 4567 about my order?"
+note = "store's public phone number"
+
+[[hard_negative]]
+subject = "Pickup"
+text = "What time can I collect {order_no} from {store_address} today?"
+note = "store address, not personal"
+
+[[hard_negative]]
+subject = "Order question"
+text = "This is {first_name} again, following up on {order_no} from yesterday."
+note = "first name only, no other personal data"
+
+[[hard_negative]]
+subject = "Delivery area"
+text = "Is 3584 EA covered by your delivery drivers?"
+note = "delivery-area postcode, not a customer address"
+
+[[hard_negative]]
+subject = "General question"
+text = "Is the store phone 030 123 4567 the right number for allergy questions?"
+note = "store's public phone number"
+
+[[hard_negative]]
+subject = "Pickup"
+text = "Can someone else collect {order_no} from {store_address} on my behalf?"
+note = "store address, not personal"
+
+[[hard_negative]]
+subject = "Order question"
+text = "{first_name} here, order {order_no} still hasn't updated in the app."
+note = "first name only, no other personal data"
+
+[[hard_negative]]
+subject = "Delivery area"
+text = "Do you deliver to postcode 3521 AK on weekends?"
+note = "delivery-area postcode, not a customer address"
+
+[[hard_negative]]
+subject = "General question"
+text = "Saw the number 030 123 4567 on your website, is that still active?"
+note = "store's public phone number"
+
+[[hard_negative]]
+subject = "Pickup"
+text = "Is {store_address} open for pickup right now for order {order_no}?"
+note = "store address, not personal"
+
+[[hard_negative]]
+subject = "Order question"
+text = "Just {first_name}, wondering if {order_no} shipped yet."
+note = "first name only, no other personal data"
+
+[[hard_negative]]
+subject = "Delivery area"
+text = "Does your delivery radius reach postcode 3511 LN?"
+note = "delivery-area postcode, not a customer address"
+
+[[hard_negative]]
+subject = "General question"
+text = "Can I text the store on 030 123 4567 instead of calling?"
+note = "store's public phone number"
+
+[[hard_negative]]
+subject = "Pickup"
+text = "Parking near {store_address} for pickup of {order_no}, is there any?"
+note = "store address, not personal"
+
+[[hard_negative]]
+subject = "Order question"
+text = "{first_name} checking in about order {order_no}, any update?"
+note = "first name only, no other personal data"
+
+[[hard_negative]]
+subject = "Delivery area"
+text = "Is postcode 3572 XG within range for delivery?"
+note = "delivery-area postcode, not a customer address"
+
+[[hard_negative]]
+subject = "General question"
+text = "Does 030 123 4567 also handle catering enquiries?"
+note = "store's public phone number"
+
+[[hard_negative]]
+subject = "Pickup"
+text = "Can I swap delivery for pickup at {store_address} for {order_no}?"
+note = "store address, not personal"
+
+[[hard_negative]]
+subject = "Order question"
+text = "Hey it's {first_name}, order {order_no} seems stuck in the queue."
+note = "first name only, no other personal data"
+
+[[hard_negative]]
+subject = "Delivery area"
+text = "Curious if postcode 3531 HK is in your delivery zone."
+note = "delivery-area postcode, not a customer address"
+
+[[hard_negative]]
+subject = "General question"
+text = "Ringing 030 123 4567 didn't get an answer earlier, is that the right line?"
+note = "store's public phone number"
+
+[[hard_negative]]
+subject = "Pickup"
+text = "Would {store_address} have {order_no} ready by 6pm for pickup?"
+note = "store address, not personal"
