@@ -48,6 +48,13 @@ class Scorer:
         self.stats = stats
         self.cache = cache
         self.pack = max(1, pack)
+        # Packing changes what the backend sees (several states per request), which can shift
+        # the judged probability, so a packed run's cache entries must not be served to a
+        # differently-packed run. pack=1 keeps the plain backend name so existing unpacked
+        # cache entries stay valid.
+        self._cache_model_key = (
+            backend.name if self.pack == 1 else f"{backend.name}|pack={self.pack}"
+        )
         self._concurrency = concurrency
         self._rpm = rpm
         self._closed = False
@@ -79,7 +86,9 @@ class Scorer:
 
         resolved: dict[str, float | None] = {}
         if self.cache is not None:
-            resolved.update(self.cache.get_many(self.backend.name, question, list(positions)))
+            resolved.update(
+                self.cache.get_many(self._cache_model_key, question, list(positions))
+            )
         missing = [s for s in positions if s not in resolved]
         if missing:
             chunks = [missing[i : i + self.pack] for i in range(0, len(missing), self.pack)]
@@ -92,7 +101,7 @@ class Scorer:
                     if v is not None:
                         to_cache[s] = v
             if self.cache is not None:
-                self.cache.put_many(self.backend.name, question, to_cache)
+                self.cache.put_many(self._cache_model_key, question, to_cache)
         self.stats.add(judgments=judgments, unique=len(positions), sent=len(missing))
 
         for s, idxs in positions.items():

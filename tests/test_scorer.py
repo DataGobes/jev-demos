@@ -71,6 +71,34 @@ def test_cache_hits_skip_backend(tmp_path):
     assert (snap.judgments, snap.sent) == (3, 1)
 
 
+def test_cache_key_is_pack_aware(tmp_path):
+    """A pack=1 cache entry and a pack=3 cache entry for the same backend must not cross over:
+    packed requests batch several states into one call, which can shift the judged probability,
+    so serving a pack=1 answer to a pack=3 scorer (or vice versa) would be silently wrong."""
+    cache = Cache(tmp_path / "c.sqlite")
+
+    b1, st1 = Recorder(), Stats()
+    s1 = Scorer(b1, st1, cache, pack=1, rpm=0)
+    s1.score_many(['{"a":1}'], Q)
+    s1.close()
+
+    # pack=3 must not be served from the pack=1 entry
+    b3, st3 = Recorder(), Stats()
+    s3 = Scorer(b3, st3, cache, pack=3, rpm=0)
+    out3 = s3.score_many(['{"a":1}'], Q)
+    s3.close()
+    assert out3 == [0.07]
+    assert b3.chunks == [['{"a":1}']]
+
+    # and a fresh pack=1 scorer must still be served from the original pack=1 entry, not pack=3's
+    b1b, st1b = Recorder(), Stats()
+    s1b = Scorer(b1b, st1b, cache, pack=1, rpm=0)
+    out1b = s1b.score_many(['{"a":1}'], Q)
+    s1b.close()
+    assert out1b == [0.07]
+    assert b1b.chunks == []
+
+
 def test_failed_values_not_cached_and_counted(tmp_path):
     cache = Cache(tmp_path / "c.sqlite")
     b, st = Recorder(fail_on='{"bad":1}'), Stats()
