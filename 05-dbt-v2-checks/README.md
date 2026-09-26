@@ -33,11 +33,14 @@ uv sync
 uv run pytest -q          # tests the fallback on an information schema built from project/
 uv run ruff check
 
-# Against a real dbt v2 run (dbt v2 must be installed, see FINDINGS.md "Environment"):
+# Against a real dbt v2 run (dbt v2 must be installed, see FINDINGS.md §0):
 cd project
-dbt compile --profiles-dir . --generate-info-schema
-dbt check  --profiles-dir .
+dbt check   --profiles-dir .
+dbt compile --profiles-dir . --generate-info-schema --static-analysis strict   # strict, or compiled_code is NULL
 cd .. && uv run desc-judge --info-schema project/target/info_schema/v1
+
+# Every dbt step FINDINGS.md quotes, logged to probes/logs/ (includes the probe checks):
+DBT=dbt probes/run_dbt_evidence.sh
 ```
 
 `desc-judge` options that matter in CI:

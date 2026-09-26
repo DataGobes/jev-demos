@@ -1,0 +1,24 @@
+$ bash -c 
+  set -e
+  work=$(mktemp -d); cp -r . "$work/p"; cd "$work/p"; rm -rf target
+  "$0" parse --profiles-dir . > /dev/null 2>&1 && cp -r target "$work/state"
+  sed -i "s/description: Customer email /description: Total amount of the order /" models/schema.yml
+  grep -n "Total amount of the order" models/schema.yml
+  echo "--- dbt ls -s state:modified (description-only edit):"
+  "$0" ls --profiles-dir . -s state:modified --state "$work/state" 2>&1 | grep -v "^ *dbt-oss\|Loading\|CONNECT" || true
+  printf "\n-- edited\n" >> models/staging/stg_orders.sql
+  echo "--- dbt ls -s state:modified (after also editing stg_orders.sql):"
+  "$0" ls --profiles-dir . -s state:modified --state "$work/state" 2>&1 | grep -v "^ *dbt-oss\|Loading\|CONNECT" || true
+  rm -rf "$work" /home/user/dbt-labs/dbt-core/target/debug/dbt
+43:        description: Total amount of the order                   # WRONG
+--- dbt ls -s state:modified (description-only edit):
+
+==================== Execution Summary =====================
+Finished 'list' successfully for target 'dev' [1.1s]
+--- dbt ls -s state:modified (after also editing stg_orders.sql):
+=======================Selected nodes=======================
+desc_checks.staging.stg_orders
+
+==================== Execution Summary =====================
+Finished 'list' successfully for target 'dev' [1.2s]
+[exit 0]

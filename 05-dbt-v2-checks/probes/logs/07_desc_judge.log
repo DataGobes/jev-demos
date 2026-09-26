@@ -1,0 +1,8 @@
+$ uv run --project /home/user/jev-demos/05-dbt-v2-checks desc-judge --info-schema target/info_schema/v1 --no-cache
+FAIL description_matches_column (4 violations) [judge=mock-v1 in_scope=16 judged=16 cached=0 unchanged=0 undocumented=1]
+  unique_id                          column_name   message
+  model.desc_checks.customer_orders  order_count   key noun 'euros' is in neither the column name nor the SQL  ('Average basket size in euros')
+  model.desc_checks.fct_revenue      revenue_date  key noun 'delivered' is in neither the column name nor the SQL  ('Date the shipment was delivered')
+  model.desc_checks.stg_customers    last_name     key noun 'number' is in neither the column name nor the SQL  ('Customer phone number')
+  model.desc_checks.stg_orders       order_total   key noun 'email' is in neither the column name nor the SQL  ('Customer email')
+[exit 1]

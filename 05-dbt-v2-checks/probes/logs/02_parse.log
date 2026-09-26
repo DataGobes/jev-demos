@@ -1,0 +1,8 @@
+$ /home/user/dbt-labs/dbt-core/target/debug/dbt parse --profiles-dir .
+   dbt-oss 2.0.5 (56cf873 2026-09-26 19:52:15)
+   Loading profiles.yml
+CONNECT proxy failed: proxy server responded 403/403
+
+==================== Execution Summary =====================
+Finished 'parse' successfully for target 'dev' [1.0s]
+[exit 0]

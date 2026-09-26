@@ -1,0 +1,13 @@
+$ bash -c 
+  for flags in "" "--static-analysis off" "--static-analysis strict"; do
+    rm -rf target
+    "$0" compile --profiles-dir . --generate-info-schema $flags 2>&1 | grep "\[warning\]" || true
+    echo "compile --generate-info-schema $flags -> models with compiled_code: $(uv run --project "$1" python -c "import duckdb; print(duckdb.sql(\"select count(*) filter (where compiled_code is not null) || \x27 of \x27 || count(*) from \x27target/info_schema/v1/dbt.models.parquet\x27\").fetchone()[0])")"
+  done /home/user/dbt-labs/dbt-core/target/debug/dbt /home/user/jev-demos/05-dbt-v2-checks
+[warning] [Generic (dbt1000)]: --generate-info-schema: column types will not be populated without `--static-analysis strict`, which also enables column-level lineage.
+compile --generate-info-schema  -> models with compiled_code: 0 of 4
+[warning] [Generic (dbt1000)]: --generate-info-schema: column types will not be populated without `--static-analysis strict`, which also enables column-level lineage.
+compile --generate-info-schema --static-analysis off -> models with compiled_code: 0 of 4
+[warning] [Generic (dbt1000)]: static analysis was requested with `--static-analysis strict` but did not run: this distribution of dbt OSS does not include the static analysis engine. Install the full dbt distribution to enable it: dbt system upgrade-distribution
+compile --generate-info-schema --static-analysis strict -> models with compiled_code: 4 of 4
+[exit 0]

@@ -31,7 +31,15 @@ rm -rf target logs desc_checks.duckdb
 run 01_version        "$DBT" --version
 run 02_parse          "$DBT" parse --profiles-dir .
 run 03_check          "$DBT" check --profiles-dir .
-run 04_compile_info   "$DBT" compile --profiles-dir . --generate-info-schema
+# compiled_code reaches the information schema only with --static-analysis strict: compare.
+run 04a_compiled_code_by_flag bash -c '
+  for flags in "" "--static-analysis off" "--static-analysis strict"; do
+    rm -rf target
+    "$0" compile --profiles-dir . --generate-info-schema $flags 2>&1 | grep "\[warning\]" || true
+    echo "compile --generate-info-schema $flags -> models with compiled_code: $(uv run --project "$1" python -c "import duckdb; print(duckdb.sql(\"select count(*) filter (where compiled_code is not null) || \x27 of \x27 || count(*) from \x27target/info_schema/v1/dbt.models.parquet\x27\").fetchone()[0])")"
+  done' "$DBT" "$ROOT"
+rm -rf target
+run 04_compile_info   "$DBT" compile --profiles-dir . --generate-info-schema --static-analysis strict
 run 05_info_files     ls -1 target/info_schema/v1
 run 06_info_inventory uv run --project "$ROOT" python "$HERE/inventory.py" target/info_schema/v1
 run 07_desc_judge     uv run --project "$ROOT" desc-judge --info-schema target/info_schema/v1 --no-cache
@@ -49,3 +57,19 @@ trap 'kill $SERVER 2>/dev/null' EXIT
 sleep 1
 run 08_check_probes   env DESC_CHECKS_PROBES=true "$DBT" check --profiles-dir .
 echo "== 08_mock_judge_requests"; cat "$MOCK_JUDGE_LOG"
+
+# Does dbt's state:modified select a model whose only change is a column description?
+# Runs on a throwaway copy of the project, so schema.yml is never edited in place.
+kill $SERVER 2>/dev/null
+run 09_state_modified_description bash -c '
+  set -e
+  work=$(mktemp -d); cp -r . "$work/p"; cd "$work/p"; rm -rf target
+  "$0" parse --profiles-dir . > /dev/null 2>&1 && cp -r target "$work/state"
+  sed -i "s/description: Customer email /description: Total amount of the order /" models/schema.yml
+  grep -n "Total amount of the order" models/schema.yml
+  echo "--- dbt ls -s state:modified (description-only edit):"
+  "$0" ls --profiles-dir . -s state:modified --state "$work/state" 2>&1 | grep -v "^ *dbt-oss\|Loading\|CONNECT" || true
+  printf "\n-- edited\n" >> models/staging/stg_orders.sql
+  echo "--- dbt ls -s state:modified (after also editing stg_orders.sql):"
+  "$0" ls --profiles-dir . -s state:modified --state "$work/state" 2>&1 | grep -v "^ *dbt-oss\|Loading\|CONNECT" || true
+  rm -rf "$work"' "$DBT"

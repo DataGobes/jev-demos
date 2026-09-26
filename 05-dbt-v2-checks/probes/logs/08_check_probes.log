@@ -1,0 +1,79 @@
+$ env DESC_CHECKS_PROBES=true /home/user/dbt-labs/dbt-core/target/debug/dbt check --profiles-dir .
+   dbt-oss 2.0.5 (56cf873 2026-09-26 19:52:15)
+   Loading profiles.yml
+    Failed [  0.03s] check columns_have_descriptions
+    Failed [  0.01s] check description_matches_column_jinja
+    Failed [  0.01s] check description_matches_column_macro
+    Failed [  1.04s] check probe_community_ext
+    Warned [  0.05s] check probe_httpfs_judge
+    Failed [  1.00s] check probe_per_row_judge
+    Warned [  0.00s] check probe_read_file
+    Warned [  0.00s] check probe_run_query
+    Warned [  0.00s] check probe_settings
+CONNECT proxy failed: proxy server responded 403/403
+
+=================== Errors and Warnings ====================
+[error] [CheckFailed (dbt1650)]: check 'columns_have_descriptions' failed with 1 violation(s)
+┌───────────────────────────────┬─────────────┬───────────────────────────┐
+│ unique_id                     ┆ column_name ┆ message                   │
+╞═══════════════════════════════╪═════════════╪═══════════════════════════╡
+│ model.desc_checks.fct_revenue ┆ order_count ┆ column has no description │
+└───────────────────────────────┴─────────────┴───────────────────────────┘
+[error] [CheckFailed (dbt1650)]: check 'description_matches_column_jinja' failed with 4 violation(s)
+┌───────────────────────────────────┬──────────────┬─────────────────────────────────┬───────────────────────────────────────────────────────┐
+│ unique_id                         ┆ column_name  ┆ description                     ┆ message                                               │
+╞═══════════════════════════════════╪══════════════╪═════════════════════════════════╪═══════════════════════════════════════════════════════╡
+│ model.desc_checks.stg_orders      ┆ order_total  ┆ Customer email                  ┆ description does not match column (mock judge, jinja) │
+│ model.desc_checks.customer_orders ┆ order_count  ┆ Average basket size in euros    ┆ description does not match column (mock judge, jinja) │
+│ model.desc_checks.fct_revenue     ┆ revenue_date ┆ Date the shipment was delivered ┆ description does not match column (mock judge, jinja) │
+│ model.desc_checks.stg_customers   ┆ last_name    ┆ Customer phone number           ┆ description does not match column (mock judge, jinja) │
+└───────────────────────────────────┴──────────────┴─────────────────────────────────┴───────────────────────────────────────────────────────┘
+[error] [CheckFailed (dbt1650)]: check 'description_matches_column_macro' failed with 4 violation(s)
+┌───────────────────────────────────┬──────────────┬─────────────────────────────────┬──────────────────────────────────────────────────────────────┐
+│ unique_id                         ┆ column_name  ┆ description                     ┆ message                                                      │
+╞═══════════════════════════════════╪══════════════╪═════════════════════════════════╪══════════════════════════════════════════════════════════════╡
+│ model.desc_checks.stg_orders      ┆ order_total  ┆ Customer email                  ┆ description does not match column (mock judge, duckdb macro) │
+│ model.desc_checks.customer_orders ┆ order_count  ┆ Average basket size in euros    ┆ description does not match column (mock judge, duckdb macro) │
+│ model.desc_checks.fct_revenue     ┆ revenue_date ┆ Date the shipment was delivered ┆ description does not match column (mock judge, duckdb macro) │
+│ model.desc_checks.stg_customers   ┆ last_name    ┆ Customer phone number           ┆ description does not match column (mock judge, duckdb macro) │
+└───────────────────────────────────┴──────────────┴─────────────────────────────────┴──────────────────────────────────────────────────────────────┘
+[error] [CheckEvaluationFailed (dbt1653)]: check 'probe_community_ext' could not be evaluated:
+  HTTP Error: Failed to download extension "shellfs" at URL "http://community-extensions.duckdb.org/v1.5.4/linux_amd64/shellfs.duckdb_extension.gz" (HTTP 403)
+
+Candidate extensions: "httpfs", "delta", "excel", "https", "mysql"
+For more info, visit https://duckdb.org/docs/stable/extensions/troubleshooting?version=v1.5.4&platform=linux_amd64&extension=shellfs
+[warning] [CheckWarned (dbt1651)]: check 'probe_httpfs_judge' found with 1 violation(s)
+┌─────────────┬────────────────┬───────┐
+│ column_name ┆ description    ┆ ok    │
+╞═════════════╪════════════════╪═══════╡
+│ order_total ┆ customer email ┆ false │
+└─────────────┴────────────────┴───────┘
+[error] [CheckEvaluationFailed (dbt1653)]: check 'probe_per_row_judge' could not be evaluated:
+  Binder Error: Table function "read_json" does not support lateral join column parameters - cannot use column "c.column_name" in this context.
+The function only supports literals as parameters.
+[warning] [CheckWarned (dbt1651)]: check 'probe_read_file' found with 1 violation(s)
+┌───────────────┬───────┐
+│ filename      ┆ bytes │
+╞═══════════════╪═══════╡
+│ /etc/hostname ┆ 3     │
+└───────────────┴───────┘
+[warning] [CheckWarned (dbt1651)]: check 'probe_run_query' found with 1 violation(s)
+┌──────────────┬───────────────────┬────────────────┐
+│ execute_flag ┆ run_query_is_none ┆ run_query_rows │
+╞══════════════╪═══════════════════╪════════════════╡
+│ False        ┆ False             ┆ 0              │
+└──────────────┴───────────────────┴────────────────┘
+[warning] [CheckWarned (dbt1651)]: check 'probe_settings' found with 6 violation(s)
+┌──────────────────────────────┬───────┐
+│ name                         ┆ value │
+╞══════════════════════════════╪═══════╡
+│ allow_community_extensions   ┆ true  │
+│ allow_unsigned_extensions    ┆ false │
+│ autoinstall_known_extensions ┆ true  │
+│ autoload_known_extensions    ┆ true  │
+│ enable_external_access       ┆ true  │
+└──────────────────────────────┴───────┘
+
+==================== Execution Summary =====================
+Finished 'check' with 4 warnings and 5 errors for target 'dev' [3.3s]
+[exit 1]

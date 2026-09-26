@@ -12,3 +12,4 @@ project/target/
 project/logs/
 project/dbt_packages/
 .desc_judge_cache.json
+project/.user.yml

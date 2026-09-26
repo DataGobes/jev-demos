@@ -1,0 +1,13 @@
+$ /home/user/dbt-labs/dbt-core/target/debug/dbt compile --profiles-dir . --generate-info-schema --static-analysis strict
+   dbt-oss 2.0.5 (56cf873 2026-09-26 19:52:15)
+   Loading profiles.yml
+CONNECT proxy failed: proxy server responded 403/403
+
+=================== Errors and Warnings ====================
+[warning] [Generic (dbt1000)]: static analysis was requested with `--static-analysis strict` but did not run: this distribution of dbt OSS does not include the static analysis engine. Install the full dbt distribution to enable it: dbt system upgrade-distribution
+
+==================== Execution Summary =====================
+Finished 'compile' with 1 warning for target 'dev' [1.5s]
+Processed: 4 models | 3 checks
+Summary: 4 total | 4 success
+[exit 0]
