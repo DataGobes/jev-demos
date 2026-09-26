@@ -13,6 +13,7 @@ a regex baseline. Spec: `docs/superpowers/specs/2026-09-24-jev-dbt-semantic-test
 - Tests: `uv run pytest -q` · fast only (skip the end-to-end dbt build): `uv run pytest -q -m "not slow"`
 - Lint: `uv run ruff check`
 - Failure viewer: `uv run python scripts/show_failures.py`
+- Pack-layout benchmark (live, calls Jev directly, no dbt): `uv run python scripts/pack_bench.py run --style nested --pack 32` · compare saved runs: `uv run python scripts/pack_bench.py report`
 - Scorecard: `uv run python scripts/score.py` · fresh live run appended to `docs/eval-results.md`: `uv run python scripts/score.py --run --fresh --mode live --append`
 - Recording: `scripts/record.sh [--cold] [--pack N] [--no-captions]` (captions, title and end card built in) · smoke-test in demo mode only, never live: `yes '' | JEV_MODE=demo DOTENV_DISABLE=1 TYPE_DELAY=0 scripts/record.sh`
 
