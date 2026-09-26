@@ -2,6 +2,7 @@ import asyncio
 import json
 from types import SimpleNamespace
 
+import pytest
 from typesafe_sdk import TypeSafeError
 
 from jevdbt.backend import DemoBackend, JevBackend, make_backend
@@ -30,7 +31,7 @@ def run(coro):
 
 def test_jev_single_sends_record_as_state_with_criteria():
     fake = FakeClient()
-    b = JevBackend(client=fake)
+    b = JevBackend(client=fake, pack_style="single")
     q = Question("Contradicts `reason_code`", "t-desc", "f-desc")
     res = run(b.judge(['{"comment":"burnt","reason_code":"late"}'], q))
     assert res.values == [0.25] and res.input_tokens == 123
@@ -43,13 +44,57 @@ def test_jev_single_sends_record_as_state_with_criteria():
 
 def test_jev_packed_uses_rows_state_and_scoped_questions():
     fake = FakeClient()
-    b = JevBackend(client=fake)
+    b = JevBackend(client=fake, pack_style="rows")
     res = run(b.judge(['{"a":1}', '{"a":2}', '{"a":3}'], Question("Check `a`")))
     assert res.values == [0.25, 0.26, 0.27]
     state, questions = fake.calls[0]
     assert state == {"rows": {"r000": {"a": 1}, "r001": {"a": 2}, "r002": {"a": 3}}}
     assert "`rows.r001.a`" in questions["r001"].instructions
     assert questions["r001"].criteria is None
+
+
+def test_jev_nested_puts_each_record_in_its_own_question_with_empty_state():
+    fake = FakeClient()
+    b = JevBackend(client=fake)  # nested is the default
+    q = Question("`comment` contradicts `reason_code`", "unlike `reason_code`", None)
+    states = ['{"comment":"burnt","reason_code":"late"}', '{"comment":"slow","reason_code":"late"}']
+    res = run(b.judge(states, q))
+    assert res.values == [0.25, 0.26]
+    state, questions = fake.calls[0]
+    assert state == ""
+    noul = questions["r001"]
+    assert noul.instructions == {
+        "record": {"comment": "slow", "reason_code": "late"},
+        "question": "`record.comment` contradicts `record.reason_code`",
+    }
+    assert noul.criteria == {"true": "unlike `record.reason_code`", "false": None}
+
+
+def test_jev_nested_keeps_its_layout_for_a_trailing_single_record():
+    """A pack's last chunk can hold one record; it must be judged in the same layout as the
+    rest, or its probability would depend on where it fell in the table."""
+    fake = FakeClient()
+    run(JevBackend(client=fake).judge(['{"a":1}'], Question("Check `a`")))
+    state, questions = fake.calls[0]
+    assert state == "" and questions["r000"].instructions["record"] == {"a": 1}
+
+
+def test_jev_inline_sends_question_verbatim_beside_the_columns():
+    fake = FakeClient()
+    run(JevBackend(client=fake, pack_style="inline").judge(['{"a":1}'], Question("Check `a`")))
+    _, questions = fake.calls[0]
+    assert questions["r000"].instructions == {"a": 1, "question": "Check `a`"}
+
+
+def test_jev_inline_rejects_a_question_column():
+    b = JevBackend(client=FakeClient(), pack_style="inline")
+    with pytest.raises(ValueError, match="nested"):
+        run(b.judge(['{"question":"x"}'], Question("Check `question`")))
+
+
+def test_unknown_pack_style_is_rejected():
+    with pytest.raises(ValueError, match="pack_style"):
+        JevBackend(client=FakeClient(), pack_style="sideways")
 
 
 def test_jev_error_yields_none_and_records_error():
