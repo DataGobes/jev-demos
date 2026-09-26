@@ -1,0 +1,7 @@
+desc_checks:
+  target: dev
+  outputs:
+    dev:
+      type: duckdb
+      path: desc_checks.duckdb
+      threads: 1

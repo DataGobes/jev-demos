@@ -11,6 +11,7 @@ honestly: live vs simulated is always labelled, and numbers come from logged run
 | 02 | [semsql](02-semsql/) | semantic SQL in DuckDB: plain-English judgments like `jev_noul(body, 'asks for a refund') > 0.8` become typed columns you can filter, sort and aggregate |
 | 03 | [VISUALIZE](03-visualize/) | a SQL query ends in `VISUALIZE '<intent>'`; code proposes only valid charts, Jev scores which one answers the intent, and code builds the chart or dashboard |
 | 04 | [dbt semantic tests](04-dbt-semantic-tests/) | dbt tests written as English sentences catch rows that pass every structural test but are still wrong (or leak PII), scored against a hidden answer key and a regex baseline |
+| 05 | [dbt v2 checks × LLM judge](05-dbt-v2-checks/) | research spike: can a dbt v2 native check call an LLM judge to flag column descriptions that don't match their column? Source-cited findings, and a check-shaped fallback CLI over the dbt information schema with a pluggable judge, change detection and a verdict cache |
 
 Every demo lives in its own folder with its own README, dependencies and instructions. Most run
 without an API key in a clearly labelled `SIMULATED` mode; put `TYPESAFE_API_KEY=...` in the

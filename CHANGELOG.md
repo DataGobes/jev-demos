@@ -6,6 +6,18 @@ here come from live, logged runs; see each demo's own docs for the full record.
 
 ## 2026-09-26
 
+### 05 · dbt v2 checks × LLM judge — research spike
+
+- **Added** `05-dbt-v2-checks/`: whether dbt v2's native checks can call an external judge
+  (they can't in a usable way: parse-time SQL on a private DuckDB, no model SQL, no per-row
+  calls), with every conclusion tied to a dbt-core source line or a logged command in
+  [`FINDINGS.md`](05-dbt-v2-checks/FINDINGS.md), plus open questions for
+  [dbt-core#15584](https://github.com/dbt-labs/dbt-core/discussions/15584).
+- **Added** the fallback, `desc-judge`: reads the dbt information schema Parquet, judges only
+  changed or uncached columns through a pluggable `Judge` (a deterministic mock for now, no API
+  calls), and reports like a check (0 rows = pass, exit 1 on violations).
+- Built in this repo rather than imported from a dev repo, since it is a spike.
+
 ### 01 · Cringe-o-Meter, 02 · semsql, 03 · VISUALIZE — first three demos ([#2](https://github.com/DataGobes/jev-demos/pull/2))
 
 - **Added** `01-cringe-o-meter/` (Next.js), `02-semsql/` (Python + DuckDB) and `03-visualize/`

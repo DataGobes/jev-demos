@@ -1,0 +1,15 @@
+name: desc_checks
+version: "1.0.0"
+profile: desc_checks
+
+model-paths: ["models"]
+macro-paths: ["macros"]
+check-paths: ["checks"]
+
+# Required once a package has checks (dbt-parser/src/resolve/resolve_checks.rs:130-148).
+info_schema:
+  version: 1
+
+models:
+  desc_checks:
+    +materialized: view

@@ -1,0 +1,14 @@
+.venv
+__pycache__
+*.duckdb
+*.duckdb.wal
+.pytest_cache
+.ruff_cache
+.DS_Store
+.env
+.env.local
+.claude/
+project/target/
+project/logs/
+project/dbt_packages/
+.desc_judge_cache.json
