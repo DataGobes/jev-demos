@@ -118,8 +118,8 @@ default `pack_style`) gives each question its own `{"record": {...}, "question":
 the shared state empty. Its answers don't change with pack size, and it passes the gate at pack=32
 and pack=64: 35 or 18 requests instead of 1,057, about 2 s, $0.006. It differs from pack=1 only on
 a couple of borderline rows (ticket 131, customer 379). The demo still records at pack=1. See
-"Pack layouts" in `docs/eval-results.md` for the full comparison, and `scripts/pack_bench.py` to
-rerun it.
+[`docs/pack-layouts.md`](docs/pack-layouts.md) for the full comparison, and
+`scripts/pack_bench.py` to rerun it.
 
 The two remaining Jev errors are honest ones, not tuning targets: it misses `Pietje Puk` (a Dutch
 placeholder name, culturally specific) and flags `Anna Test` (p=0.90 — "Test" is a real surname).

@@ -12,7 +12,7 @@ therefore live in two places in a packed request:
 
 The shared state for the second kind is empty on purpose: any text there is read as evidence.
 A neutral-sounding "Data-quality check ..." note measurably pushed borderline rows towards
-"defect". See docs/eval-results.md, "Pack layouts".
+"defect". See docs/pack-layouts.md.
 
 Every style maps `states` (JSON strings, one per record) to one request: a state plus one Noul
 question per record, answered under the returned ids in record order.
