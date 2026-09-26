@@ -6,7 +6,7 @@ here come from live, logged runs; see each demo's own docs for the full record.
 
 ## 2026-09-26
 
-### 01 · Cringe-o-Meter, 02 · semsql, 03 · VISUALIZE — first three demos
+### 01 · Cringe-o-Meter, 02 · semsql, 03 · VISUALIZE — first three demos ([#2](https://github.com/DataGobes/jev-demos/pull/2))
 
 - **Added** `01-cringe-o-meter/` (Next.js), `02-semsql/` (Python + DuckDB) and `03-visualize/`
   (Python backend + React frontend), each imported with its history from its own dev repo, and
