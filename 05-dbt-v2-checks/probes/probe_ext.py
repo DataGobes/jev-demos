@@ -1,41 +1,26 @@
 """Probe 5c/5d: can check-shaped SQL reach an external judge through a DuckDB extension?
 
-Starts a local mock judge over HTTP, loads DuckDB's signed httpfs extension from a local
-file (the sandbox blocks extensions.duckdb.org), and sends each probe as one ADBC execute
-on a fresh in-memory DuckDB 1.5.4, the way dbt v2 sends a check.
+Starts the mock judge (mock_judge_server.py) on 127.0.0.1, loads DuckDB's signed httpfs
+extension from the `duckdb-extension-httpfs` wheel (the sandbox blocks extensions.duckdb.org),
+and sends each probe as one ADBC execute on a fresh in-memory DuckDB 1.5.4, the way dbt v2
+sends a check.
+
+    uv run python probes/probe_ext.py
 """
 
-import json
 import sys
 import threading
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import HTTPServer
 from pathlib import Path
-from urllib.parse import parse_qs, urlparse
 
+import duckdb_extension_httpfs
 from adbc_driver_duckdb import dbapi
-
-HTTPFS = Path(__file__).parent / "ext/x/duckdb_extension_httpfs/extensions/v1.5.4/httpfs.duckdb_extension"
-CALLS: list[str] = []
+from mock_judge_server import CALLS, Handler
 
 
-def mock_verdict(name: str, description: str) -> bool:
-    """True = description matches. False when the description's last word is not in the name."""
-    words = description.lower().split()
-    return not words or words[-1] in name.lower()
-
-
-class Handler(BaseHTTPRequestHandler):
-    def do_GET(self):
-        q = parse_qs(urlparse(self.path).query)
-        CALLS.append(self.path)
-        body = json.dumps({"ok": mock_verdict(q.get("name", [""])[0], q.get("description", [""])[0])})
-        self.send_response(200)
-        self.send_header("Content-Type", "application/json")
-        self.end_headers()
-        self.wfile.write(body.encode())
-
-    def log_message(self, *args):
-        pass
+def httpfs_path() -> Path:
+    root = Path(duckdb_extension_httpfs.__file__).parent
+    return next(root.rglob("httpfs.duckdb_extension"))
 
 
 def run(name: str, sql: str) -> None:
@@ -53,7 +38,7 @@ def main() -> None:
     port = server.server_address[1]
     threading.Thread(target=server.serve_forever, daemon=True).start()
     base = f"http://127.0.0.1:{port}/judge"
-    load = f"load '{HTTPFS}';"
+    load = f"load '{httpfs_path()}';"
 
     run("load_httpfs_from_file", f"{load} select 1 as loaded")
     run(

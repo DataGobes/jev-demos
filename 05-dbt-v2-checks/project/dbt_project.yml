@@ -13,3 +13,12 @@ info_schema:
 models:
   desc_checks:
     +materialized: view
+
+# Probe checks (checks/probes/) exist to record what a check can do. Off unless
+# DESC_CHECKS_PROBES=true; severity warn so they show their rows without failing the run.
+checks:
+  desc_checks:
+    probes:
+      +enabled: "{{ env_var('DESC_CHECKS_PROBES', 'false') }}"
+      +severity: warn
+      +tags: [probe]
