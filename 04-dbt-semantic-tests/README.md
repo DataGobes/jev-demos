@@ -44,8 +44,8 @@ Jev sees alongside the tested one; `threshold` is the probability above which a 
 3. The UDF batches rows by question, dedupes identical states, and hands misses to a `Scorer`
    that packs them into requests, calls TypeSafe's Jev model (`AsyncTypeSafeClient.system_one`)
    under a concurrency and rate limit, and caches every result in `.jev_cache.sqlite`. Cached
-   judgments are keyed by the model alias (`jev-latest`) and pack size, so clear the cache file
-   after a model update.
+   judgments are keyed by the model alias (`jev-latest`), pack size and pack layout, so clear the
+   cache file after a model update.
 4. `dbt test --select tag:semantic` runs the four tests; `store_failures: true` persists every
    row with `jev_p >= threshold` into `main_dbt_test__audit`, alongside a hand-written regex
    baseline (`tag:baseline`) run the same way.
@@ -110,11 +110,16 @@ Run-to-run variance: `tickets_body_has_no_pii` precision was 0.93 in the first p
 1.00 in this one — one hard negative sits near the 0.5 threshold. Quote the range (0.93–1.00),
 not just the best run.
 
-Packing (batching multiple rows into one Jev request) trades accuracy for speed on exactly the
-test that relates two fields: `returns_comment_matches_reason_code` recall falls from 1.00 at
-pack=1 to 0.75 at pack=4 and 0.58 at pack=8, while the other three tests hold steady. So pack
-stays at 1 by default; the plugin config and `JEV_PACK` exist to explore that trade-off, not to
-ship a packed default.
+Packing (several rows per Jev request) works when each row travels inside its own question.
+The first packed layout put all rows in the shared `state`. That cost recall on exactly the test
+that relates two fields: `returns_comment_matches_reason_code` fell from 1.00 at pack=1 to 0.58 at
+pack=8 and 0.42 at pack=32, because every other row is a distractor. The `nested` layout (now the
+default `pack_style`) gives each question its own `{"record": {...}, "question": ...}` and leaves
+the shared state empty. Its answers don't change with pack size, and it passes the gate at pack=32
+and pack=64: 35 or 18 requests instead of 1,057, about 2 s, $0.006. It differs from pack=1 only on
+a couple of borderline rows (ticket 131, customer 379). The demo still records at pack=1. See
+[`docs/pack-layouts.md`](docs/pack-layouts.md) for the full comparison, and
+`scripts/pack_bench.py` to rerun it.
 
 The two remaining Jev errors are honest ones, not tuning targets: it misses `Pietje Puk` (a Dutch
 placeholder name, culturally specific) and flags `Anna Test` (p=0.90 — "Test" is a real surname).

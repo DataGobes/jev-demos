@@ -80,3 +80,8 @@ def test_simulated_banner_simulated_or_missing_vs_live():
     assert "SIMULATED" in score.simulated_banner(None)
     assert score.simulated_banner("Jev · 1 judgments · SIMULATED demo pack=1") is not None
     assert score.simulated_banner("Jev · 1 judgments · LIVE jev-latest pack=1") is None
+
+
+def test_mode_pack_includes_pack_style():
+    assert score._mode_pack("Jev · 1 judgments · LIVE jev-latest pack=1") == "live/pack=1"
+    assert score._mode_pack("Jev · LIVE jev-latest pack=32/nested") == "live/pack=32/nested"

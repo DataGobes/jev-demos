@@ -86,12 +86,15 @@ def format_cost(usd: float) -> str:
     return "<$0.001" if usd < 0.001 else f"${usd:.3f}"
 
 
-def format_summary(snap: StatsSnapshot, *, simulated: bool, model: str, pack: int) -> str:
+def format_summary(
+    snap: StatsSnapshot, *, simulated: bool, model: str, pack: int, pack_style: str = "single"
+) -> str:
     mode = "SIMULATED" if simulated else "LIVE"
+    packing = f"pack={pack}" if pack == 1 else f"pack={pack}/{pack_style}"
     line = (
         f"Jev · {snap.judgments:,} judgments · {snap.unique:,} unique · "
         f"{snap.cached_fraction:.0%} cached · {snap.requests:,} requests · "
-        f"{snap.wall_seconds:.1f} s · {format_cost(snap.cost_usd)} · {mode} {model} pack={pack}"
+        f"{snap.wall_seconds:.1f} s · {format_cost(snap.cost_usd)} · {mode} {model} {packing}"
     )
     if snap.errors:
         line += f" · {snap.errors} errors"

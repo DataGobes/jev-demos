@@ -133,3 +133,48 @@ Jev · 1,300 judgments · 1,057 unique · 0% cached · 1,057 requests · 53.9 s 
 - `returns_comment_matches_reason_code`: hard negatives flagged = [], defects missed = []
 - `reviews_body_matches_stars`: hard negatives flagged = [], defects missed = []
 - `tickets_body_has_no_pii`: hard negatives flagged = [], defects missed = []
+
+## 2026-09-26T15:15:25Z · live/pack=32/nested
+
+Jev · 1,300 judgments · 1,057 unique · 0% cached · 35 requests · 2.0 s · $0.006 · LIVE jev-latest pack=32/nested
+
+| test | defects | Jev P | Jev R | Jev hard-neg | regex P | regex R | regex hard-neg |
+|---|---|---|---|---|---|---|---|
+| customers_full_name_is_a_person | 25 | 0.96 | 0.92 | 1 | 0.71 | 0.60 | 6 |
+| returns_comment_matches_reason_code | 12 | 1.00 | 1.00 | 0 | 0.45 | 0.75 | 6 |
+| reviews_body_matches_stars | 24 | 1.00 | 1.00 | 0 | 0.39 | 0.92 | 8 |
+| tickets_body_has_no_pii | 14 | 0.93 | 1.00 | 1 | 0.48 | 0.86 | 13 |
+
+**Gate: PASS**
+
+- `customers_full_name_is_a_person`: hard negatives flagged = [406], defects missed = [174, 379]
+- `returns_comment_matches_reason_code`: hard negatives flagged = [], defects missed = []
+- `reviews_body_matches_stars`: hard negatives flagged = [], defects missed = []
+- `tickets_body_has_no_pii`: hard negatives flagged = [131], defects missed = []
+
+## 2026-09-26T15:15:33Z · live/pack=64/nested
+
+Jev · 1,300 judgments · 1,057 unique · 0% cached · 18 requests · 1.2 s · $0.006 · LIVE jev-latest pack=64/nested
+
+| test | defects | Jev P | Jev R | Jev hard-neg | regex P | regex R | regex hard-neg |
+|---|---|---|---|---|---|---|---|
+| customers_full_name_is_a_person | 25 | 0.96 | 0.96 | 1 | 0.71 | 0.60 | 6 |
+| returns_comment_matches_reason_code | 12 | 1.00 | 1.00 | 0 | 0.45 | 0.75 | 6 |
+| reviews_body_matches_stars | 24 | 1.00 | 1.00 | 0 | 0.39 | 0.92 | 8 |
+| tickets_body_has_no_pii | 14 | 0.93 | 1.00 | 1 | 0.48 | 0.86 | 13 |
+
+**Gate: PASS**
+
+- `customers_full_name_is_a_person`: hard negatives flagged = [406], defects missed = [174]
+- `returns_comment_matches_reason_code`: hard negatives flagged = [], defects missed = []
+- `reviews_body_matches_stars`: hard negatives flagged = [], defects missed = []
+- `tickets_body_has_no_pii`: hard negatives flagged = [131], defects missed = []
+
+## Pack layouts (2026-09-26)
+
+The two runs above use the new `nested` pack layout: each record goes inside its own question and
+the shared state is empty. Both pass the gate at 35 / 18 requests instead of 1,057 (~2 s, $0.006
+vs $0.017). The only rows that change against pack=1 are borderline ones: ticket 131 and customer
+379 (the latter dips just under its 0.7 threshold at pack=32). The investigation behind the choice
+(6 layouts, 23 live benchmark runs, a noise floor and row-level drift) is written up in
+[pack-layouts.md](pack-layouts.md). No questions, thresholds, golden key or baseline were changed.

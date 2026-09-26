@@ -16,6 +16,8 @@ Every demo lives in its own folder with its own README, dependencies and instruc
 without an API key in a clearly labelled `SIMULATED` mode; put `TYPESAFE_API_KEY=...` in the
 demo folder's `.env` for live results.
 
+What changed and when: [CHANGELOG.md](CHANGELOG.md).
+
 Built by [DataGobes](https://datagobes.dev).
 
 ## License

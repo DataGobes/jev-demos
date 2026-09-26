@@ -63,10 +63,12 @@ def _snap(**kw):
 
 
 def test_format_summary_live():
-    line = format_summary(_snap(), simulated=False, model="jev-latest", pack=8)
+    line = format_summary(
+        _snap(), simulated=False, model="jev-latest", pack=8, pack_style="nested"
+    )
     expected = (
         "Jev · 1,312 judgments · 1,057 unique · 23% cached · 164 requests · 7.9 s · $0.004 · "
-        "LIVE jev-latest pack=8"
+        "LIVE jev-latest pack=8/nested"
     )
     assert line == expected
 

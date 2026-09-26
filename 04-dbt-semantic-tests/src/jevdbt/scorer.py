@@ -41,6 +41,7 @@ class Scorer:
         cache: Cache | None = None,
         *,
         pack: int = 1,
+        pack_style: str = "nested",
         concurrency: int = 32,
         rpm: int = 1200,
     ) -> None:
@@ -48,12 +49,12 @@ class Scorer:
         self.stats = stats
         self.cache = cache
         self.pack = max(1, pack)
-        # Packing changes what the backend sees (several states per request), which can shift
-        # the judged probability, so a packed run's cache entries must not be served to a
-        # differently-packed run. pack=1 keeps the plain backend name so existing unpacked
-        # cache entries stay valid.
+        # Packing changes what the backend sees (several states per request, laid out by
+        # `pack_style`), which can shift the judged probability, so a packed run's cache entries
+        # must not be served to a differently-packed run. pack=1 keeps the plain backend name so
+        # existing unpacked cache entries stay valid.
         self._cache_model_key = (
-            backend.name if self.pack == 1 else f"{backend.name}|pack={self.pack}"
+            backend.name if self.pack == 1 else f"{backend.name}|pack={self.pack}|{pack_style}"
         )
         self._concurrency = concurrency
         self._rpm = rpm

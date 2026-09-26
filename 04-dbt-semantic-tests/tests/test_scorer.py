@@ -99,6 +99,18 @@ def test_cache_key_is_pack_aware(tmp_path):
     assert b1b.chunks == []
 
 
+def test_cache_key_is_pack_style_aware(tmp_path):
+    """Two layouts at the same pack size put records in different places in the request, so
+    one layout's cached answers must not be served to the other."""
+    cache = Cache(tmp_path / "c.sqlite")
+    for style, expect_sent in [("rows", True), ("nested", True), ("rows", False)]:
+        b = Recorder()
+        s = Scorer(b, Stats(), cache, pack=3, pack_style=style, rpm=0)
+        s.score_many(['{"a":1}'], Q)
+        s.close()
+        assert (b.chunks != []) == expect_sent, style
+
+
 def test_failed_values_not_cached_and_counted(tmp_path):
     cache = Cache(tmp_path / "c.sqlite")
     b, st = Recorder(fail_on='{"bad":1}'), Stats()

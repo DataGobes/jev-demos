@@ -4,12 +4,12 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
-import json
 from dataclasses import dataclass
 from typing import Any, Protocol
 
-from typesafe_sdk import AsyncTypeSafeClient, Noul, TypeSafeError
+from typesafe_sdk import AsyncTypeSafeClient, TypeSafeError
 
+from jevdbt.packing import STYLES
 from jevdbt.questions import Question
 
 
@@ -29,19 +29,17 @@ class Backend(Protocol):
     async def aclose(self) -> None: ...
 
 
-def _to_noul(q: Question) -> Noul:
-    criteria = None
-    if q.criteria_true is not None or q.criteria_false is not None:
-        criteria = {"true": q.criteria_true, "false": q.criteria_false}
-    return Noul(instructions=q.instructions, criteria=criteria)
-
-
 class JevBackend:
-    def __init__(self, model: str = "jev-latest", client: Any = None) -> None:
+    def __init__(
+        self, model: str = "jev-latest", client: Any = None, pack_style: str = "nested"
+    ) -> None:
+        if pack_style not in STYLES:
+            raise ValueError(f"pack_style must be one of {sorted(STYLES)}, got {pack_style!r}")
         self.name = model
         self.simulated = False
         self.last_error: str | None = None
         self._client = client
+        self._build = STYLES[pack_style]
 
     def _ensure_client(self) -> Any:
         if self._client is None:
@@ -50,16 +48,10 @@ class JevBackend:
 
     async def judge(self, states: list[str], question: Question) -> BatchResult:
         client = self._ensure_client()
+        state, questions, ids = self._build(states, question)
         try:
-            if len(states) == 1:
-                resp = await client.system_one(json.loads(states[0]), {"q": _to_noul(question)})
-                values: list[float | None] = [resp.answers["q"].noul]
-            else:
-                ids = [f"r{i:03d}" for i in range(len(states))]
-                state = {"rows": {rid: json.loads(s) for rid, s in zip(ids, states, strict=True)}}
-                questions = {rid: _to_noul(question.for_packed_row(rid)) for rid in ids}
-                resp = await client.system_one(state, questions)
-                values = [resp.answers[rid].noul for rid in ids]
+            resp = await client.system_one(state, questions)
+            values: list[float | None] = [resp.answers[qid].noul for qid in ids]
             return BatchResult(values, resp.usage.input_tokens)
         except (TypeSafeError, KeyError) as exc:
             self.last_error = f"{type(exc).__name__}: {exc}"
@@ -95,9 +87,9 @@ class DemoBackend:
         return None
 
 
-def make_backend(mode: str, model: str) -> Backend:
+def make_backend(mode: str, model: str, pack_style: str = "nested") -> Backend:
     if mode == "demo":
         return DemoBackend()
     if mode == "live":
-        return JevBackend(model=model)
+        return JevBackend(model=model, pack_style=pack_style)
     raise ValueError(f"mode must be 'live' or 'demo', got {mode!r}")

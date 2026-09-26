@@ -4,7 +4,13 @@ import time
 import pytest
 
 from jevdbt.questions import Question
-from jevdbt.runtime import Settings, build_runtime, effective_rpm, resolve_settings
+from jevdbt.runtime import (
+    Settings,
+    build_runtime,
+    effective_pack_style,
+    effective_rpm,
+    resolve_settings,
+)
 
 
 def test_defaults_auto_without_key_is_demo():
@@ -23,6 +29,19 @@ def test_env_overrides_config():
         {"JEV_MODE": "demo", "JEV_PACK": "8", "JEV_NO_CACHE": "1"},
     )
     assert (s.mode, s.pack, s.cache_path) == ("demo", 8, None)
+
+
+def test_pack_style_defaults_to_nested_and_env_overrides():
+    assert resolve_settings({}, {}).pack_style == "nested"
+    s = resolve_settings({"pack_style": "inline"}, {"JEV_PACK_STYLE": "rows"})
+    assert s.pack_style == "rows"
+    with pytest.raises(ValueError, match="pack_style"):
+        resolve_settings({"pack_style": "sideways"}, {})
+
+
+def test_pack_one_is_always_the_single_layout():
+    assert effective_pack_style(Settings("demo", "jev-latest", 1, 4, 0, None, "nested")) == "single"
+    assert effective_pack_style(Settings("demo", "jev-latest", 8, 4, 0, None, "nested")) == "nested"
 
 
 def test_live_without_key_raises():
