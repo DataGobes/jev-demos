@@ -1,0 +1,31 @@
+[project]
+name = "semsql"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "Gijs Jansen", email = "gijs.jansen@miele.com" }
+]
+requires-python = ">=3.13"
+dependencies = [
+    "duckdb>=1.5.5",
+    "numpy>=2.0",
+    "prompt-toolkit>=3.0.53",
+    "pyarrow>=25.0.1",
+    "rich>=15.0.0",
+    "typesafe-sdk>=0.7.0",
+]
+
+[project.scripts]
+semsql = "semsql:main"
+
+[build-system]
+requires = ["uv_build>=0.12.9,<0.13.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "pytest-asyncio>=1.4.0",
+    "ruff>=0.16.8",
+]
