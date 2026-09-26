@@ -47,7 +47,7 @@ DBT_TEST_CMD = "uv run dbt test --profiles-dir . --select tag:semantic tag:basel
 DBT_BUILD_CMD = "uv run dbt build --profiles-dir . --exclude tag:semantic"
 
 _ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
-_MODE_PACK_RE = re.compile(r"(LIVE|SIMULATED)\s+\S+\s+pack=(\d+)")
+_MODE_PACK_RE = re.compile(r"(LIVE|SIMULATED)\s+\S+\s+pack=(\d+(?:/\w+)?)")
 
 
 @dataclass(frozen=True)

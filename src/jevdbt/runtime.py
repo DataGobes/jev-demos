@@ -12,6 +12,7 @@ from typing import Any
 
 from jevdbt.backend import make_backend
 from jevdbt.cache import Cache
+from jevdbt.packing import STYLES
 from jevdbt.scorer import Scorer
 from jevdbt.stats import Stats, format_summary
 from jevdbt.ticker import Ticker, ticker_enabled
@@ -27,6 +28,7 @@ class Settings:
     concurrency: int
     rpm: int
     cache_path: str | None
+    pack_style: str = "nested"  # request layout when pack > 1; pack=1 is always "single"
 
 
 def resolve_settings(config: Mapping[str, Any], env: Mapping[str, str]) -> Settings:
@@ -38,6 +40,9 @@ def resolve_settings(config: Mapping[str, Any], env: Mapping[str, str]) -> Setti
         mode = "live" if has_key else "demo"
     if mode == "live" and not has_key:
         raise RuntimeError("JEV_MODE=live but TYPESAFE_API_KEY is not set")
+    pack_style = env.get("JEV_PACK_STYLE") or str(config.get("pack_style", "nested"))
+    if pack_style not in STYLES:
+        raise ValueError(f"jevdbt pack_style must be one of {sorted(STYLES)}, got {pack_style!r}")
     default_cache = config.get("cache_path", ".jev_cache.sqlite")
     cache_path: str | None = env.get("JEV_CACHE") or str(default_cache)
     if env.get("JEV_NO_CACHE") == "1":
@@ -46,6 +51,7 @@ def resolve_settings(config: Mapping[str, Any], env: Mapping[str, str]) -> Setti
         mode=mode,
         model=str(config.get("model", "jev-latest")),
         pack=int(env.get("JEV_PACK") or config.get("pack", 1)),
+        pack_style=pack_style,
         concurrency=int(config.get("concurrency", 32)),
         rpm=int(config.get("rpm", 1200)),
         cache_path=cache_path,
@@ -65,12 +71,17 @@ class Runtime:
     def simulated(self) -> bool:
         return self.scorer.backend.simulated
 
+    @property
+    def effective_pack_style(self) -> str:
+        return effective_pack_style(self.settings)
+
     def summary(self) -> str:
         return format_summary(
             self.stats.snapshot(),
             simulated=self.simulated,
             model=self.scorer.backend.name,
             pack=self.settings.pack,
+            pack_style=self.effective_pack_style,
         )
 
     def stats_json(self) -> str:
@@ -81,9 +92,15 @@ class Runtime:
                 "simulated": self.simulated,
                 "model": self.scorer.backend.name,
                 "pack": self.settings.pack,
+                "pack_style": self.effective_pack_style,
                 "summary": self.summary(),
             }
         )
+
+
+def effective_pack_style(settings: Settings) -> str:
+    """pack=1 is the plain one-record-per-request layout, whatever pack_style says."""
+    return settings.pack_style if settings.pack > 1 else "single"
 
 
 def effective_rpm(settings: Settings) -> int:
@@ -94,12 +111,14 @@ def effective_rpm(settings: Settings) -> int:
 def build_runtime(settings: Settings) -> Runtime:
     stats = Stats()
     cache = Cache(settings.cache_path) if settings.cache_path else None
-    backend = make_backend(settings.mode, settings.model)
+    pack_style = effective_pack_style(settings)
+    backend = make_backend(settings.mode, settings.model, pack_style)
     scorer = Scorer(
         backend,
         stats,
         cache,
         pack=settings.pack,
+        pack_style=pack_style,
         concurrency=settings.concurrency,
         rpm=effective_rpm(settings),
     )

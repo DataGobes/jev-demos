@@ -10,6 +10,7 @@ jaffle_shop:
           config:
             mode: auto        # live when TYPESAFE_API_KEY is set, else SIMULATED
             pack: 1           # override with JEV_PACK; only record at a pack size that passed the gate
+            pack_style: nested  # layout when pack > 1; override with JEV_PACK_STYLE (see packing.py)
             concurrency: 32
             rpm: 1200
             model: jev-latest
