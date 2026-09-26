@@ -6,6 +6,14 @@ here come from live, logged runs; see each demo's own docs for the full record.
 
 ## 2026-09-26
 
+### 01 · Cringe-o-Meter, 02 · semsql, 03 · VISUALIZE — first three demos ([#2](https://github.com/DataGobes/jev-demos/pull/2))
+
+- **Added** `01-cringe-o-meter/` (Next.js), `02-semsql/` (Python + DuckDB) and `03-visualize/`
+  (Python backend + React frontend), each imported with its history from its own dev repo, and
+  listed in the root README.
+- **Added** a root `CLAUDE.md` with the demo-to-dev-repo map, the subtree workflow, and the
+  pre-publish checks: a history-wide secret scan, and no `.env`, caches or `.claude/` committed.
+
 ### 04 · dbt semantic tests — packed requests without losing accuracy ([#1](https://github.com/DataGobes/jev-demos/pull/1))
 
 - **Added** the `nested` pack layout, now the default `pack_style` for pack > 1. Each record goes
