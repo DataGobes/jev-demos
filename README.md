@@ -1,5 +1,12 @@
 # Jev demos
 
+<p align="center">
+  <picture>
+    <source media="(max-width: 600px)" srcset="assets/jev-hero-mobile.svg">
+    <img src="assets/jev-hero.svg" alt="Animated loop through the four Jev demos: English goes in, Jev judges it, typed values come out.">
+  </picture>
+</p>
+
 Small, self-contained demos of [TypeSafe](https://typesafe.ai)'s **Jev**, a System One model
 that returns typed judgments (probabilities, choices, scores) instead of generated text. Each
 demo puts Jev inside a tool data and analytics engineers already use, and each one is scored
