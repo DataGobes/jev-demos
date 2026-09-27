@@ -42,7 +42,8 @@ This repo is public and its history is permanent. Before importing or pulling a 
 - Adding or renaming a demo updates the table in the root `README.md`.
 - Numbers in READMEs, changelog entries and posts come from live, logged runs. A demo's `SIMULATED`
   / demo-mode output is never quoted as a result.
-- `assets/jev-hero.svg` (the README hero) is generated: edit `assets/build_hero.py`, then run
-  `python3 assets/build_hero.py` from the root. The numbers rule above applies to it too.
+- `assets/jev-hero.svg` and `assets/jev-hero-mobile.svg` (the README hero) are generated: edit
+  `assets/build_hero.py`, then run `python3 assets/build_hero.py` from the root. The numbers rule
+  above applies to them too.
 - Each demo runs from its own folder (`cd NN-name`). There is no root-level build, test or
   dependency setup.

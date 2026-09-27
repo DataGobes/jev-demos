@@ -11,6 +11,9 @@ here come from live, logged runs; see each demo's own docs for the full record.
 - **Added** `assets/jev-hero.svg`, an animated hero at the top of the README: one 28 s loop, one
   scene per demo, English typed in on the left, Jev in the middle, typed values out on the right.
   Plain CSS animation, no JS; with reduced motion it shows one static scene.
+- **Added** `assets/jev-hero-mobile.svg`, a portrait version of the same loop (cards stacked, Jev
+  between them). The README serves it below 600 px wide, so on a phone the text renders at about
+  0.9× instead of 0.37×.
 - **Added** `assets/build_hero.py` (Python stdlib only), which generates the SVG. Scenes are data,
   so a new demo is one more entry. Every number drawn comes from a live, logged run and each scene
   prints its source: semsql's 780 / 913 / 595, VISUALIZE's 1.00 vs 0.57, and the dbt returns

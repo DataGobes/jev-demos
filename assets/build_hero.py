@@ -1,11 +1,15 @@
 #!/usr/bin/env python3
-"""Build assets/jev-hero.svg, the animated hero at the top of the root README.
+"""Build the animated hero at the top of the root README, in two layouts:
+assets/jev-hero.svg (desktop, 960x420) and assets/jev-hero-mobile.svg (portrait, 400x852). The
+README serves the portrait one below 600 px with <picture>, so phones don't shrink the wide one
+to unreadable.
 
 Run from the repo root:   python3 assets/build_hero.py
 Standard library only. Edit this script, not the SVG: the SVG is generated.
 
 The story, once per demo: English types in on the left, Jev judges it, typed values come out
-on the right. Adding a demo means adding one entry to SCENES and one render function.
+on the right. Adding a demo means adding one entry to SCENES and one render function; both
+layouts pick it up, because scenes draw in card space and a Layout only moves the cards.
 
 Numbers follow the repo rule: every number drawn comes from a live, logged run, and each scene
 prints its source file. Scene 01 has no logged per-post scores, so its bars carry no numbers
@@ -23,11 +27,12 @@ animation is off and one static scene (STATIC_SCENE) is shown.
 """
 
 import random
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Callable
 from xml.sax.saxutils import escape as esc
 
-OUT_PATH = Path(__file__).with_name("jev-hero.svg")
-W, H = 960, 420
+HERE = Path(__file__).parent
 
 # Palette (the hero is a dark card, so it reads the same on GitHub's light and dark themes)
 BG, CARD, EDGE = "#0A0E1A", "#10162A", "#222B47"
@@ -38,10 +43,10 @@ KW, FN, STR = "#C4B5FD", "#67E8F9", "#86EFAC"  # code: keyword, function, string
 MONO = "ui-monospace,SFMono-Regular,Menlo,Consolas,'Liberation Mono',monospace"
 SANS = "-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif"
 
-# Layout
+# Card space: everything inside a card is drawn at these (desktop) coordinates. A Layout moves
+# whole cards with a translate, so every scene renders once and fits both layouts.
 IN_X, OUT_X, CARD_Y, CARD_W, CARD_H = 32, 556, 76, 372, 262
 PAD = 18
-OX, OY = 480, 207            # orb centre
 LINE0, LH = 138, 20          # first code baseline, line height
 CW = 7.5                     # monospace advance at 12.5px (0.6em)
 RX = OUT_X + PAD             # output content left edge
@@ -54,6 +59,53 @@ T_OUT = 2.5                  # typed values start appearing
 STATIC_SCENE = 1             # shown when motion is reduced
 
 EASE = "animation-timing-function:cubic-bezier(.2,.8,.2,1)"
+EASE_IN, EASE_OUT = "cubic-bezier(.55,0,.9,.5)", "cubic-bezier(.1,.5,.3,1)"
+
+
+@dataclass
+class Layout:
+    """Where the parts sit. Card contents stay in card space; in_shift/out_shift move the cards."""
+    path: Path
+    W: int
+    H: int
+    flow: tuple                  # how the desc names the input / output side
+    in_shift: tuple              # (dx, dy) from card space to this layout
+    out_shift: tuple
+    orb: tuple                   # (x, y, scale)
+    prim: tuple                  # "primitive" label: (x, y, anchor)
+    title: tuple                 # (x, y) of "Jev demos"; the mark sits 20 px left of it
+    subtitle: tuple              # (x, y)
+    chip_right: float            # right edge of the scene chip
+    tagline: tuple               # (x, y)
+    progress: tuple              # (x, y, segment width)
+    spawn: tuple                 # dots start in this card-space box: (x0, x1, y0, y1)
+    token_at: Callable           # (k, rng) -> card-space start of word token k
+    out_at: Callable             # k -> card-space target of output square k
+    ease_in: tuple               # (x, y) easing for flights into the orb: the curve's shape
+    ease_out: tuple              # (x, y) easing for flights out of the orb
+
+
+DESKTOP = Layout(
+    path=HERE / "jev-hero.svg", W=960, H=420, flow=("on the left", "on the right"),
+    in_shift=(0, 0), out_shift=(0, 0), orb=(480, 207, 1), prim=(480, 297, "middle"),
+    title=(66, 46), subtitle=(174, 46), chip_right=928, tagline=(32, 390), progress=(658, 378, 60),
+    spawn=(318, 396, 128, 318),
+    token_at=lambda k, rng: (350 - k * 10, 146 + k * 78 + rng.uniform(-6, 6)),
+    out_at=lambda k: (OUT_X + PAD - 10, 132 + k * 27),
+    ease_in=(EASE_IN, EASE_OUT), ease_out=("cubic-bezier(.2,.7,.3,1)", "cubic-bezier(.4,0,.6,1)"))
+
+# Portrait, for phones: the same cards stacked, the orb between them, content flowing down.
+# 400 wide, so a ~360 px phone column shows it at ~0.9x instead of the desktop hero's ~0.37x.
+MOBILE = Layout(
+    path=HERE / "jev-hero-mobile.svg", W=400, H=852, flow=("at the top", "at the bottom"),
+    in_shift=(-18, 10), out_shift=(-542, 432), orb=(200, 428, 0.8), prim=(262, 424, "start"),
+    title=(46, 44), subtitle=(14, 72), chip_right=386, tagline=(14, 806), progress=(14, 826, 85.5),
+    spawn=(60, 380, 262, 330),
+    token_at=lambda k, rng: (110 + k * 100, 300 + rng.uniform(-6, 6)),
+    out_at=lambda k: (OUT_X + 40 + k * 50, CARD_Y + 2),
+    ease_in=(EASE_OUT, EASE_IN), ease_out=("cubic-bezier(.4,0,.6,1)", "cubic-bezier(.2,.7,.3,1)"))
+
+LAYOUTS = [DESKTOP, MOBILE]
 
 
 class Timeline:
@@ -351,36 +403,41 @@ def typed_input(tl, i, sc):
     return g(tl.window(i, 0.05, rise=0), "".join(texts) + "".join(covers) + beam)
 
 
-def particles(tl, i, sc, rng):
+def particles(tl, i, sc, rng, L):
     s, _ = tl.span(i)
+    OX, OY, _ = L.orb
+    (ix, iy), (ox, oy) = L.in_shift, L.out_shift
+    bx0, bx1, by0, by1 = L.spawn
     parts = []
     # dots and word tokens stream from the input card into the orb
     for k in range(9):
-        x0, y0 = rng.uniform(318, 396), rng.uniform(128, 318)
+        x0, y0 = rng.uniform(bx0, bx1) + ix, rng.uniform(by0, by1) + iy
         a, dur = s + 1.15 + k * 0.1 + rng.uniform(0, 0.08), rng.uniform(0.85, 1.05)
-        cx, cy = tl.fly(a, dur, OX - x0 + rng.uniform(-6, 6), OY - y0 + rng.uniform(-6, 6),
-                            "cubic-bezier(.55,0,.9,.5)", "cubic-bezier(.1,.5,.3,1)")
+        cx, cy = tl.fly(a, dur, OX - x0 + rng.uniform(-6, 6), OY - y0 + rng.uniform(-6, 6), *L.ease_in)
         dot = f'<circle r="{rng.uniform(1.6, 2.8):.1f}" fill="{rng.choice([CYAN, KW, TXT])}"/>'
         parts.append(g("pt", g(cx, g(cy, dot)), f"translate({x0:.1f},{y0:.1f})"))
     for k, tok in enumerate(sc["tokens"]):
-        x0, y0 = 350 - k * 10, 146 + k * 78 + rng.uniform(-6, 6)
+        x0, y0 = L.token_at(k, rng)
+        x0, y0 = x0 + ix, y0 + iy
         a, dur = s + 0.95 + k * 0.3, 0.95
-        cx, cy = tl.fly(a, dur, OX - x0, OY - y0, "cubic-bezier(.55,0,.9,.5)", "cubic-bezier(.1,.5,.3,1)", 0.6)
+        cx, cy = tl.fly(a, dur, OX - x0, OY - y0, *L.ease_in, 0.6)
         w = mono_width(tok, 10.5) + 14
         chip = (f'<rect x="{-w / 2:.1f}" y="-10" width="{w:.1f}" height="19" rx="9.5" fill="#1B2340" stroke="{VIOLET}"/>'
                 + text(0, 3.5, tok, cls="m", fill=TXT, size=10.5, anchor="middle"))
         parts.append(g("pt", g(cx, g(cy, chip)), f"translate({x0:.1f},{y0:.1f})"))
     # typed values leave the orb as small squares
     for k in range(7):
-        ty = 132 + k * 27
+        tx, ty = L.out_at(k)
         a = s + T_JUDGE + 0.05 + k * 0.05
-        cx, cy = tl.fly(a, 0.5, RX - 10 - OX, ty - OY, "cubic-bezier(.2,.7,.3,1)", "cubic-bezier(.4,0,.6,1)", 0.8)
+        cx, cy = tl.fly(a, 0.5, tx + ox - OX, ty + oy - OY, *L.ease_out, 0.8)
         sq = f'<rect x="-3" y="-3" width="6" height="6" rx="1.5" fill="{GREEN if k % 3 else CYAN}"/>'
         parts.append(g("pt", g(cx, g(cy, sq)), f"translate({OX},{OY})"))
     return "".join(parts)
 
 
-def orb(tl):
+def orb(tl, L):
+    OX, OY, sc = L.orb
+    r = lambda v: f"{v * sc:g}"
     judges = [s + T_JUDGE for s in tl.starts]
     glow, core = [(0, "opacity:.35")], [(0, "transform:scale(1)")]
     for j in judges:
@@ -390,18 +447,25 @@ def orb(tl):
     for j in judges:
         w = tl.anim([(0, "opacity:0;transform:scale(1)"), (j, "opacity:.9;transform:scale(1);animation-timing-function:cubic-bezier(.1,.6,.3,1)"),
                      (j + 1.1, "opacity:0;transform:scale(2.7)"), (j + 1.11, "opacity:0;transform:scale(1)")])
-        waves += f'<circle class="pt c {w}" cx="{OX}" cy="{OY}" r="34" fill="none" stroke="{CYAN}" stroke-width="1.5"/>'
-    return (f'<circle class="{tl.anim(glow)}" cx="{OX}" cy="{OY}" r="92" fill="url(#glow)"/>'
+        waves += f'<circle class="pt c {w}" cx="{OX}" cy="{OY}" r="{r(34)}" fill="none" stroke="{CYAN}" stroke-width="1.5"/>'
+    return (f'<circle class="{tl.anim(glow)}" cx="{OX}" cy="{OY}" r="{r(92)}" fill="url(#glow)"/>'
             + waves
-            + f'<circle class="c spin" cx="{OX}" cy="{OY}" r="50" fill="none" stroke="url(#jg)" stroke-width="1.5" stroke-dasharray="3 7"/>'
-            + f'<circle class="c spin-r" cx="{OX}" cy="{OY}" r="61" fill="none" stroke="{CYAN}" stroke-opacity=".35" stroke-dasharray="40 16 2 16"/>'
-            + f'<g class="c {tl.anim(core)}"><circle cx="{OX}" cy="{OY}" r="34" fill="url(#core)" stroke="{KW}" stroke-opacity=".6"/>'
-            + text(OX, OY + 6, "jev", fill="#fff", size=17, anchor="middle", weight=700, extra=' letter-spacing=".5"') + "</g>")
+            + f'<circle class="c spin" cx="{OX}" cy="{OY}" r="{r(50)}" fill="none" stroke="url(#jg)" stroke-width="1.5" stroke-dasharray="3 7"/>'
+            + f'<circle class="c spin-r" cx="{OX}" cy="{OY}" r="{r(61)}" fill="none" stroke="{CYAN}" stroke-opacity=".35" stroke-dasharray="40 16 2 16"/>'
+            + f'<g class="c {tl.anim(core)}"><circle cx="{OX}" cy="{OY}" r="{r(34)}" fill="url(#core)" stroke="{KW}" stroke-opacity=".6"/>'
+            + text(OX, OY + 6 * sc, "jev", fill="#fff", size=r(17), anchor="middle", weight=700, extra=' letter-spacing=".5"') + "</g>")
 
 
-def build():
+def place(shift, inner):
+    """Move card-space content into a layout."""
+    dx, dy = shift
+    return inner if (dx, dy) == (0, 0) else f'<g transform="translate({dx:g},{dy:g})">{inner}</g>'
+
+
+def build(L):
     rng = random.Random(7)
     tl = Timeline([sc["dur"] for sc in SCENES])
+    W, H = L.W, L.H
     body = []
 
     # background: dot grid, a slow light sweep, header and cards
@@ -409,10 +473,11 @@ def build():
                 f'<rect width="{W}" height="{H}" rx="18" fill="url(#dots)"/>'
                 f'<g clip-path="url(#frame)"><rect class="sweep" x="-320" y="0" width="320" height="{H}" fill="url(#sweep)"/></g>'
                 f'<rect x=".5" y=".5" width="{W - 1}" height="{H - 1}" rx="17.5" fill="none" stroke="{EDGE}"/>')
-    body.append(f'<circle cx="46" cy="40" r="8" fill="url(#core)"/><circle class="c spin" cx="46" cy="40" r="12" fill="none" stroke="url(#jg)" stroke-dasharray="2 3"/>'
-                + text(66, 46, "Jev demos", size=18, weight=700)
-                + text(174, 46, "typed judgments, not generated text · TypeSafe", fill=MUTED, size=12.5))
-    body.append(card(IN_X, None, "ENGLISH IN") + card(OUT_X, None, "TYPED OUT"))
+    (tx, ty), (mx, my) = L.title, (L.title[0] - 20, L.title[1] - 6)
+    body.append(f'<circle cx="{mx}" cy="{my}" r="8" fill="url(#core)"/><circle class="c spin" cx="{mx}" cy="{my}" r="12" fill="none" stroke="url(#jg)" stroke-dasharray="2 3"/>'
+                + text(tx, ty, "Jev demos", size=18, weight=700)
+                + text(*L.subtitle, "typed judgments, not generated text · TypeSafe", fill=MUTED, size=12.5))
+    body.append(place(L.in_shift, card(IN_X, None, "ENGLISH IN")) + place(L.out_shift, card(OUT_X, None, "TYPED OUT")))
 
     for i, sc in enumerate(SCENES):
         scene = []
@@ -420,36 +485,37 @@ def build():
         label = f"{sc['num']} · {sc['name']}"
         cw = len(label) * 7.1 + 26
         scene.append(g(tl.window(i, 0.0, rise=-6),
-                       f'<rect x="{W - 32 - cw:.1f}" y="26" width="{cw:.1f}" height="26" rx="13" fill="#161D35" stroke="{VIOLET}" stroke-opacity=".6"/>'
-                       + text(W - 32 - cw / 2, 43.5, label, fill=TXT, size=12.5, anchor="middle", weight=600)))
+                       f'<rect x="{L.chip_right - cw:.1f}" y="26" width="{cw:.1f}" height="26" rx="13" fill="#161D35" stroke="{VIOLET}" stroke-opacity=".6"/>'
+                       + text(L.chip_right - cw / 2, 43.5, label, fill=TXT, size=12.5, anchor="middle", weight=600)))
         # card sub-labels
-        scene.append(g(tl.window(i, 0.05, rise=0), text(IN_X + PAD, CARD_Y + 23, sc["file"], cls="m", fill=MUTED, size=11)))
-        scene.append(g(tl.window(i, T_OUT - 0.1, rise=0), text(RX, CARD_Y + 23, sc["out"], cls="m", fill=MUTED, size=11)))
-        scene.append(f'<g clip-path="url(#inclip)">{typed_input(tl, i, sc)}</g>')
-        scene.append(sc["render"](tl, i))
-        # primitive under the orb
+        scene.append(place(L.in_shift, g(tl.window(i, 0.05, rise=0), text(IN_X + PAD, CARD_Y + 23, sc["file"], cls="m", fill=MUTED, size=11))))
+        scene.append(place(L.out_shift, g(tl.window(i, T_OUT - 0.1, rise=0), text(RX, CARD_Y + 23, sc["out"], cls="m", fill=MUTED, size=11))))
+        scene.append(place(L.in_shift, f'<g clip-path="url(#inclip)">{typed_input(tl, i, sc)}</g>'))
+        scene.append(place(L.out_shift, sc["render"](tl, i)))
+        # primitive, next to the orb
+        px, py, pa = L.prim
         scene.append(g(tl.window(i, T_JUDGE - 0.2, rise=4),
-                       text(OX, OY + 90, "primitive", fill=DIM, size=9.5, anchor="middle", extra=' letter-spacing="1.2"')
-                       + text(OX, OY + 106, sc["prim"], cls="m", fill=FN, size=11.5, anchor="middle")))
-        scene.append(particles(tl, i, sc, rng))
+                       text(px, py, "primitive", fill=DIM, size=9.5, anchor=pa, extra=' letter-spacing="1.2"')
+                       + text(px, py + 16, sc["prim"], cls="m", fill=FN, size=11.5, anchor=pa)))
+        scene.append(particles(tl, i, sc, rng, L))
         body.append(g("later" if i != STATIC_SCENE else "", "".join(scene)))
 
-    body.append(orb(tl))
+    body.append(orb(tl, L))
 
     # footer: tagline and per-scene progress
-    body.append(f'<text class="s" x="32" y="390" font-size="19" font-weight="700" fill="{TXT}">English in. '
+    body.append(f'<text class="s" x="{L.tagline[0]}" y="{L.tagline[1]}" font-size="19" font-weight="700" fill="{TXT}">English in. '
                 f'<tspan fill="url(#jg)">Typed judgments out.</tspan></text>')
-    seg_w, gap = 60, 10
-    x = W - 32 - len(SCENES) * seg_w - (len(SCENES) - 1) * gap
+    x, py, seg_w = L.progress
+    gap = 10
     for i, sc in enumerate(SCENES):
         s, e = tl.span(i)
         e2 = min(e, tl.T - 0.02)
         fill = tl.anim([(0, "transform:scaleX(0)"), (s, "transform:scaleX(0)"), (e2, "transform:scaleX(1)"),
                         (tl.T - 0.02, "transform:scaleX(1)"), (tl.T - 0.01, "transform:scaleX(0)")])
         lit = tl.anim([(0, "opacity:.4"), (s, "opacity:.4"), (s + 0.2, "opacity:1"), (e - 0.2, "opacity:1"), (e, "opacity:.4")])
-        body.append(text(x, 378, sc["num"], cls=f"m {lit}", fill=TXT, size=10)
-                    + f'<rect x="{x}" y="385" width="{seg_w}" height="3" rx="1.5" fill="#1B2340"/>'
-                    + f'<rect class="bar {fill}" x="{x}" y="385" width="{seg_w}" height="3" rx="1.5" fill="url(#jg)"/>')
+        body.append(text(x, py, sc["num"], cls=f"m {lit}", fill=TXT, size=10)
+                    + f'<rect x="{x:g}" y="{py + 7}" width="{seg_w}" height="3" rx="1.5" fill="#1B2340"/>'
+                    + f'<rect class="bar {fill}" x="{x:g}" y="{py + 7}" width="{seg_w}" height="3" rx="1.5" fill="url(#jg)"/>')
         x += seg_w + gap
 
     defs = f"""<defs>
@@ -473,8 +539,8 @@ def build():
              + "".join(tl.css)
              + "@media (prefers-reduced-motion:reduce){*{animation:none!important}.later,.cover,.pt,.sweep{display:none}}")
 
-    desc = ("An animated loop through the four Jev demos. In each, English goes in on the left, the Jev model "
-            "judges it, and typed values come out on the right: eight cringe judgments of a LinkedIn post; "
+    desc = (f"An animated loop through the four Jev demos. In each, English goes in {L.flow[0]}, the Jev model "
+            f"judges it, and typed values come out {L.flow[1]}: eight cringe judgments of a LinkedIn post; "
             "a semantic SQL filter that finds 913 refund requests where keyword search finds 780, 595 of which "
             "never say refund; a VISUALIZE clause that scores a multi-line chart 1.00 and a partial line chart 0.57; "
             "and a dbt test that passes every structural check on a return row but fails the English one, "
@@ -484,9 +550,10 @@ def build():
            f'role="img" aria-labelledby="title desc">'
            f'<title id="title">Jev demos: English in, typed judgments out</title><desc id="desc">{esc(desc)}</desc>'
            f"<style>{style}</style>{defs}{''.join(body)}</svg>\n")
-    OUT_PATH.write_text(svg, encoding="utf-8")
-    print(f"wrote {OUT_PATH} · {len(svg) / 1024:.1f} KB · loop {tl.T:g} s · {tl.k} keyframe sets")
+    L.path.write_text(svg, encoding="utf-8")
+    print(f"wrote {L.path.relative_to(HERE.parent)} · {len(svg) / 1024:.1f} KB · loop {tl.T:g} s · {tl.k} keyframe sets")
 
 
 if __name__ == "__main__":
-    build()
+    for layout in LAYOUTS:
+        build(layout)

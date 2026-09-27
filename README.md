@@ -1,7 +1,10 @@
 # Jev demos
 
 <p align="center">
-  <img src="assets/jev-hero.svg" width="960" alt="Animated loop through the four Jev demos: English goes in on the left, Jev judges it, typed values come out on the right.">
+  <picture>
+    <source media="(max-width: 600px)" srcset="assets/jev-hero-mobile.svg">
+    <img src="assets/jev-hero.svg" alt="Animated loop through the four Jev demos: English goes in, Jev judges it, typed values come out.">
+  </picture>
 </p>
 
 Small, self-contained demos of [TypeSafe](https://typesafe.ai)'s **Jev**, a System One model
