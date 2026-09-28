@@ -40,6 +40,9 @@ def test_standard_tests_green(project):
 def test_semantic_tests_store_failures_and_summary(project):
     r = dbt(project, "test", "--select", "tag:semantic")
     assert "Jev · 1,300 judgments" in r.stdout, r.stdout[-3000:]
+    # severity warn: flagged rows are stored for review, the run itself doesn't fail
+    assert r.returncode == 0, r.stdout[-3000:]
+    assert "ERROR=0" in r.stdout and "WARN=4" in r.stdout
     assert "SIMULATED" in r.stdout
     con = duckdb.connect(str(project / "jaffle_shop.duckdb"), read_only=True)
     for name in SEMANTIC:

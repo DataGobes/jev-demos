@@ -6,6 +6,17 @@ here come from live, logged runs; see each demo's own docs for the full record.
 
 ## 2026-09-28
 
+### 04 · dbt semantic tests — tests warn instead of fail; packing recording ([#5](https://github.com/DataGobes/jev-demos/pull/5))
+
+- **Changed** the four `jev_expect` tests to `severity: warn` (suggested in a comment on the LinkedIn
+  post). A probability should flag a row for review, not stop a pipeline. Flagged rows are still
+  stored with their `jev_p`, and scores are unchanged: the scorecard reads the stored rows, not dbt's
+  exit code.
+- **Added** `scripts/record_packing.sh`, a short recording of the packing speed-up. It shows a text
+  recap of the logged live one-row-per-request run, one live run at 64 rows per request, and
+  `scripts/packing_compare.py` putting both side by side with the speed-up computed from the two
+  runs.
+
 ### 04 · dbt semantic tests — how far packing goes ([#4](https://github.com/DataGobes/jev-demos/pull/4))
 
 - **Added** benchmark runs of the `nested` layout at 128, 256, 512 and 1024 rows per request, plus a
