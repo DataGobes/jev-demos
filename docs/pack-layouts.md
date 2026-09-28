@@ -1,6 +1,7 @@
 # Pack layouts: batching rows into one Jev request without losing accuracy
 
-*2026-09-26 · live `jev-latest` runs only · code: `src/jevdbt/packing.py`, `scripts/pack_bench.py`*
+*2026-09-26, extended 2026-09-28 with pack sizes up to 1024 · live `jev-latest` runs only · code:
+`src/jevdbt/packing.py`, `scripts/pack_bench.py`*
 
 ## Question
 
@@ -85,9 +86,11 @@ thresholds), not ranking.
 ## Findings
 
 1. **Pack size is free when records sit in their own questions.** `inline` at pack 1 vs pack 64 differs
-   by drift 0.0048, the same as the noise floor. With records in state, returns recall collapses as the
-   pack grows (1.00 → 0.67 → 0.42), with a systematic downward shift of about −0.07 on the two tests that
-   need the most reading (customers, returns).
+   by drift 0.0048, the same as the noise floor, and `nested` stays that stable up to 256 rows per
+   request (see [How far packing goes](#how-far-packing-goes-pack-size-and-the-token-ceiling)).
+   With records in state, returns recall collapses as the pack grows (1.00 → 0.67 → 0.42), with a
+   systematic downward shift of about −0.07 on the two tests that need the most reading (customers,
+   returns).
 2. **The shared state is never neutral.** An innocuous "Data-quality check…" note as the shared state
    pushed borderline PII hard negatives over 0.5 (ticket 131: 0.47 → 0.77) and cost returns recall.
    "Records from a company database." added a new false positive. An empty state (`""` and `{}` give
@@ -125,11 +128,48 @@ one flipped benchmark row (ticket 131: 0.53 vs 0.65), and because it works with 
 (`inline` can't carry a column called `question`). It costs about 6% more tokens. No questions,
 thresholds, golden key or baseline were changed.
 
+## How far packing goes: pack size and the token ceiling
+
+*Added 2026-09-28.* Is there a point where more rows per request start to cost accuracy? And what
+actually limits the pack size?
+
+**There is no limit on the number of questions.** A one-off live probe sent requests of tiny `nested`
+questions (`{"record": {"n": i}, "question": "\`record.n\` is an even number"}`) with an empty state.
+Every size from 128 to 1,700 questions per request was accepted (1,700 questions = 62k input tokens).
+2,048 questions (about 74k tokens) was rejected with `400 {"error_type": "max_tokens_exceeded"}`. The
+ceiling is the documented 64k tokens per request, not a question count. These probe requests aren't
+saved in `eval/pack_bench/`, because they aren't a benchmark of the demo's tests.
+
+**The demo's tests, with `nested` and an empty state, at larger packs.** The scorer packs each test
+separately, and the largest test has 500 unique rows. So from pack 512 up, every test goes out as a
+single request, and pack 512 and 1024 are the same run.
+
+| rows per request | requests | tokens | wall (benchmark) | customers P / R | returns P / R | reviews P / R | tickets P / R | drift vs pack=64 |
+|---|---|---|---|---|---|---|---|---|
+| 64 | 18 | 150k | 2.1 s | 0.96 / 0.96 | 1.00 / 1.00 | 1.00 / 1.00 | 0.93 / 1.00 | — |
+| 128 | 10 | 148k | 1.6 s | 0.96 / 0.96 | 1.00 / 1.00 | 1.00 / 1.00 | 0.93 / 1.00 | 0.0052 |
+| 256 | 5 | 147k | 1.7 s | 0.96 / 0.96 | 1.00 / 1.00 | 1.00 / 1.00 | 0.93 / 1.00 | 0.0053 |
+| 512 = 1024 | 4 | 79k | 1.4 s | **failed**: all 500 rows, `max_tokens_exceeded` | 1.00 / 1.00 | 1.00 / 1.00 | 0.93 / 1.00 | 0.0037 (3 tests) |
+
+- **Up to 256 rows per request, pack size makes no measurable difference.** Drift against pack 64 stays
+  at the noise floor (0.0049), and every pass/fail decision is identical. That includes the one known
+  difference from pack=1, ticket 131.
+- **A whole test in one request is fine when it fits.** At pack ≥ 512, returns (139 rows), tickets (177)
+  and reviews (241) each went out as a single request and scored exactly as at pack 64.
+- **The only failure is the token ceiling.** 500 customer rows in one request exceed 64k tokens. The API
+  rejects the whole request, all 500 rows come back without a value, and the run reports errors. It
+  never passes silently. In this project a `nested` row costs about 140 tokens, because each question
+  repeats the question text and criteria next to its record. So roughly 450 short rows fit in one
+  request, and fewer when the texts are long.
+- **Returns diminish past about 64 rows.** From 64 to 256, requests fall 18 → 5, but tokens barely move
+  (150k → 147k) and wall time only drops about 2.1 → 1.7 s.
+
 ## Reproducing
 
 ```bash
 uv run python scripts/pack_bench.py run --style single --pack 1 --tag a
 uv run python scripts/pack_bench.py run --style nested --pack 32 --tag sEmpty
+uv run python scripts/pack_bench.py run --style nested --pack 256 --tag sEmpty
 uv run python scripts/pack_bench.py report
 ```
 
@@ -144,6 +184,8 @@ Two things to know when reading the saved runs:
 
 ## Open item
 
-Packs are cut by row count. With long texts, a fixed pack could exceed Jev's per-request context (64k
-tokens across state and all questions; 32k for state plus the longest question). A production setup
-should cut packs by token budget as well as row count.
+Packs are cut by row count. A pack that goes over Jev's per-request budget (64k tokens across the state
+and all questions; 32k for the state plus the longest question) fails as a whole. That is exactly what
+happens to the 500-row customers request above. Accuracy doesn't limit the pack size; tokens do. So a
+production setup should cut packs by an estimated token budget as well as a row cap, and put a row
+that is too long on its own into a request by itself.
