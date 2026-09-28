@@ -16,6 +16,7 @@ a regex baseline. Spec: `docs/superpowers/specs/2026-09-24-jev-dbt-semantic-test
 - Pack-layout benchmark (live, calls Jev directly, no dbt): `uv run python scripts/pack_bench.py run --style nested --pack 32` · compare saved runs: `uv run python scripts/pack_bench.py report`
 - Scorecard: `uv run python scripts/score.py` · fresh live run appended to `docs/eval-results.md`: `uv run python scripts/score.py --run --fresh --mode live --append`
 - Recording: `scripts/record.sh [--cold] [--pack N] [--no-captions]` (captions, title and end card built in) · smoke-test in demo mode only, never live: `yes '' | JEV_MODE=demo DOTENV_DISABLE=1 TYPE_DELAY=0 scripts/record.sh`
+- Packing recording: `scripts/record_packing.sh [--pack N] [--no-captions]` (text recap of the logged live pack=1 run `eval/pack_bench/single_p1_a.json`, one cold live pack=N run, then `scripts/packing_compare.py show`) · same rule, demo-mode smoke test only: `yes '' | JEV_MODE=demo DOTENV_DISABLE=1 TYPE_DELAY=0 scripts/record_packing.sh`
 
 ## Rules
 - Never read, print, or log `.env` or `TYPESAFE_API_KEY`. The key stays inside the plugin process.
