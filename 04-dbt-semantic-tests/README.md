@@ -25,13 +25,19 @@ package: no PyPI, no dbt hub.
           criteria:
             "true": "The stated main reason plainly belongs to another code"
             "false": "Consistent with the code, or too vague to tell; code 'other' fits anything unusual"
-        config: {severity: error, store_failures: true, tags: [semantic]}
+        config: {severity: warn, store_failures: true, tags: [semantic]}
 ```
 
 `fails_if` is the defect condition, phrased so "yes" means the row fails. `context` adds columns
 Jev sees alongside the tested one; `threshold` is the probability above which a row is flagged;
 `criteria` gives Jev a short true/false rubric. Everything else (`severity`, `store_failures`,
 `tags`) is standard dbt.
+
+The semantic tests run at `severity: warn`. A probabilistic judgment should flag rows for someone
+to review, not stop a pipeline: a borderline row sitting near its threshold can land on either side
+from one run to the next. Flagged rows are stored in `main_dbt_test__audit` either way, with their
+`jev_p`, so nothing is lost. The scorecard reads those tables, not dbt's exit code. Set a single test
+to `severity: error` if its check should block a deploy.
 
 ## How it works
 
@@ -160,6 +166,34 @@ yes '' | JEV_MODE=demo DOTENV_DISABLE=1 TYPE_DELAY=0 scripts/record.sh
 This overwrites the stored-failure tables in `jaffle_shop/jaffle_shop.duckdb` with demo-mode
 output; if you smoke-test after a live run, restore state by rerunning the live semantic +
 baseline tests (no `JEV_MODE` set) once the cache is warm, so no live requests are actually made.
+
+### Packing recording
+
+`scripts/record_packing.sh [--pack N] [--no-captions]` is a short second recording, focused only on
+speed. It has three beats, each with a caption:
+
+1. a text-only recap of the one-row-per-request baseline: `1,057 requests · 54.9 s · $0.017`. It is
+   read from the committed live run `eval/pack_bench/single_p1_a.json` (same four tests, same rows) and
+   labelled as a logged run. It is not re-run on camera, because a minute of waiting to show a
+   two-second contrast is dead air;
+2. the four semantic tests live, at `N` rows per request (default 64, `nested` layout). The run is
+   cold (`JEV_NO_CACHE=1`, set off camera), so its time is real Jev latency, not cache hits: about 1–2 s
+   and well under a cent;
+3. `scripts/packing_compare.py show packN`: the logged baseline next to the run just made (requests,
+   wall time, tokens, cost, and precision/recall per test against the golden key), with the speed-up
+   computed from the two runs.
+
+After the live run the script quietly saves its stats and flagged rows (`packing_compare.py save`).
+The baseline column is headed "(logged)". A simulated run is labelled `SIMULATED`, on the banner and on
+the speed-up line. One caveat: the baseline's time comes from `scripts/pack_bench.py` calling Jev
+directly, while the live run's time is measured inside dbt. Both cover only the time spent judging,
+and dbt's own row-by-row runs measured about 54 s as well.
+
+Smoke-test it in demo mode only, as with `record.sh`:
+
+```bash
+yes '' | JEV_MODE=demo DOTENV_DISABLE=1 TYPE_DELAY=0 scripts/record_packing.sh
+```
 
 ## Why dbt-core, not Fusion
 
