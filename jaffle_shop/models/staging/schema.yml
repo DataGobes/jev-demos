@@ -19,7 +19,7 @@ models:
                 criteria:
                   "true": "Clearly not a real person's name"
                   "false": "Plausibly a real person's name, including unusual, very short, single-word, or non-Western names"
-              config: {severity: error, store_failures: true, tags: [semantic]}
+              config: {severity: warn, store_failures: true, tags: [semantic]}
 
   - name: stg_orders
     columns:
@@ -57,7 +57,7 @@ models:
                 criteria:
                   "true": "The stated main reason plainly belongs to another code"
                   "false": "Consistent with the code, or too vague to tell; code 'other' fits anything unusual"
-              config: {severity: error, store_failures: true, tags: [semantic]}
+              config: {severity: warn, store_failures: true, tags: [semantic]}
 
   - name: stg_reviews
     columns:
@@ -83,7 +83,7 @@ models:
                 criteria:
                   "true": "A glowing text with 1-2 stars, or an angry/negative text with 4-5 stars"
                   "false": "Sentiment roughly matches the stars, including sarcasm that matches a low rating and mixed 3-star reviews"
-              config: {severity: error, store_failures: true, tags: [semantic]}
+              config: {severity: warn, store_failures: true, tags: [semantic]}
 
   - name: stg_tickets
     columns:
@@ -105,4 +105,4 @@ models:
                 criteria:
                   "true": "Contains at least one such personal detail about a private person"
                   "false": "No such detail; order numbers, the shop's own address or phone, and a first name alone are not personal data"
-              config: {severity: error, store_failures: true, tags: [semantic]}
+              config: {severity: warn, store_failures: true, tags: [semantic]}

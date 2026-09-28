@@ -25,13 +25,19 @@ package: no PyPI, no dbt hub.
           criteria:
             "true": "The stated main reason plainly belongs to another code"
             "false": "Consistent with the code, or too vague to tell; code 'other' fits anything unusual"
-        config: {severity: error, store_failures: true, tags: [semantic]}
+        config: {severity: warn, store_failures: true, tags: [semantic]}
 ```
 
 `fails_if` is the defect condition, phrased so "yes" means the row fails. `context` adds columns
 Jev sees alongside the tested one; `threshold` is the probability above which a row is flagged;
 `criteria` gives Jev a short true/false rubric. Everything else (`severity`, `store_failures`,
 `tags`) is standard dbt.
+
+The semantic tests run at `severity: warn`. A probabilistic judgment should flag rows for someone
+to review, not stop a pipeline: a borderline row sitting near its threshold can land on either side
+from one run to the next. Flagged rows are stored in `main_dbt_test__audit` either way, with their
+`jev_p`, so nothing is lost. The scorecard reads those tables, not dbt's exit code. Set a single test
+to `severity: error` if its check should block a deploy.
 
 ## How it works
 
