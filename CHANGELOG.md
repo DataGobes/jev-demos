@@ -6,7 +6,7 @@ here come from live, logged runs; see each demo's own docs for the full record.
 
 ## 2026-09-28
 
-### 04 · dbt semantic tests — tests warn instead of fail; packing recording
+### 04 · dbt semantic tests — tests warn instead of fail; packing recording ([#5](https://github.com/DataGobes/jev-demos/pull/5))
 
 - **Changed** the four `jev_expect` tests to `severity: warn` (suggested in a comment on the LinkedIn
   post). A probability should flag a row for review, not stop a pipeline. Flagged rows are still
