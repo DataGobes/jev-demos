@@ -159,8 +159,11 @@ def summarize(run_data: dict, reference: dict | None, golden: dict, tests: list[
         if reference is not None:
             ref = {int(i): v for i, v in reference["tests"][test.name].items() if v is not None}
             common = probs.keys() & ref.keys()
-            drift = sum(abs(probs[i] - ref[i]) for i in common) / len(common)
-            flips = sum((probs[i] >= test.threshold) != (ref[i] >= test.threshold) for i in common)
+            if common:
+                drift = sum(abs(probs[i] - ref[i]) for i in common) / len(common)
+                flips = sum(
+                    (probs[i] >= test.threshold) != (ref[i] >= test.threshold) for i in common
+                )
         rows.append(
             {
                 "test": test.name,
@@ -173,6 +176,7 @@ def summarize(run_data: dict, reference: dict | None, golden: dict, tests: list[
                 "missed": sorted(defects - flagged),
                 "false_pos": sorted(flagged - defects),
                 "none": sum(v is None for v in raw.values()),
+                "rows": len(raw),
             }
         )
     return rows
@@ -199,8 +203,12 @@ def report(out_dir: Path) -> None:
         rows = summarize(d, reference if key != ref_key else None, golden, tests)
         cells = []
         for r in rows:
+            if r["none"] == r["rows"]:
+                cells.append(f"FAILED: all {r['rows']} rows errored")
+                continue
             flips = "-" if r["flips"] is None else str(r["flips"])
-            cells.append(f"{r['R']:.2f} · {r['P']:.2f} · {r['AUC']:.3f} · {flips}")
+            partial = f" ⚠{r['none']} rows errored" if r["none"] else ""
+            cells.append(f"{r['R']:.2f} · {r['P']:.2f} · {r['AUC']:.3f} · {flips}{partial}")
         drifts = [r["drift"] for r in rows if r["drift"] is not None]
         mean_drift = f"{sum(drifts) / len(drifts):.3f}" if drifts else "-"
         err = f" ⚠{d['errors']} err" if d["errors"] else ""
@@ -215,7 +223,7 @@ def report(out_dir: Path) -> None:
         misses = "; ".join(
             f"{short[r['test']]} missed={r['missed']} fp={r['false_pos']}"
             for r in rows
-            if r["missed"] or r["false_pos"]
+            if (r["missed"] or r["false_pos"]) and r["none"] < r["rows"]
         )
         print(f"- {key}: {misses or 'no errors'}")
 

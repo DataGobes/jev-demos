@@ -4,6 +4,19 @@ Notable changes to the demos in this repo, newest first. Each entry names the de
 The demos aren't versioned, so entries are dated by the day they land on `main`. Numbers quoted
 here come from live, logged runs; see each demo's own docs for the full record.
 
+## 2026-09-28
+
+### 04 · dbt semantic tests — how far packing goes ([#4](https://github.com/DataGobes/jev-demos/pull/4))
+
+- **Added** benchmark runs of the `nested` layout at 128, 256, 512 and 1024 rows per request, plus a
+  "How far packing goes" section in [`docs/pack-layouts.md`](04-dbt-semantic-tests/docs/pack-layouts.md).
+  Up to 256 rows per request the answers match pack 64 within run-to-run noise (drift 0.0053 vs 0.0049),
+  with identical pass/fail decisions: 5 requests instead of 1,057.
+- **Found** that the limit is tokens, not question count. A live probe accepted 1,700 questions in one
+  request (62k tokens). The 500-row customers test in a single request exceeds the 64k-token budget
+  and fails with `max_tokens_exceeded`; the run reports it as errors, never as a silent pass.
+- **Fixed** `pack_bench.py report` crashing on a test whose rows all errored; it now shows `FAILED`.
+
 ## 2026-09-26
 
 ### Repo · animated README hero
