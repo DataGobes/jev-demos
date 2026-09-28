@@ -6,7 +6,7 @@ here come from live, logged runs; see each demo's own docs for the full record.
 
 ## 2026-09-28
 
-### 04 · dbt semantic tests — how far packing goes
+### 04 · dbt semantic tests — how far packing goes ([#4](https://github.com/DataGobes/jev-demos/pull/4))
 
 - **Added** benchmark runs of the `nested` layout at 128, 256, 512 and 1024 rows per request, plus a
   "How far packing goes" section in [`docs/pack-layouts.md`](04-dbt-semantic-tests/docs/pack-layouts.md).
