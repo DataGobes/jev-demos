@@ -285,3 +285,22 @@ def test_render_function_reports_a_missing_function():
     out = StringIO()
     assert show.render_function(Console(file=out, width=90), sql, "jev_demo.jev.x") == 1
     assert "UNRESOLVED_ROUTINE" in out.getvalue()
+
+
+def test_show_never_puts_a_live_banner_over_stale_stored_failures(monkeypatch):
+    # F5: the latest invocation is a complete LIVE run, but the stored failures were written by
+    # another invocation (e.g. an older build, or a SIMULATED one): no LIVE provenance is shown.
+    monkeypatch.setattr(show.score, "load_budget", lambda: 48_000)
+    sql = FakeSql({
+        "order by recorded_at desc limit 1": Result("SUCCEEDED", rows=[["inv"]]),
+        "from jev_demo.jev.hook_runs": Result("SUCCEEDED", rows=[
+            ["4", "10", "10", "10", "0", "live", "jev-1.13.0"]]),
+        "from jev_demo.jev.requests": Result("SUCCEEDED", rows=[
+            ["1", "100", "90", "10", "0", "0", "0", "1.0", "jev-1.13.0"]]),
+        "from jev_demo.jev.judgments where invocation_id": Result("SUCCEEDED", rows=[["0", "0"]]),
+        "is distinct from": Result("SUCCEEDED", rows=[["5", "5"]]),
+    })
+    run = show.current_run(sql)
+    assert run is None
+    banner = show.score.simulated_banner(run)
+    assert banner is not None and "LIVE" not in banner

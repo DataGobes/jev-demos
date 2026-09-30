@@ -6,12 +6,23 @@ always labelled SIMULATED and `--append` refuses it.
 
     uv run python scripts/score.py --run --fresh --mode demo     # smoke test, no live calls
     uv run python scripts/score.py --run --fresh --mode live --append   # the recorded yardstick run
-    uv run python scripts/score.py --run --production --rerun --mode live --append
     uv run python scripts/score.py                               # score what is already stored
+
+The production run, in four logged steps (each `--append` is a billed live run, ask first):
+
+    # (a) part 1 loaded: judge it from scratch (gate PENDING until the audit and the rerun)
+    uv run python scripts/score.py --production --run --fresh --mode live --append
+    # (b) the user labels data/production_audit.csv (scripts/audit_sample.py)
+    # (c) part 2 uploaded: only the new distinct (body, stars) states are judged
+    uv run python scripts/score.py --production --run --mode live --increment --append
+    # (d) the rerun check: a build with nothing new, then a rebuild that must make 0 requests
+    uv run python scripts/score.py --production --run --rerun --mode live --append
 
 Stored failures are read from jev_demo.jaffle_shop_dbt_test__audit.<test>; run provenance (mode,
 model, requests, tokens, retries, 429s, errors) from jev_demo.jev.hook_runs and .requests for the
-latest invocation of the scored tests. dbt runs only through scripts/dbtw.py.
+latest invocation of the scored tests. Every stored-failure row carries jev_mode and
+jev_invocation_id, and they must be the scored run's (a build's tests share its invocation).
+dbt runs only through scripts/dbtw.py; `--run` needs an explicit `--mode`.
 """
 
 import argparse
@@ -52,6 +63,10 @@ TESTS = {
 }
 PROD_TEST = "product_reviews_body_matches_stars"
 PROD_ID = "review_id"
+PROD_MODEL = "jev_demo.jaffle_shop.stg_product_reviews"
+# Production builds halve the packs in flight: TypeSafe allows 250k tokens/s and the retry path has
+# never been exercised live (spec §3, §8), so the first 100k-row run stays well under the limit.
+PROD_VARS = "{production: true, jev_max_concurrency: 2}"
 
 PRECISION_MIN = RECALL_MIN = 0.85
 PENDING_REASONS = {"audited precision: audit pending", "rerun not checked (use --rerun)"}
@@ -287,6 +302,15 @@ def refuse_append_if_simulated(run: Run | None) -> None:
         )
 
 
+def refuse_append_if_cached(run: Run) -> None:
+    """A yardstick entry is a run that judged every state it scores: 0% cached."""
+    if run.tested == 0 or run.missing != run.tested:
+        raise SystemExit(
+            f"refusing --append: {run.cached_pct:.0f}% of the scored states were cached from "
+            "earlier invocations; a yardstick entry must judge every state in the run it scores "
+            "(use --run --fresh)")
+
+
 def scorecard_title(run: Run | None) -> str:
     if run is None or run.simulated:
         return "SIMULATED backend vs regex baseline"
@@ -296,7 +320,8 @@ def scorecard_title(run: Run | None) -> str:
 def simulated_banner(run: Run | None) -> str | None:
     if run is None:
         return (
-            "SIMULATED — no run provenance found: numbers are not from a recorded live run"
+            "SIMULATED — no run provenance matches these stored failures: numbers are not "
+            "from a recorded live run"
         )
     if run.simulated:
         return (
@@ -332,7 +357,7 @@ def fresh_sql(mode: str, tests: list[str]) -> str:
 def dbt_args(production: bool) -> list[str]:
     """dbt arguments (scripts/dbtw.py adds --profiles-dir and --target)."""
     if production:
-        return ["build", "--vars", "{production: true}",
+        return ["build", "--vars", PROD_VARS,
                 "--select", "+tag:production", "tag:production_baseline"]
     # A fresh schema needs stg_orders (relationships tests), so build the whole yardstick.
     return ["build", "--exclude", "tag:production", "tag:production_baseline"]
@@ -343,6 +368,44 @@ def flagged_query(table: str, id_col: str, judged_only: bool = False) -> str:
     not flagged, they are unjudged, so `judged_only` leaves them out."""
     q = f"select {id_col} from {AUDIT_SCHEMA}.{table}"
     return q + " where jev_p is not null" if judged_only else q
+
+
+def stored_provenance_sql(test: str, run: "Run") -> str:
+    """Rows of a Jev stored-failure table that were not written by `run` (other mode or other
+    invocation), next to the table's row count."""
+    return (
+        f"select count(*), count_if(jev_mode is distinct from {_lit(run.mode)} "
+        f"or jev_invocation_id is distinct from {_lit(run.invocation_id)}) "
+        f"from {AUDIT_SCHEMA}.{test}"
+    )
+
+
+def loaded_ids_sql(ids: set[int]) -> str:
+    """Which of `ids` the production model holds (part 1 alone holds ~95% of the flips)."""
+    listed = ", ".join(str(int(i)) for i in sorted(ids))
+    return f"select {PROD_ID} from {PROD_MODEL} where {PROD_ID} in ({listed})"
+
+
+def sources_sql(tests: list[str], mode: str) -> str:
+    """The invocations that made the successful judgments on record for `tests` (their latest
+    question) in `mode`: states judged, requests, tokens and Jev span per invocation."""
+    names, m = _in_list(tests), _lit(mode)
+    return (
+        "with latest as (select test_name, max_by(question, judged_at) as q "
+        f"from {LEDGER}.judgments where mode = {m} and test_name in ({names}) group by test_name), "
+        "src as (select j.invocation_id, count(*) as states, min(j.judged_at) as first_at "
+        f"from {LEDGER}.judgments j "
+        "join latest l on j.test_name = l.test_name and j.question = l.q "
+        f"where j.p is not null and j.mode = {m} group by j.invocation_id), "
+        "req as (select invocation_id, count(*) as requests, "
+        "coalesce(sum(pack_tokens), 0) as tokens, "
+        "coalesce((unix_micros(max(finished_at)) - unix_micros(min(started_at))) / 1e6, 0) as span "
+        f"from {LEDGER}.requests where mode = {m} and test_name in ({names}) "
+        "group by invocation_id) "
+        "select s.invocation_id, s.states, coalesce(r.requests, 0), coalesce(r.tokens, 0), "
+        "coalesce(r.span, 0) from src s left join req r on r.invocation_id = s.invocation_id "
+        "order by s.first_at"
+    )
 
 
 def latest_invocation_sql(tests: list[str]) -> str:
@@ -440,7 +503,7 @@ def audit_for(flagged: set[int], planted: set[int], audit: dict[int, str]) -> di
 @dataclass(frozen=True)
 class ProductionMetrics:
     flagged: int
-    planted: int
+    planted: int  # planted flips that are loaded (in the production model)
     planted_tp: int
     unplanted_flagged: int
     recall: float
@@ -452,6 +515,7 @@ class ProductionMetrics:
     audit_lo: float | None
     audit_hi: float | None
     audited_f1: float | None
+    planted_total: int = 0  # every planted flip in eval/production_flips.csv
 
 
 def production_metrics(
@@ -459,7 +523,13 @@ def production_metrics(
     planted: set[int],
     baseline_flagged: set[int],
     audit: dict[int, str] | None,
+    loaded: set[int] | None = None,
 ) -> ProductionMetrics:
+    """Metrics against the planted flips. With `loaded` (the ids the production model holds), only
+    loaded flips count: after part 1 alone, the part-2 flips cannot be recalled."""
+    planted_total = len(planted)
+    if loaded is not None:
+        planted = planted & loaded
     key = {i: "defect" for i in planted}
     jev = metrics(flagged, key)
     base = metrics(baseline_flagged, key)
@@ -472,8 +542,66 @@ def production_metrics(
         flagged=len(flagged), planted=len(planted), planted_tp=jev.tp, unplanted_flagged=unplanted,
         recall=jev.recall, raw_precision=jev.precision, jev_raw=jev, baseline=base,
         audit_n=len(audit or {}), audited_precision=point, audit_lo=lo, audit_hi=hi,
-        audited_f1=f1,
+        audited_f1=f1, planted_total=planted_total,
     )
+
+
+@dataclass(frozen=True)
+class Increment:
+    """The incremental step: rows in the production model before and after the build, and the
+    distinct (body, stars) states the hook found missing (and judged) in this invocation."""
+
+    rows_before: int
+    rows_after: int
+    new_states: int
+
+    @property
+    def rows_loaded(self) -> int:
+        return self.rows_after - self.rows_before
+
+    @property
+    def line(self) -> str:
+        return (f"increment: {self.new_states:,} new distinct states judged "
+                f"({self.rows_loaded:,} rows loaded)")
+
+
+def check_increment(rows_before: int, rows_after: int, run: "Run") -> Increment:
+    """New rows were loaded, every missing state was inserted once, and no more states were judged
+    than rows were added (only the new rows' states: nothing else)."""
+    inc = Increment(rows_before, rows_after, run.missing)
+    if inc.rows_loaded <= 0:
+        raise NotCaptured(f"--increment: no new rows were loaded ({rows_before:,} before, "
+                          f"{rows_after:,} after); upload part 2 first "
+                          "(fetch_reviews.py --upload-part2)")
+    if run.inserted != run.missing:
+        raise NotCaptured(f"--increment: {run.inserted:,} rows inserted for {run.missing:,} "
+                          "missing states")
+    if run.missing > inc.rows_loaded:
+        raise NotCaptured(f"--increment: {run.missing:,} states judged but only "
+                          f"{inc.rows_loaded:,} rows were loaded: states other than the new "
+                          "rows' were judged")
+    return inc
+
+
+@dataclass(frozen=True)
+class Source:
+    """An invocation whose successful judgments the scored run reused (or made)."""
+
+    invocation_id: str
+    states: int
+    requests: int
+    tokens: int
+    span_s: float
+
+    @property
+    def cost_usd(self) -> float:
+        return cost_usd(self.tokens)
+
+    @property
+    def line(self) -> str:
+        return (f"- judged in invocation {self.invocation_id}: {self.states:,} states · "
+                f"{self.requests:,} requests · {self.tokens:,} tokens · ${self.cost_usd:.6f} · "
+                f"{self.span_s:.1f} s Jev")
 
 
 def production_gate(
@@ -514,8 +642,8 @@ def _query(sql, statement: str, what: str):
         err = res.error or res.state
         if "TABLE_OR_VIEW_NOT_FOUND" in err:
             print(
-                f"Missing {what}. Run first: uv run python scripts/score.py --run "
-                "(or scripts/dbtw.py build ...)",
+                f"Missing {what}. Run first: uv run python scripts/score.py --run --mode "
+                "demo|live (or scripts/dbtw.py build ...)",
                 file=sys.stderr,
             )
             raise SystemExit(2)
@@ -531,6 +659,51 @@ def load_flagged(sql, table: str, id_col: str, judged_only: bool = False) -> set
 def latest_invocation(sql, tests: list[str]) -> str | None:
     res = _query(sql, latest_invocation_sql(tests), f"{LEDGER}.hook_runs")
     return res.rows[0][0] if res.rows else None
+
+
+def check_stored_provenance(sql, tests: list[str], run: Run) -> None:
+    """Every stored-failure row of the scored Jev tests was written by `run`: its mode and its
+    invocation (in a `dbt build` the tests and the judging hook share the invocation). Otherwise
+    NotCaptured: stale or SIMULATED rows are never scored under this run's provenance. (A table
+    with no rows has nothing to check.)"""
+    bad = []
+    for test in tests:
+        res = sql.run(stored_provenance_sql(test, run))
+        if res.state != "SUCCEEDED":
+            err = res.error or res.state
+            if "UNRESOLVED_COLUMN" in err:
+                bad.append(f"{test} has no jev_mode/jev_invocation_id columns (stored by an older "
+                           "build; rebuild)")
+                continue
+            if "TABLE_OR_VIEW_NOT_FOUND" in err:
+                bad.append(f"{test} has no stored failures")
+                continue
+            raise SystemExit(f"could not read {AUDIT_SCHEMA}.{test}: {err}")
+        rows, stale = int(res.rows[0][0]), int(res.rows[0][1])
+        if stale:
+            bad.append(f"{test}: {stale:,} of {rows:,} stored rows are not from invocation "
+                       f"{run.invocation_id} in {run.mode} mode")
+    if bad:
+        raise NotCaptured("stored failures do not belong to the scored run: " + "; ".join(bad))
+
+
+def load_loaded(sql, ids: set[int]) -> set[int]:
+    if not ids:
+        return set()
+    return {int(r[0]) for r in _query(sql, loaded_ids_sql(ids), PROD_MODEL).rows}
+
+
+def load_sources(sql, tests: list[str], mode: str) -> list[Source]:
+    res = _query(sql, sources_sql(tests, mode), f"{LEDGER}.judgments")
+    return [Source(str(r[0]), int(r[1]), int(r[2]), int(r[3]), float(r[4])) for r in res.rows]
+
+
+def count_rows(sql, relation: str) -> int:
+    res = sql.run(f"select count(*) from {relation}")
+    if res.state != "SUCCEEDED":
+        raise NotCaptured(f"--increment: cannot count {relation} ({res.error or res.state}); "
+                          "build and score part 1 first")
+    return int(res.rows[0][0])
 
 
 def load_budget() -> int:
@@ -608,7 +781,9 @@ def current_run(sql, tests: list[str], budget: int) -> Run | None:
     if inv is None:
         return None
     try:
-        return load_run(sql, inv, budget, tests)
+        run = load_run(sql, inv, budget, tests)
+        check_stored_provenance(sql, tests, run)
+        return run
     except NotCaptured:
         return None
 
@@ -737,6 +912,11 @@ def print_report(console: Console, results: GateResults, run: Run | None, ref: d
             f"{t['jev']['precision']:.2f}/{t['jev']['recall']:.2f}" if t else "-",
             f"{baseline.f1:.2f}", f"{t['baseline']['f1_derived']:.2f}" if t else "-")
     console.print(cmp)
+    budget = f"{int(run.budget / 1000)}k" if run is not None and run.budget else "48k"
+    console.print(
+        f"note: demo 04's reference is {key} (64 rows per request); demo 05 cuts packs by "
+        f"estimated tokens (budget {budget}, cap 256 rows), ~120–256 rows per pack on these "
+        "tests, so request counts are not like for like.")
 
     if run is None:
         console.print("summary: not captured (use --run)")
@@ -754,7 +934,8 @@ def print_report(console: Console, results: GateResults, run: Run | None, ref: d
 
 
 def print_production_report(
-    console: Console, m: ProductionMetrics, run: Run | None, rerun_requests: int | None
+    console: Console, m: ProductionMetrics, run: Run | None, rerun_requests: int | None,
+    *, increment: Increment | None = None,
 ) -> None:
     from rich.table import Table
 
@@ -782,7 +963,10 @@ def print_production_report(
             f"[bold]{m.audited_precision:.3f}[/bold] ({m.audit_lo:.3f}–{m.audit_hi:.3f})", "-")
         table.add_row("audited F1", f"{m.audited_f1:.3f}", "-")
     console.print(table)
+    console.print(f"planted flips loaded: {m.planted:,} of {m.planted_total:,}")
     console.print(f"flagged = {m.planted_tp:,} planted + {m.unplanted_flagged:,} unplanted")
+    if increment is not None:
+        console.print(increment.line)
     if run is None:
         console.print("summary: not captured (use --run)")
     else:
@@ -798,19 +982,24 @@ def print_production_report(
     _print_gate(console, ok, reasons)
 
 
-def _provenance_lines(run: Run, warehouse: str) -> list[str]:
+def _provenance_lines(run: Run, warehouse: str, sources: list[Source] | None = None
+                      ) -> list[str]:
     ratio = f"{run.est_ratio:.2f}" if run.est_ratio is not None else "n/a"
-    return [
+    lines = [
         run_line(run),
         "",
+        f"- invocation {run.invocation_id}",
         f"- warehouse {warehouse} · budget {run.budget:,} tokens · {run.packs:,} requests · "
         f"{run.retries:,} retries ({run.throttled:,}× 429) · {run.tokens:,} tokens · "
         f"Jev cost ${run.cost_usd:.6f} · est/actual tokens {ratio}",
         f"- once-per-row {'OK' if run.once_per_row_ok else 'VIOLATED'}: {run.inserted:,} inserted"
         f" = {run.missing:,} missing · packs sum {run.pack_rows:,} (+{run.oversized:,} too long)"
         f" · {run.dups:,} duplicate keys · {run.errors:,} errors",
-        "",
+        f"- cached {run.cached_pct:.0f}% ({run.tested - run.missing:,} of {run.tested:,} states "
+        f"from earlier invocations; {run.missing:,} judged in this run)",
     ]
+    lines += [s.line for s in sources or []]
+    return [*lines, ""]
 
 
 def _write(path: Path, lines: list[str]) -> None:
@@ -827,6 +1016,7 @@ def append_report(
 ) -> None:
     refuse_append_if_simulated(run)
     assert run is not None
+    refuse_append_if_cached(run)
     ts = dt.datetime.now(dt.UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
     ok, reasons = gate(results, run)
     lines = [f"\n## {ts} · {_mode_budget(run)}\n", *_provenance_lines(run, warehouse)]
@@ -852,7 +1042,8 @@ def append_report(
 
 def append_production_report(
     path: Path, m: ProductionMetrics, run: Run | None, warehouse: str,
-    rerun_requests: int | None,
+    rerun_requests: int | None, *, increment: Increment | None = None,
+    sources: list[Source] | None = None,
 ) -> None:
     refuse_append_if_simulated(run)
     assert run is not None
@@ -863,8 +1054,12 @@ def append_production_report(
     else:
         audited = (f"audited precision {m.audited_precision:.2f} "
                    f"(95% Wilson {m.audit_lo:.2f}–{m.audit_hi:.2f}, n={m.audit_n})")
-    lines = [f"\n## {ts} · production {_mode_budget(run)}\n", *_provenance_lines(run, warehouse)]
+    lines = [f"\n## {ts} · production {_mode_budget(run)}\n",
+             *_provenance_lines(run, warehouse, sources)]
+    if increment is not None:
+        lines += [f"- {increment.line}", ""]
     lines += [
+        f"- planted flips loaded: {m.planted:,} of {m.planted_total:,}",
         f"- Jev: recall {m.recall:.2f} on {m.planted:,} planted flips · raw precision "
         f"{m.raw_precision:.2f} · {audited}",
         f"- regex baseline (same data): recall {m.baseline.recall:.2f} · raw precision "
@@ -885,17 +1080,23 @@ def append_production_report(
 # ---------------------------------------------------------------------------------------------
 
 
-def _obtain_run(sql, args, tests: list[str], console: Console, *, production: bool):
+def _obtain_run(sql, args, tests: list[str], *, production: bool):
     """Optionally (--run) run dbt, then read the provenance of the invocation this run made.
 
-    Returns (run, rerun_requests). `run` is None ("not captured", reason on stderr) unless the
-    run was started here, left a new invocation, covers every scored test and is in the
-    requested mode. A failing --rerun raises NotCaptured."""
+    Returns (run, increment). `run` is None ("not captured", reason on stderr) unless the run was
+    started here, left a new invocation, covers every scored test, is in the requested mode and
+    wrote every stored-failure row of the scored tests. With --increment, the production model's
+    rows are counted before and after the build and checked (`check_increment`)."""
     mode = args.mode
+    increment_wanted = getattr(args, "increment", False)
     violated = False
+    increment = None
     try:
+        rows_before = None
         if args.run:
             before = latest_invocation(sql, tests)
+            if increment_wanted:
+                rows_before = count_rows(sql, PROD_MODEL)
             if args.fresh:
                 res = sql.run(fresh_sql(_effective_mode(mode), tests))
                 if res.state != "SUCCEEDED":
@@ -910,6 +1111,7 @@ def _obtain_run(sql, args, tests: list[str], console: Console, *, production: bo
                 raise NotCaptured(
                     f"hook_runs mode is {run.mode!r} but this run was started in "
                     f"{_effective_mode(mode)!r}")
+            check_stored_provenance(sql, tests, run)
             rows = table_unjudged(sql, tests)
             if not unjudged_consistent(run.unjudged, rows):
                 raise NotCaptured(
@@ -917,15 +1119,20 @@ def _obtain_run(sql, args, tests: list[str], console: Console, *, production: bo
                     f"stored-failure tables {rows} rows with jev_p NULL")
             if violated:
                 run = replace(run, dbt_reported_violation=True)
+            if rows_before is not None:
+                increment = check_increment(rows_before, count_rows(sql, PROD_MODEL), run)
     except NotCaptured as e:
         print(f"run not captured: {e}", file=sys.stderr)
         return None, None
-    rerun_requests = None
-    if args.run and args.rerun and run is not None:
-        run_dbt(production=production, mode=mode)
-        inv2 = require_new_invocation(run.invocation_id, latest_invocation(sql, tests))
-        rerun_requests = load_run(sql, inv2, load_budget(), tests).packs
-    return run, rerun_requests
+    return run, increment
+
+
+def _rerun(sql, args, tests: list[str], run: Run, *, production: bool) -> int:
+    """Build again (after the scored stored failures were read) and return the requests the new
+    invocation made. Raises NotCaptured if the rebuild left no new invocation."""
+    run_dbt(production=production, mode=args.mode)
+    inv2 = require_new_invocation(run.invocation_id, latest_invocation(sql, tests))
+    return load_run(sql, inv2, load_budget(), tests).packs
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -941,10 +1148,19 @@ def main(argv: list[str] | None = None) -> int:
                         help="with --run: build again and require 0 requests")
     parser.add_argument("--append", action="store_true",
                         help="with --run: append to docs/eval-results.md (LIVE runs only)")
+    parser.add_argument("--increment", action="store_true",
+                        help="with --production --run: part 2 was just uploaded; check and log "
+                             "that only the new distinct states are judged")
     args = parser.parse_args(argv)
-    if (args.fresh or args.rerun or args.append) and not args.run:
-        parser.error("--fresh, --rerun and --append need --run "
+    if (args.fresh or args.rerun or args.append or args.increment) and not args.run:
+        parser.error("--fresh, --rerun, --append and --increment need --run "
                      "(a recorded result must come from the run scored here)")
+    if args.run and args.mode is None:
+        parser.error("--run needs an explicit --mode live|demo (a live run is billed by TypeSafe)")
+    if args.increment and not args.production:
+        parser.error("--increment is a production step (--production)")
+    if args.increment and args.fresh:
+        parser.error("--increment judges only the new states; --fresh would forget the old ones")
 
     console = Console()
     sql = Sql()
@@ -968,9 +1184,10 @@ def _main_production(console: Console, sql, args, warehouse: str | None) -> int:
         return 2
     with open(FLIPS_PATH, newline="") as f:
         planted = {int(r["id"]) for r in csv.DictReader(f)}
-    run, rerun_requests = _obtain_run(sql, args, [PROD_TEST], console, production=True)
+    run, increment = _obtain_run(sql, args, [PROD_TEST], production=True)
     flagged = load_flagged(sql, PROD_TEST, PROD_ID, judged_only=True)
     baseline = load_flagged(sql, f"baseline_{PROD_TEST}", PROD_ID)
+    loaded = load_loaded(sql, planted)
     try:
         audit_labels = resolve_audit_labels(LABELS_PATH, AUDIT_SAMPLE_PATH)
     except ValueError as e:
@@ -979,10 +1196,15 @@ def _main_production(console: Console, sql, args, warehouse: str | None) -> int:
         console.print(f"[yellow]audit pending: {audit_labels.pending}[/yellow]")
     audit = (audit_for(flagged, planted, audit_labels.labels)
              if audit_labels.labels is not None else None)
-    m = production_metrics(flagged, planted, baseline, audit)
-    print_production_report(console, m, run, rerun_requests)
+    m = production_metrics(flagged, planted, baseline, audit, loaded=loaded)
+    rerun_requests = (_rerun(sql, args, [PROD_TEST], run, production=True)
+                      if args.rerun and run is not None else None)
+    print_production_report(console, m, run, rerun_requests, increment=increment)
     if args.append:
-        append_production_report(DOCS_PATH, m, run, warehouse, rerun_requests)
+        sources = (load_sources(sql, [PROD_TEST], run.mode)
+                   if run is not None and run.tested > run.missing else [])
+        append_production_report(DOCS_PATH, m, run, warehouse, rerun_requests,
+                                 increment=increment, sources=sources)
         console.print(f"Appended run to {DOCS_PATH.relative_to(ROOT)}")
         if audit_labels.source == "sample":
             write_audit_labels(audit_labels.labels, LABELS_PATH)
@@ -992,7 +1214,7 @@ def _main_production(console: Console, sql, args, warehouse: str | None) -> int:
 
 def _main_yardstick(console: Console, sql, args, warehouse: str | None, ref: dict) -> int:
     golden = load_golden(GOLDEN_PATH)
-    run, _ = _obtain_run(sql, args, list(TESTS), console, production=False)
+    run, _ = _obtain_run(sql, args, list(TESTS), production=False)
     results: GateResults = {}
     detail: dict[str, tuple[list[int], list[int]]] = {}
     for test_name, id_col in TESTS.items():
@@ -1003,6 +1225,9 @@ def _main_yardstick(console: Console, sql, args, warehouse: str | None, ref: dic
         detail[test_name] = (
             _hard_neg_flagged_ids(jev_flagged, gold), _defects_missed_ids(jev_flagged, gold))
     print_report(console, results, run, ref)
+    if args.rerun and run is not None:
+        console.print(f"rerun: {_rerun(sql, args, list(TESTS), run, production=False):,} "
+                      "requests (expected 0)")
     if args.append:
         append_report(DOCS_PATH, results, detail, run, warehouse)
         console.print(f"Appended run to {DOCS_PATH.relative_to(ROOT)}")

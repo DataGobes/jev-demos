@@ -243,6 +243,7 @@ def ledger_sql(distinct_tests="4", mode="demo", dups="0", unjudged="0"):
             ["5", "31000", "30000", "1057", "2", "1", "0", "1.3", "jev-1.13.0"]]),
         "from jev_demo.jev.judgments where invocation_id": Result(
             "SUCCEEDED", rows=[[unjudged, dups]]),
+        "jev_invocation_id is distinct from": Result("SUCCEEDED", rows=[["10", "0"]]),
     })
 
 
@@ -325,7 +326,7 @@ def test_dbt_args_yardstick_builds_the_whole_project_minus_production():
 
 def test_dbt_args_production_selects_the_production_models_and_tests():
     assert score.dbt_args(production=True) == [
-        "build", "--vars", "{production: true}",
+        "build", "--vars", "{production: true, jev_max_concurrency: 2}",
         "--select", "+tag:production", "tag:production_baseline"]
 
 
@@ -634,15 +635,13 @@ def dbt_calls(monkeypatch):
 
 
 def obtain(sql, args, **kw):
-    from rich.console import Console
-
-    return score._obtain_run(sql, args, TESTS4, Console(record=True), production=False, **kw)
+    return score._obtain_run(sql, args, TESTS4, production=False, **kw)
 
 
 def test_obtain_run_takes_the_new_invocation_of_this_run(dbt_calls):
     sql = SeqSql(["old", "new"])
-    run, rerun = obtain(sql, Args())
-    assert run.invocation_id == "new" and rerun is None and dbt_calls == [(False, None)]
+    run, increment = obtain(sql, Args())
+    assert run.invocation_id == "new" and increment is None and dbt_calls == [(False, None)]
 
 
 def test_obtain_run_rejects_a_stale_invocation(dbt_calls, capsys):
@@ -685,15 +684,20 @@ def test_obtain_run_without_run_flag_uses_latest_and_does_not_run_dbt(dbt_calls)
     assert run.invocation_id == "latest" and dbt_calls == []
 
 
-def test_obtain_run_rerun_needs_its_own_new_invocation(dbt_calls, capsys):
+def test_rerun_needs_its_own_new_invocation(dbt_calls, capsys):
     # second build leaves no new invocation -> the rerun check cannot pass
+    sql = SeqSql(["old", "new", "new"])
+    run, _ = obtain(sql, Args(rerun=True))
     with pytest.raises(score.NotCaptured, match="no new invocation"):
-        obtain(SeqSql(["old", "new", "new"]), Args(rerun=True))
+        score._rerun(sql, Args(rerun=True), TESTS4, run, production=False)
 
 
-def test_obtain_run_rerun_counts_the_second_builds_requests(dbt_calls):
-    run, rerun = obtain(SeqSql(["old", "new", "newer"]), Args(rerun=True))
-    assert run.invocation_id == "new" and rerun == 5 and len(dbt_calls) == 2
+def test_rerun_counts_the_second_builds_requests(dbt_calls):
+    sql = SeqSql(["old", "new", "newer"])
+    run, _ = obtain(sql, Args(rerun=True))
+    assert run.invocation_id == "new" and len(dbt_calls) == 1  # _obtain_run builds once
+    assert score._rerun(sql, Args(rerun=True), TESTS4, run, production=False) == 5
+    assert len(dbt_calls) == 2
 
 
 def test_append_requires_run():
@@ -781,3 +785,207 @@ def test_write_audit_labels_writes_id_and_label_only(tmp_path):
     out = tmp_path / "labels.csv"
     score.write_audit_labels({2: "ok", 1: "real"}, out)
     assert out.read_text() == "id,label\n1,real\n2,ok\n"
+
+
+# -- --run needs an explicit --mode ------------------------------------------------------------
+
+
+def test_run_requires_an_explicit_mode(capsys):
+    with pytest.raises(SystemExit) as e:
+        score.main(["--run"])
+    assert e.value.code == 2 and "--mode" in capsys.readouterr().err
+    with pytest.raises(SystemExit) as e:
+        score.main(["--production", "--run", "--fresh"])
+    assert e.value.code == 2
+
+
+# -- F5: stored failures must belong to the scored run -----------------------------------------
+
+
+def test_stored_provenance_sql_checks_mode_and_invocation():
+    q = score.stored_provenance_sql("t1", live_run(invocation_id="inv-9"))
+    assert "from jev_demo.jaffle_shop_dbt_test__audit.t1" in q
+    assert "jev_mode is distinct from 'live'" in q
+    assert "jev_invocation_id is distinct from 'inv-9'" in q
+
+
+def test_check_stored_provenance_accepts_rows_of_this_run():
+    sql = FakeSql({"is distinct from": Result("SUCCEEDED", rows=[["7", "0"]])})
+    score.check_stored_provenance(sql, ["a", "b"], live_run(invocation_id="inv"))
+    assert len(sql.seen) == 2
+
+
+def test_check_stored_provenance_rejects_stale_or_other_mode_rows():
+    sql = FakeSql({"is distinct from": Result("SUCCEEDED", rows=[["7", "3"]])})
+    with pytest.raises(score.NotCaptured, match="3 of 7 stored rows"):
+        score.check_stored_provenance(sql, ["a"], live_run(invocation_id="inv"))
+
+
+def test_check_stored_provenance_rejects_tables_without_the_columns():
+    sql = FakeSql({"is distinct from": Result(
+        "FAILED",
+        error="[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column `jev_mode` cannot be resolved")})
+    with pytest.raises(score.NotCaptured, match="no jev_mode"):
+        score.check_stored_provenance(sql, ["a"], live_run(invocation_id="inv"))
+
+
+def test_obtain_run_is_not_captured_when_stored_failures_are_stale(dbt_calls, capsys):
+    sql = SeqSql(["old", "new"])
+    sql.fixed.answers["jev_invocation_id is distinct from"] = Result(
+        "SUCCEEDED", rows=[["10", "10"]])
+    run, _ = obtain(sql, Args())
+    assert run is None and "stored failures do not belong" in capsys.readouterr().err
+    q = next(q for q in sql.seen if "is distinct from" in q)
+    assert "'new'" in q and "'demo'" in q
+
+
+def test_current_run_is_none_when_stored_failures_are_from_another_invocation():
+    sql = SeqSql(["inv"])
+    sql.fixed.answers["jev_invocation_id is distinct from"] = Result(
+        "SUCCEEDED", rows=[["10", "2"]])
+    assert score.current_run(sql, TESTS4, 48_000) is None
+
+
+def test_rerun_happens_after_the_stored_failures_are_checked(dbt_calls):
+    # the scored stored failures are the first build's; the rerun's own tables are not scored
+    sql = SeqSql(["old", "new", "newer"])
+    run, _ = obtain(sql, Args(rerun=True))
+    checked = [q for q in sql.seen if "is distinct from" in q]
+    assert checked and all("'new'" in q for q in checked)
+
+
+# -- F2: recall counts only the planted flips that are loaded ----------------------------------
+
+
+def test_loaded_ids_query_reads_the_production_model():
+    q = score.loaded_ids_sql({3, 1, 2})
+    assert q == ("select review_id from jev_demo.jaffle_shop.stg_product_reviews "
+                 "where review_id in (1, 2, 3)")
+
+
+def test_load_loaded_intersects_with_what_the_model_holds():
+    sql = FakeSql({"stg_product_reviews": Result("SUCCEEDED", rows=[["1"], ["3"]])})
+    assert score.load_loaded(sql, {1, 2, 3}) == {1, 3}
+    assert score.load_loaded(FakeSql({}), set()) == set()  # no query for no ids
+
+
+def test_production_metrics_scores_recall_on_the_loaded_flips_only():
+    planted = set(range(1, 101))
+    loaded = set(range(1, 81))  # part 1 holds 80 of the 100 planted flips
+    m = score.production_metrics(set(range(1, 73)), planted, set(), None, loaded=loaded)
+    assert (m.planted, m.planted_total) == (80, 100)
+    assert m.recall == pytest.approx(72 / 80)
+    text = _render(score.print_production_report, m, live_run(), None)
+    assert "planted flips loaded: 80 of 100" in text
+
+
+def test_append_production_report_records_loaded_flips(tmp_path):
+    path = tmp_path / "e.md"
+    m = score.production_metrics(set(range(1, 73)), set(range(1, 101)), set(), None,
+                                 loaded=set(range(1, 81)))
+    score.append_production_report(path, m, live_run(tested=5, missing=5, inserted=5,
+                                                     pack_rows=5), "w", None)
+    assert "planted flips loaded: 80 of 100" in path.read_text()
+
+
+# -- F3: the increment, cached share and the invocations cached judgments came from -------------
+
+
+def test_increment_line_and_checks():
+    run = live_run(tested=100_000, missing=4_987, inserted=4_987, pack_rows=4_987)
+    inc = score.check_increment(95_000, 100_000, run)
+    assert inc.line == "increment: 4,987 new distinct states judged (5,000 rows loaded)"
+    with pytest.raises(score.NotCaptured, match="no new rows"):
+        score.check_increment(95_000, 95_000, run)
+    with pytest.raises(score.NotCaptured, match="only 10 rows"):
+        score.check_increment(95_000, 95_010, run)
+    bad = live_run(tested=100_000, missing=4_987, inserted=4_900, pack_rows=4_900)
+    with pytest.raises(score.NotCaptured, match="inserted"):
+        score.check_increment(95_000, 100_000, bad)
+
+
+def test_obtain_run_with_increment_counts_rows_before_and_after(dbt_calls):
+    sql = SeqSql(["old", "new"])
+    counts, builds_seen = iter([["95000"], ["100000"]]), []
+    orig = sql.fixed.run
+
+    def run(q, timeout_s=900):
+        if q.startswith("select count(*) from jev_demo.jaffle_shop.stg_product_reviews"):
+            builds_seen.append(len(dbt_calls))
+            return Result("SUCCEEDED", rows=[next(counts)])
+        return orig(q, timeout_s)
+
+    sql.fixed.run = run
+    got, inc = obtain(sql, Args(increment=True))
+    assert got is not None and inc.rows_loaded == 5_000 and inc.new_states == 1057
+    assert builds_seen == [0, 1]  # counted once before the build and once after it
+
+
+def test_increment_needs_production_and_run_and_no_fresh():
+    for argv in (["--increment"], ["--run", "--mode", "live", "--increment"],
+                 ["--production", "--run", "--mode", "live", "--fresh", "--increment"]):
+        with pytest.raises(SystemExit) as e:
+            score.main(argv)
+        assert e.value.code == 2, argv
+
+
+def test_sources_sql_is_scoped_to_tests_mode_and_latest_question():
+    q = score.sources_sql(["t1"], "live")
+    assert "max_by(question, judged_at)" in q and "test_name in ('t1')" in q
+    assert "j.p is not null" in q and "mode = 'live'" in q and "group by j.invocation_id" in q
+    assert "jev_demo.jev.requests" in q
+
+
+def test_load_sources():
+    sql = FakeSql({"max_by(question": Result("SUCCEEDED", rows=[
+        ["inv-a", "94000", "400", "12000000", "310.5"], ["inv-b", "4987", "22", "600000", "20"]])})
+    src = score.load_sources(sql, ["t1"], "live")
+    assert [s.invocation_id for s in src] == ["inv-a", "inv-b"]
+    assert src[0].states == 94_000 and src[0].requests == 400 and src[0].tokens == 12_000_000
+    assert src[0].cost_usd == pytest.approx(12_000_000 * 0.042 / 1e6)
+
+
+def test_every_append_records_invocation_and_cached_share(tmp_path):
+    path = tmp_path / "e.md"
+    run = live_run(tested=10, missing=10, inserted=10, packs=2, pack_rows=10,
+                   invocation_id="0f0e0d0c-0b0a-4908-8706-050403020100")
+    score.append_report(path, yard_results(), {"t": ([], [])}, run, warehouse="w")
+    text = path.read_text()
+    assert "invocation 0f0e0d0c-0b0a-4908-8706-050403020100" in text
+    assert "cached 0% (0 of 10 states from earlier invocations; 10 judged in this run)" in text
+
+
+def test_production_append_records_where_cached_judgments_came_from(tmp_path):
+    path = tmp_path / "e.md"
+    m = score.production_metrics(**prod_inputs())
+    run = live_run(tested=100, missing=0, inserted=0, packs=0, pack_rows=0, invocation_id="i3")
+    sources = [score.Source("i1", 95, 3, 30_000, 12.5), score.Source("i2", 5, 1, 1_000, 1.0)]
+    inc = score.Increment(95_000, 100_000, 5)
+    score.append_production_report(path, m, run, "w", 0, increment=inc, sources=sources)
+    text = path.read_text()
+    assert "cached 100% (100 of 100 states from earlier invocations; 0 judged in this run)" in text
+    assert "- judged in invocation i1: 95 states · 3 requests · 30,000 tokens · $0.001260" in text
+    assert "12.5 s Jev" in text and "- judged in invocation i2: 5 states" in text
+    assert "increment: 5 new distinct states judged (5,000 rows loaded)" in text
+
+
+# -- F4: a yardstick entry never comes from cached judgments -----------------------------------
+
+
+def test_yardstick_append_refuses_a_cached_run(tmp_path):
+    path = tmp_path / "e.md"
+    cached = live_run(tested=10, missing=4, inserted=4, pack_rows=4)
+    with pytest.raises(SystemExit) as e:
+        score.append_report(path, yard_results(), {"t": ([], [])}, cached, warehouse="w")
+    assert "60% of the scored states were cached" in str(e.value.code)
+    assert "--fresh" in str(e.value.code) and not path.exists()
+
+
+# -- comparison note ---------------------------------------------------------------------------
+
+
+def test_print_report_notes_how_packs_differ_from_demo04():
+    ref = score.load_demo04_reference()
+    results = {n: (score.metrics(set(), {}), score.metrics(set(), {})) for n in score.TESTS}
+    text = _render(score.print_report, results, live_run(budget=48_000), ref)
+    assert "pack=64/nested" in text and "estimated tokens" in text and "256" in text

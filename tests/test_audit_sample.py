@@ -31,3 +31,23 @@ def test_flagged_query_skips_unjudged_rows_and_never_selects_the_score():
     select_list, _, rest = sql.partition(" from ")
     assert "jev_p" not in select_list and "jev_p is not null" in rest
     assert rest.startswith("cat.sch.tbl") and "review_id" in select_list
+
+
+def test_flagged_query_reads_live_rows_only_and_never_exports_provenance():
+    sql = au.flagged_query("cat.sch.tbl").lower()
+    select_list, _, rest = sql.partition(" from ")
+    assert "jev_mode = 'live'" in rest
+    for col in ("jev_p", "jev_mode", "jev_invocation_id"):
+        assert col not in select_list
+
+
+def test_provenance_query_counts_rows_that_are_not_live():
+    q = au.provenance_query("cat.sch.tbl").lower()
+    assert "from cat.sch.tbl" in q and "jev_mode is distinct from 'live'" in q
+    assert "count(distinct jev_invocation_id)" in q
+
+
+def test_refuses_a_table_with_simulated_or_mixed_rows():
+    assert au.provenance_problem(0, 1) is None
+    assert "SIMULATED" in au.provenance_problem(3, 1)
+    assert "invocations" in au.provenance_problem(0, 2)

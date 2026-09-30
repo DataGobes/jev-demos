@@ -1,4 +1,5 @@
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -98,6 +99,21 @@ def test_compiled_test_sql_reads_judgments():
     sql = next((JAFFLE / "target/compiled").rglob("reviews_body_matches_stars.sql")).read_text()
     assert "jev_demo.jev.judgments" in sql and "judged.p >= 0.8" in sql
     assert "except (__jev_key)" in sql and "where judged.p is null or" in sql
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize("mode", ["live", "demo"])
+def test_compiled_test_sql_carries_mode_and_invocation(mode):
+    # F5: every stored-failure row says which mode and which dbt invocation wrote it, so
+    # score.py/show.py can refuse to present stale or SIMULATED rows under a LIVE run.
+    res = dbt("compile", "--select", "reviews_body_matches_stars", env={"JEV_MODE": mode})
+    assert res.returncode == 0, res.stdout + res.stderr
+    sql = next((JAFFLE / "target/compiled").rglob("reviews_body_matches_stars.sql")).read_text()
+    assert f"'{mode}' as jev_mode" in sql
+    m = re.search(r"'([0-9a-f-]{36})' as jev_invocation_id", sql)
+    assert m, sql
+    select_list = sql.rsplit("select tested.*", 1)[1].split("from tested", 1)[0]
+    assert "jev_mode" in select_list and "jev_invocation_id" in select_list
 
 
 PRODUCTION_SCHEMA = JAFFLE / "models/production/schema.yml"

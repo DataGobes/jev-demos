@@ -4,7 +4,9 @@ Reads the ids Jev flagged from
 jev_demo.jaffle_shop_dbt_test__audit.product_reviews_body_matches_stars, drops the planted flips
 (eval/production_flips.csv: their label is known), samples 100 with seed 42 and writes
 data/production_audit.csv with id, stars, body and an empty label. The model's score
-(jev_p) is deliberately left out so the labeller is not anchored by it.
+(jev_p) is deliberately left out so the labeller is not anchored by it, and so are the
+provenance columns (jev_mode, jev_invocation_id). The table must hold rows of one LIVE
+invocation: a SIMULATED (demo-mode) table is never audited.
 
     uv run python scripts/audit_sample.py
 
@@ -31,8 +33,25 @@ def pick_audit(flagged: set[int], planted: set[int], n: int, seed: int) -> list[
 
 
 def flagged_query(table: str) -> str:
-    """Judged failures only (unjudged rows have jev_p NULL); jev_p is not selected (blind audit)."""
-    return f"select review_id, stars, body from {table} where jev_p is not null"
+    """Judged LIVE failures only (unjudged rows have jev_p NULL); jev_p and the provenance columns
+    are not selected (blind audit)."""
+    return (f"select review_id, stars, body from {table} "
+            "where jev_p is not null and jev_mode = 'live'")
+
+
+def provenance_query(table: str) -> str:
+    """Rows not written in live mode, and how many dbt invocations wrote the table."""
+    return (f"select count_if(jev_mode is distinct from 'live'), "
+            f"count(distinct jev_invocation_id) from {table}")
+
+
+def provenance_problem(not_live: int, invocations: int) -> str | None:
+    if not_live:
+        return (f"{not_live:,} stored rows are not LIVE (SIMULATED demo mode): "
+                "never audit a SIMULATED run")
+    if invocations > 1:
+        return f"the table mixes rows of {invocations} invocations: rebuild it"
+    return None
 
 
 def main(n: int = 100, seed: int = 42) -> int:
@@ -41,6 +60,14 @@ def main(n: int = 100, seed: int = 42) -> int:
     with open(ROOT / "eval/production_flips.csv", newline="") as f:
         planted = {int(r["id"]) for r in csv.DictReader(f)}
     sql = Sql()
+    prov = sql.run(provenance_query(TABLE))
+    if prov.state != "SUCCEEDED":
+        print(f"could not read {TABLE}: {prov.error}", file=sys.stderr)
+        return 1
+    problem = provenance_problem(int(prov.rows[0][0]), int(prov.rows[0][1]))
+    if problem:
+        print(f"refusing to sample {TABLE}: {problem}", file=sys.stderr)
+        return 1
     res = sql.run(flagged_query(TABLE))
     if res.state != "SUCCEEDED":
         print(f"could not read {TABLE}: {res.error}", file=sys.stderr)
