@@ -7,7 +7,6 @@ The token and the environment are never printed.
 """
 
 import os
-import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -28,8 +27,8 @@ def build_command(argv: list[str]) -> list[str]:
 
 
 def dbt_executable() -> list[str]:
-    exe = shutil.which("dbt", path=str(Path(sys.executable).parent))
-    return [exe] if exe else [sys.executable, "-c", "from dbt.cli.main import cli; cli()"]
+    """dbt with seed CSVs read like dbt-duckdb reads them (see jevdbx.dbt_cli)."""
+    return [sys.executable, "-m", "jevdbx.dbt_cli"]
 
 
 def main(argv=None) -> int:
