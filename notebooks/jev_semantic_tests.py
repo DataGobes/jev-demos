@@ -44,7 +44,8 @@ pythonpath = os.pathsep.join(
     p for p in (str(bundle_root / "src"), os.environ.get("PYTHONPATH", "")) if p)
 
 if selection == "production":
-    args = ["build", "--vars", "{production: true}",
+    # 2 packs in flight per statement: 250k tokens/s at TypeSafe, retries never exercised live.
+    args = ["build", "--vars", "{production: true, jev_max_concurrency: 2}",
             "--select", "+tag:production", "tag:production_baseline"]
 else:
     # A fresh schema needs stg_orders (relationships tests), so build the whole yardstick.

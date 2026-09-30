@@ -55,7 +55,7 @@ def test_notebook_runs_dbt_through_the_seed_patching_cli_with_src_on_the_path():
 def test_notebook_selections_match_the_scorer():
     src = _notebook()
     assert '"--exclude", "tag:production", "tag:production_baseline"' in src
-    assert '"{production: true}"' in src
+    assert '"{production: true, jev_max_concurrency: 2}"' in src  # same as score.PROD_VARS
     assert '"+tag:production", "tag:production_baseline"' in src
     for widget in ('"mode"', '"selection"', '"warehouse"'):
         assert "dbutils.widgets" in src and widget in src
@@ -86,3 +86,12 @@ def test_notebook_fails_clearly_and_captions_the_mode():
     assert "next((x for x in w.warehouses.list()" in src and ", None)" in src
     assert "SIMULATED (demo)" in src and "probabilities are not Jev judgments" in src
     assert "Mode: LIVE" in src
+
+
+def test_notebook_production_vars_equal_the_scorers():
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("score_nb", ROOT / "scripts" / "score.py")
+    score = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(score)
+    assert f'"{score.PROD_VARS}"' in _notebook()
