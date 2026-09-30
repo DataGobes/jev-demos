@@ -1,0 +1,24 @@
+version: 2
+
+models:
+  - name: stg_product_reviews
+    columns:
+      - name: review_id
+        data_tests: [unique, not_null]
+      - name: stars
+        data_tests:
+          - not_null
+          - accepted_values: {arguments: {values: [1, 2, 3, 4, 5], quote: false}}
+      - name: body
+        data_tests:
+          - not_null
+          - jev_expect:
+              name: product_reviews_body_matches_stars
+              arguments:
+                fails_if: "The overall sentiment of the review `body` clearly contradicts its `stars` rating (1 = very bad, 5 = excellent)."
+                context: [stars]
+                threshold: 0.8
+                criteria:
+                  "true": "A glowing text with 1-2 stars, or an angry/negative text with 4-5 stars"
+                  "false": "Sentiment roughly matches the stars, including sarcasm that matches a low rating and mixed 3-star reviews"
+              config: {severity: warn, store_failures: true, tags: [production]}

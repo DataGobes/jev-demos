@@ -98,3 +98,60 @@ def test_compiled_test_sql_reads_judgments():
     sql = next((JAFFLE / "target/compiled").rglob("reviews_body_matches_stars.sql")).read_text()
     assert "jev_demo.jev.judgments" in sql and "judged.p >= 0.8" in sql
     assert "except (__jev_key)" in sql and "where judged.p is null or" in sql
+
+
+PRODUCTION_SCHEMA = JAFFLE / "models/production/schema.yml"
+
+
+def test_production_jev_expect_arguments_equal_demo04_and_ours():
+    block = _jev_blocks(PRODUCTION_SCHEMA)["product_reviews_body_matches_stars"]
+    model, column, expect = block
+    assert (model, column) == ("stg_product_reviews", "body")
+    ours = _jev_blocks(JAFFLE / "models/staging/schema.yml")["reviews_body_matches_stars"][2]
+    assert expect["arguments"] == ours["arguments"]
+    assert expect["config"] == {"severity": "warn", "store_failures": True, "tags": ["production"]}
+    if DEMO4_SCHEMA.exists():
+        assert expect["arguments"] == _jev_blocks(DEMO4_SCHEMA)["reviews_body_matches_stars"][2][
+            "arguments"]
+
+
+def test_production_baseline_is_the_reviews_baseline_with_two_changes():
+    base = (JAFFLE / "tests/baseline/baseline_reviews_body_matches_stars.sql").read_text()
+    prod = (JAFFLE / "tests/production_baseline"
+            / "baseline_product_reviews_body_matches_stars.sql").read_text()
+    config = "{{ config(tags=['baseline'], store_failures=true, severity='warn') }}"
+    prod_config = ("{{ config(tags=['production_baseline'], store_failures=true, severity='warn', "
+                   "enabled=var('production', false)) }}")
+    assert config in base and prod_config in prod
+    assert prod.replace(prod_config, config).replace("stg_product_reviews", "stg_reviews") == base
+
+
+def test_production_model_reads_the_volume_and_joins_summary_and_text():
+    sql = (JAFFLE / "models/production/stg_product_reviews.sql").read_text()
+    assert "read_files('/Volumes/jev_demo/production/raw/', format => 'parquet')" in sql
+    assert "concat_ws('\\n', summary, text) as body" in sql
+    assert "tags=['production']" in sql
+
+
+@pytest.mark.slow
+def test_production_nodes_exist_only_with_the_production_var():
+    def listed(*extra):
+        res = dbt("ls", "--resource-type", "all", "--output", "name", *extra)
+        assert res.returncode == 0, res.stdout + res.stderr
+        return {ln.strip() for ln in res.stdout.splitlines()}
+
+    off = listed()
+    assert not [n for n in off if "product_reviews" in n]  # model, its tests and the baseline
+    on = listed("--vars", "{production: true}")
+    assert {"stg_product_reviews", "product_reviews_body_matches_stars",
+            "baseline_product_reviews_body_matches_stars"} <= on
+    # tests/production_baseline is already under test-paths ("tests"); listing it again would
+    # register the baseline twice and make `production: true` fail with a duplicate resource.
+    assert dbt("parse", "--vars", "{production: true}").returncode == 0
+
+
+def test_production_baseline_lives_under_the_test_path():
+    project = yaml.safe_load((JAFFLE / "dbt_project.yml").read_text())
+    root = (JAFFLE / project["test-paths"][0]).resolve()
+    assert (JAFFLE / "tests/production_baseline").resolve().is_relative_to(root)
+    assert project["test-paths"] == ["tests"]
