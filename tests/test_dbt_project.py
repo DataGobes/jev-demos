@@ -128,9 +128,21 @@ def test_production_baseline_is_the_reviews_baseline_with_only_ref_and_config_ch
 
 def test_production_model_reads_the_volume_and_joins_summary_and_text():
     sql = (JAFFLE / "models/production/stg_product_reviews.sql").read_text()
-    assert "read_files('/Volumes/jev_demo/production/raw/', format => 'parquet')" in sql
+    assert "/Volumes/jev_demo" not in sql  # the catalog comes from var('jev_catalog')
+    assert "var('jev_catalog')" in sql
     assert "concat_ws('\\n', summary, text) as body" in sql
     assert "tags=['production']" in sql
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize("catalog", [None, "other_cat"])
+def test_production_model_volume_path_follows_the_catalog_var(catalog):
+    vars_ = {"production": True} | ({"jev_catalog": catalog} if catalog else {})
+    res = dbt("compile", "--select", "stg_product_reviews", "--vars", json.dumps(vars_))
+    assert res.returncode == 0, res.stdout + res.stderr
+    sql = next((JAFFLE / "target/compiled").rglob("stg_product_reviews.sql")).read_text()
+    expected = f"/Volumes/{catalog or 'jev_demo'}/production/raw/"
+    assert f"read_files('{expected}', format => 'parquet')" in sql
 
 
 @pytest.mark.slow
