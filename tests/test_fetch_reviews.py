@@ -155,3 +155,28 @@ def test_main_creates_eval_dir_for_the_flips_csv(tmp_path, monkeypatch):
     assert fr.main(["--source", str(src), "--out", str(tmp_path / "out"),
                     "--n", "20", "--first", "15"]) == 0
     assert (tmp_path / "eval/production_flips.csv").exists()
+
+
+# -- Ruling R21: <br /> and HTML entities are markup artifacts, not review content --------------
+
+
+@pytest.mark.parametrize("raw,clean", [
+    ("Great.<br /><br />Would buy again.", "Great.\n\nWould buy again."),
+    ("a<br/>b<BR>c<br  />d<Br />e", "a\nb\nc\nd\ne"),
+    ("Tom &amp; Jerry &quot;snack&quot; &#39;ok&#39; &lt;3", "Tom & Jerry \"snack\" 'ok' <3"),
+    ("&lt;br /&gt; stays text", "<br /> stays text"),
+    ("plain", "plain"),
+])
+def test_clean_markup(raw, clean):
+    assert fr.clean_markup(raw) == clean
+
+
+def test_both_sources_clean_summary_and_text(tmp_path):
+    rs = list(fr.parse_snap([
+        "review/score: 5.0\n", "review/summary: A &amp; B\n",
+        "review/text: one<br />two &quot;x&quot;\n"]))
+    assert (rs[0]["summary"], rs[0]["text"]) == ("A & B", 'one\ntwo "x"')
+    csv_path = tmp_path / "Reviews.csv"
+    csv_path.write_text('Id,Score,Summary,Text\n7,1,"C &amp; D","three<BR/>four"\n')
+    assert list(fr.parse_kaggle_csv(csv_path)) == [
+        {"id": 7, "score": 1, "summary": "C & D", "text": "three\nfour"}]

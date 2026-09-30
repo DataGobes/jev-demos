@@ -1,8 +1,9 @@
 """Production dataset: Amazon Fine Food Reviews (SNAP, McAuley & Leskovec, WWW 2013).
 
-Keeps only id, score, summary and text (drops user ids and profile names), samples 100,000 with
-seed 42, plants star flips across the pole (1<->5, 2<->4) on 3% of the non-3-star rows, writes two
-Parquet files (95,000 + 5,000, for the incremental proof) and eval/production_flips.csv.
+Keeps only id, score, summary and text (drops user ids and profile names; `<br />` becomes a
+newline and HTML entities are unescaped), samples 100,000 with seed 42, plants star flips across
+the pole (1<->5, 2<->4) on 3% of the non-3-star rows, writes two Parquet files (95,000 + 5,000,
+for the incremental proof) and eval/production_flips.csv.
 
     uv run python scripts/fetch_reviews.py --source data/finefoods.txt.gz --out data/
     uv run python scripts/fetch_reviews.py --source data/finefoods.txt.gz --out data/ --upload
@@ -14,7 +15,9 @@ Downloading is a separate, explicit step (`--download`), done only after the use
 import argparse
 import csv
 import gzip
+import html
 import random
+import re
 import sys
 import urllib.request
 from collections.abc import Iterable, Iterator
@@ -26,11 +29,21 @@ FLIPS = {1: 5, 5: 1, 2: 4, 4: 2}
 VOLUME = "/Volumes/jev_demo/production/raw"
 PART1 = "reviews_part1.parquet"
 PART2 = "reviews_part2.parquet"
+_BR = re.compile(r"<br\s*/?\s*>", re.I)
+
+
+def clean_markup(s: str) -> str:
+    """`<br />` (any case or spacing) becomes a newline and HTML entities are unescaped: they are
+    markup artifacts of the source, not review content (Ruling R21), and would reach Jev and the
+    regex baseline alike. Entities are unescaped after the line breaks, so an escaped `&lt;br /&gt;`
+    stays text."""
+    return html.unescape(_BR.sub("\n", s))
 
 
 def _record(n: int, rec: dict) -> dict:
     return {"id": n, "score": int(float(rec["review/score"])),
-            "summary": rec.get("review/summary", ""), "text": rec.get("review/text", "")}
+            "summary": clean_markup(rec.get("review/summary", "")),
+            "text": clean_markup(rec.get("review/text", ""))}
 
 
 def parse_snap(lines: Iterable[str]) -> Iterator[dict]:
@@ -57,7 +70,7 @@ def parse_kaggle_csv(path: Path) -> Iterator[dict]:
     with open(path, newline="", encoding="utf-8") as f:
         for r in csv.DictReader(f):
             yield {"id": int(r["Id"]), "score": int(r["Score"]),
-                   "summary": r["Summary"], "text": r["Text"]}
+                   "summary": clean_markup(r["Summary"]), "text": clean_markup(r["Text"])}
 
 
 def sample(rows: list[dict], n: int, seed: int) -> list[dict]:
