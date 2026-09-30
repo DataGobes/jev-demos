@@ -1,0 +1,37 @@
+[project]
+name = "jevdbx"
+version = "0.1.0"
+description = "Semantic dbt tests backed by TypeSafe Jev, on Databricks + Unity Catalog (demo)"
+requires-python = ">=3.13"
+dependencies = [
+    "dbt-databricks==1.12.5",
+    "databricks-sdk",
+    "pyarrow>=21",
+    "rich>=14",
+    "pyyaml>=6",
+]
+
+[dependency-groups]
+dev = ["pytest>=8", "ruff>=0.12", "dbt-duckdb==1.11.0"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/jevdbx"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "slow: runs dbt (offline render target)",
+    "databricks: talks to the Databricks workspace (demo mode only); run with -m databricks",
+]
+addopts = "-m 'not databricks'"
+
+[tool.ruff]
+line-length = 100
+src = ["src", "scripts"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
