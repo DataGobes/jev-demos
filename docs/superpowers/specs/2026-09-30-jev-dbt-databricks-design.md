@@ -172,8 +172,14 @@ dbt build
   That covers "sentence changed, only `dbt test` was run". It never silently passes.
 - **Hooks and selection:** `dbt build --select +tag:semantic` builds the tested models (hooks run)
   and then the tests. Models without `jev_expect` tests get a no-op hook (renders to nothing).
-- **Concurrency of dbt threads:** hooks of different models append disjoint keys; Delta blind
-  appends do not conflict.
+- **Concurrency of dbt threads:** hooks of different models append disjoint keys.
+  *Amended 2026-09-30:* blind appends do conflict here. Two hooks running at once failed with
+  `DELTA_CONCURRENT_APPEND.ROW_LEVEL_CHANGES` (measured) whenever each hook's cache read
+  (`LEFT ANTI JOIN judgments`) scanned the whole table, because Delta then treats the read as
+  depending on rows the other hook appends. The hook now scopes its cache read to its own
+  question (`WHERE question = ...`), so concurrent hooks for different questions touch disjoint
+  data and do not conflict. The key already contains the question, so cache semantics are
+  unchanged.
 
 ### 6.1 Judgments table
 
@@ -207,6 +213,12 @@ was cached and nothing was inserted.
   `pack = (bucket, floor((row_number() OVER (PARTITION BY bucket ORDER BY key) - 1) / max_rows))`.
   Starting a row's bucket at `cum - est` puts it where it begins, so a bucket exceeds the budget
   by at most one row; the 16k margin absorbs that.
+  *Amended 2026-09-30:* the margin absorbs it only while that last row is ≤ ~16k tokens. A pack
+  can exceed the 64k request limit only if a bucket's last row has an estimate between ~16k and
+  the 30k row limit (48k budget + a last row above 16k is over 64k). The API then rejects that pack
+  (`max_tokens_exceeded`), its rows are stored unjudged (`p = NULL`, with the error) and the
+  summary reports them as unjudged: loud, not silent. Real rows are far below 16k estimated
+  tokens (~50k characters), so this is a pathological-input edge case, documented in the README.
 - A row with `est > var('jev_row_token_limit', 30000)` is not sent: it is inserted with
   `p = NULL, error = 'row exceeds token limit (est N)'` and reported. It is never a silent pass.
 - Accuracy: demo 04 showed no measurable change up to 256 rows per request with `nested`/`""`;
@@ -221,6 +233,11 @@ TypeSafe: 1,200 requests/min, 250k tokens/s, 64k tokens/request, all "adjusting 
 - Layer 1: `REPARTITION(n)`, `n = var('jev_max_concurrency', 4)`, caps concurrent packs.
 - Layer 2: in-function retry with backoff on 429/529/5xx (§5.1). Each pack records attempts and
   statuses; the summary shows the number of 429s.
+- *Amended 2026-09-30:* `REPARTITION(n)` caps the packs in flight **per statement**. dbt runs
+  with 4 threads, so up to 4 hooks can run at once (up to `4 × n` = 16 packs in flight with the
+  defaults). The coordination across statements is the 429 and the backoff: `retry-after` is
+  honoured as a floor (sleep = retry-after × U(1.0, 1.5)), capped at 60 s; without it, the
+  exponential backoff of §5.1 applies.
 - There is no global pacer across executors. The server's 429 is the coordination signal. The
   spec and README say so; the production run reports whether 429s occurred.
 
@@ -229,6 +246,11 @@ TypeSafe: 1,200 requests/min, 250k tokens/s, 64k tokens/request, all "adjusting 
 - Structural: a hook runs once per model build. The INSERT evaluates the function once per pack:
   an integration test asserts `EXPLAIN` of the generated INSERT contains exactly one
   `EvalPython` operator.
+  *Amended 2026-09-30:* on the serverless Photon warehouse the physical plan shows a single
+  `PhotonScalarUDF` node after the pack aggregation, not an `EvalPython` operator; the test
+  accepts either name and asserts there is exactly one. Single evaluation is also checked on
+  data: one `pack_uuid` per pack and `rows_written = pack_rows` for every pack. The summary
+  raises (the run fails) on any once-per-row violation, after printing both lines.
 - Counted per invocation (on-run-end, printed with the summary, failing loudly if violated):
   1. rows inserted = distinct missing states (counted by the hook before the insert, stored in
      `hook_runs`, checked by the hook itself right after the insert),
@@ -241,8 +263,14 @@ TypeSafe: 1,200 requests/min, 250k tokens/s, 64k tokens/request, all "adjusting 
 
 ## 10. Secrets and SIMULATED mode
 
-- Live mode needs only the UC secret. dbt authenticates to Databricks with OAuth; no token in the
-  repo, no `.env` with the TypeSafe key. The workspace host and warehouse HTTP path come from
+- Live mode needs only the UC secret. dbt authenticates to Databricks without a stored
+  credential; no token in the repo, no `.env` with the TypeSafe key.
+  *Amended 2026-09-30:* local dbt does not use a browser OAuth flow (it cannot run unattended).
+  `scripts/dbtw.py` asks the Databricks SDK for a short-lived token from the logged-in CLI
+  profile and hands it to dbt in the environment variable `DBT_ENV_SECRET_DATABRICKS_TOKEN`
+  (dbt scrubs `DBT_ENV_SECRET_*` values from its logs); it is never printed. The notebook (§17)
+  uses the SDK's notebook-native auth, with the notebook context's `apiToken` as a fallback.
+  Never a personal access token. The workspace host and warehouse HTTP path come from
   environment variables (`DATABRICKS_HOST`, `JEV_HTTP_PATH`), printed by `scripts/jev_env.py` from
   the CLI profile `jev-demo-5` (host and warehouse only, never tokens), so the public repo does
   not name the workspace.
@@ -260,6 +288,11 @@ Jev · 1,057 judgments · 0% cached · 5 requests · 0 retries · 1.3 s Jev · $
 Jev · once-per-row: 1,057 inserted = 1,057 missing · packs sum 1,057 · 0 duplicate keys
 ```
 
+- *Amended 2026-09-30:* "N judgments" counts distinct (test, state) pairs with a successful
+  judgment. Demo 04 printed the same quantity as "unique" (`1,300 judgments · 1,057 unique`), so
+  demo 05's 1,057 is comparable with demo 04's 1,057 unique, not with its 1,300. Rows that were
+  sent but not judged (oversized, failed packs) are reported separately
+  (`· U unjudged (E failed requests)`). The once-per-row line carries `LIVE` or `SIMULATED`.
 - `judgments` = tested rows with a successful judgment for this invocation's tests; `cached` = share
   that were not inserted this invocation; `requests` = packs this invocation; `s Jev` = span of
   pack timestamps (wall, not summed).
@@ -276,6 +309,11 @@ Jev · once-per-row: 1,057 inserted = 1,057 missing · packs sum 1,057 · 0 dupl
 to demo 04's (a test asserts it). `eval/golden_defects.csv` copied unchanged. The four `jev_expect`
 blocks are copied verbatim (sentences, context, thresholds, criteria). Staging SQL is ported to
 Spark only where the dialect differs (a test compares its row counts and key columns to demo 04).
+*Amended 2026-09-30:* seeds are loaded through `jevdbx.dbt_cli`, which keeps the surname "Null"
+(customer 477, a golden hard negative) as text. dbt-core's agate CSV reader would turn it into
+NULL and silently change the defect key. Also measured on the warehouse: in Databricks SQL `''`
+is **not** a quote escape (`'don''t need'` reads as two adjacent literals, `dont need`); the
+ported baselines use `\'`.
 Note: Spark's `to_json` omits NULL fields where DuckDB wrote `null`; tested and context columns
 are non-null in every seed, so states are identical.
 
@@ -318,6 +356,11 @@ reframe). The golden key, pools and baselines are never edited to make Jev win.
 - F1 above the demo 04 review lexicon baseline, ported to Spark SQL, not tuned.
 - Operational: 0 errors after retries; the three once-per-row checks pass; ledger tokens vs
   TypeSafe bill logged; rerun makes **0** requests; +5,000 new rows judges exactly 5,000.
+
+*Amended 2026-09-30:* `score.py --append` requires `--run` and a new, fully covering invocation of
+the scored tests (provenance must belong to the run being scored); a dbt run with errors is "not
+captured" and nothing is appended. The production gate stays **PENDING** (not PASS) until the
+audit is labelled and `--rerun` has run, because the rerun with 0 requests is a gate item.
 
 Every scored live run is appended to `docs/eval-results.md` with date, warehouse, budget,
 requests, retries, tokens, Jev cost, DBUs, wall time and the numbers.
@@ -372,7 +415,9 @@ Local dbt (uv) stays for development and tests. For the demo and the production 
 - `notebooks/jev_semantic_tests.py` (Databricks source-format notebook, serverless): `%pip install`
   the pinned `dbt-databricks`, write a `profiles.yml` at run time (host from the workspace, the
   warehouse HTTP path from a widget/lookup, the notebook's short-lived run token passed to the dbt
-  subprocess as an environment variable, never displayed), run `dbt build` for the chosen
+  subprocess as the environment variable `DBT_ENV_SECRET_DATABRICKS_TOKEN`, never displayed;
+  acquired from the SDK's notebook auth, with the notebook context's `apiToken` as a fallback,
+  never a PAT. *Amended 2026-09-30.*), run `dbt build` for the chosen
   selection and mode (widgets: `mode` demo|live, `selection` yardstick|production), then display
   the summary line, failing rows with `jev_p` and the scorecard.
 - `databricks.yml` (Databricks Asset Bundle): uploads the project and defines job
