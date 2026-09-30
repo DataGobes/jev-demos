@@ -34,6 +34,20 @@ def test_insert_packs_by_token_budget_and_row_cap(sql):
 
 
 @pytest.mark.slow
+def test_cache_read_is_scoped_to_this_question(sql):
+    # Unscoped, concurrent hooks (dbt threads) failed on the dev warehouse with
+    # DELTA_CONCURRENT_APPEND.ROW_LEVEL_CHANGES: every INSERT reads judgments, and Delta checks
+    # that read's predicate against rows other hooks append meanwhile. The key contains the
+    # question, so scoping the read to it changes no result and removes the conflict.
+    sections = _sections(sql)
+    question = re.search(r"x -> x\.state\), ('(?:[^'\\]|\\.)*')", sections["insert"]).group(1)
+    for name in ("count", "insert"):
+        read = re.search(r"left anti join \((.*?)\) done", sections[name], re.S).group(1)
+        assert read.split() == ["select", "key", "from", "jev_demo.jev.judgments", "where", "p",
+                                "is", "not", "null", "and", "question", "="] + question.split()
+
+
+@pytest.mark.slow
 def test_key_matches_the_test_macro(sql):
     ins = _sections(sql)["insert"]
     assert "sha2(concat_ws(chr(31), 'jev-1.13.0', 'live', 'nested', " in ins

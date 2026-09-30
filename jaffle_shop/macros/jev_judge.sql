@@ -41,7 +41,12 @@ missing as (
   select tested.key, tested.state,
          cast(ceil((length(tested.state) + {{ question | length }}) / 3.0) + 20 as bigint) as est
   from tested
-  left anti join (select key from {{ judgments }} where p is not null) done
+  {#- `question = ...` changes no result (the key contains the question). It scopes this read so
+      that Delta row-level concurrency does not treat other hooks' concurrent appends (other
+      questions, other dbt threads) as conflicts: DELTA_CONCURRENT_APPEND.ROW_LEVEL_CHANGES. #}
+  left anti join (
+    select key from {{ judgments }} where p is not null and question = {{ jev_sql_string(question) }}
+  ) done
     on done.key = tested.key
 )
   {%- endset -%}
