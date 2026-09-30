@@ -304,3 +304,73 @@ def test_show_never_puts_a_live_banner_over_stale_stored_failures(monkeypatch):
     assert run is None
     banner = show.score.simulated_banner(run)
     assert banner is not None and "LIVE" not in banner
+
+
+# ---------------------------------------------------------------------------
+# production: the last logged production entry, verbatim (recording beat 7)
+# ---------------------------------------------------------------------------
+
+LOG = """# Eval results
+
+## Reference: demo 04
+
+### live/pack=64/nested (logged 2026-09-26T15:15:33Z)
+
+| a | b |
+
+## Runs
+
+## 2026-10-02T10:00:00Z · live/budget=48k
+
+Jev · yardstick
+
+## 2026-10-02T11:00:00Z · production live/budget=48k
+
+first production block
+
+## 2026-10-02T12:00:00Z · live/budget=48k
+
+Jev · yardstick again
+
+## 2026-10-02T13:00:00Z · production live/budget=48k
+
+Jev · 100,000 judgments · 100% cached · 0 requests
+- judged in invocation i1: 94,000 states · 400 requests · $0.52
+
+**Gate: PASS**
+"""
+
+
+def test_last_production_block_is_verbatim_and_the_newest():
+    block = show.last_production_block(LOG)
+    assert block.startswith("## 2026-10-02T13:00:00Z · production live/budget=48k\n")
+    assert "- judged in invocation i1: 94,000 states · 400 requests · $0.52" in block
+    assert block.rstrip().endswith("**Gate: PASS**")
+    assert "first production block" not in block and "yardstick" not in block
+
+
+def test_last_production_block_stops_at_the_next_entry():
+    two = LOG.replace("**Gate: PASS**\n", "**Gate: PASS**\n\n## 2026-10-03T00:00:00Z · live/b\n")
+    assert "2026-10-03" not in show.last_production_block(two)
+
+
+def test_last_production_block_none_without_a_production_entry():
+    assert show.last_production_block("# Eval results\n\n## Runs\n\nnothing yet\n") is None
+
+
+def test_render_production_prints_the_block_or_says_there_is_none(tmp_path):
+    from io import StringIO
+
+    from rich.console import Console
+
+    log = tmp_path / "eval-results.md"
+    extra = "**Gate: PASS**\n- `t`: flagged = [3], [bold]x[/bold]"
+    log.write_text(LOG.replace("**Gate: PASS**", extra))
+    out = StringIO()
+    assert show.render_production(Console(file=out, width=90), log) == 0
+    # verbatim: no Rich markup interpretation
+    assert "$0.52" in out.getvalue() and "flagged = [3], [bold]x[/bold]" in out.getvalue()
+    log.write_text("# Eval results\n")
+    out = StringIO()
+    assert show.render_production(Console(file=out, width=90), log) == 1
+    assert "no logged production run" in out.getvalue()

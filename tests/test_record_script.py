@@ -54,3 +54,16 @@ def test_notebook_production_beat_names_the_production_warehouse():
 def test_notebook_yardstick_beat_uses_the_job_default_warehouse():
     cmd = next(ln for ln in _notebook_beat("yardstick").splitlines() if ln.startswith("CMD:"))
     assert "selection=yardstick" in cmd and "warehouse=" not in cmd
+
+
+def test_beat7_shows_the_logged_production_entry_then_the_rerun():
+    # F6: the rerun is fully cached ($0), so cost and throughput come from the logged entry
+    # (docs/eval-results.md); the live rerun is shown only for its 0 requests.
+    text = SCRIPT.read_text()
+    beat7 = text.split("# Beat 7", 1)[1]
+    assert "score.py --production" not in beat7
+    logged = beat7.index("python scripts/show.py production")
+    rerun = beat7.index("dbt build --vars '{production: true, jev_max_concurrency: 2}'")
+    assert logged < rerun
+    assert "0 requests" in beat7[rerun:]
+    assert "logged" in beat7[logged:rerun]

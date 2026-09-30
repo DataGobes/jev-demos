@@ -5,10 +5,11 @@ phone clip: each subcommand fits one screen at roughly 90 columns x 30 rows.
     uv run python scripts/show.py rows     # one planted-defect example row per test
     uv run python scripts/show.py score    # compact Jev-vs-regex scorecard
     uv run python scripts/show.py function # DESCRIBE FUNCTION EXTENDED of the Jev function
+    uv run python scripts/show.py production  # the last logged production entry, verbatim
 
 Companion to `scripts/score.py` (the full precision/recall table this reuses). Never truncates
 text: rows and tests wrap instead. Stored failures are read from
-jev_demo.jaffle_shop_dbt_test__audit; `tests` needs no connection.
+jev_demo.jaffle_shop_dbt_test__audit; `tests` and `production` need no connection.
 """
 
 from __future__ import annotations
@@ -16,6 +17,7 @@ from __future__ import annotations
 import argparse
 import importlib.util
 import os
+import re
 from pathlib import Path
 
 import yaml
@@ -331,6 +333,37 @@ def render_function(console: Console, sql, name: str | None = None) -> int:
 
 
 # ---------------------------------------------------------------------------
+# production (the logged entry)
+# ---------------------------------------------------------------------------
+
+_ENTRY = re.compile(r"^## ", re.M)
+_PRODUCTION_ENTRY = re.compile(r"^## \S+ · production ", re.M)
+
+
+def last_production_block(text: str) -> str | None:
+    """The newest `## <timestamp> · production ...` entry of docs/eval-results.md, verbatim up to
+    the next `## ` heading (pure). The recording shows it for cost and throughput: the live rerun
+    on camera is fully cached, so its own cost line is $0."""
+    starts = [m.start() for m in _PRODUCTION_ENTRY.finditer(text)]
+    if not starts:
+        return None
+    start = starts[-1]
+    nxt = _ENTRY.search(text, start + 3)
+    return text[start:nxt.start() if nxt else len(text)].rstrip() + "\n"
+
+
+def render_production(console: Console, path: Path = score.DOCS_PATH) -> int:
+    block = last_production_block(path.read_text()) if path.exists() else None
+    if block is None:
+        console.print(f"no logged production run in {path.name} yet "
+                      "(scripts/score.py --production --run --mode live --append)")
+        return 1
+    console.print(f"[dim]> {path.name}: the logged production run[/dim]")
+    console.print(block, markup=False, highlight=False, soft_wrap=True)
+    return 0
+
+
+# ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
 
@@ -342,12 +375,15 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("rows", help="one planted-defect example row per test")
     sub.add_parser("score", help="compact Jev-vs-regex scorecard")
     sub.add_parser("function", help="DESCRIBE FUNCTION EXTENDED of the Jev function")
+    sub.add_parser("production", help="the last logged production entry in docs/eval-results.md")
     args = parser.parse_args(argv)
 
     console = Console()
     if args.command == "tests":
         render_tests(console)
         return 0
+    if args.command == "production":
+        return render_production(console)
 
     from jevdbx.databricks import Sql
 
