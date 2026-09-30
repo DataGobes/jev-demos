@@ -4,6 +4,7 @@ The functions' Python bodies are the real modules jevdbx.noul_pack and jevdbx.de
 verbatim plus a short shim that binds their injected dependencies to the UC runtime.
 """
 
+import json
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -124,6 +125,36 @@ def platform_statements(t: Target | None = None) -> list[tuple[str, str]]:
         ("noul_pack_demo", demo_function_sql(t)),
         ("noul_pack", live_function_sql(t)),
     ]
+
+
+# --smoke: one fixed 2-row call of a deployed function. For the live function this is a live Jev
+# call (billed by TypeSafe): confirm first. Record 1 contradicts its stars, record 2 matches.
+SMOKE_MODEL = "jev-1.13.0"  # the pinned dbt var jev_model (a test keeps them equal)
+SMOKE_RECORDS = (
+    json.dumps({"body": "Absolutely loved it, the best coffee I have had in years.", "stars": 1}),
+    json.dumps({"body": "Stale and bitter. I threw the bag away.", "stars": 1}),
+)
+SMOKE_QUESTION = json.dumps({
+    "instructions": "The overall sentiment of the review `record.body` clearly contradicts its "
+                    "`record.stars` rating (1 = very bad, 5 = excellent).",
+    "criteria": {"true": "A glowing text with 1-2 stars, or an angry text with 4-5 stars",
+                 "false": "Sentiment roughly matches the stars"},
+})
+
+
+def sql_string(value: str) -> str:
+    """A Databricks SQL string literal. `''` is not an escape there: quotes become `\\'` and
+    backslashes are doubled."""
+    return "'" + value.replace("\\", "\\\\").replace("'", "\\'") + "'"
+
+
+def smoke_sql(t: Target, function: str = "noul_pack") -> str:
+    """SELECT one call of `function` on SMOKE_RECORDS; the result is the function's JSON."""
+    if function not in ("noul_pack", "noul_pack_demo"):
+        raise ValueError(f"not a Jev function: {function!r}")
+    records = ", ".join(sql_string(r) for r in SMOKE_RECORDS)
+    return (f"SELECT {t.fq(function)}(array({records}), {sql_string(SMOKE_QUESTION)}, "
+            f"{sql_string(SMOKE_MODEL)}) AS result")
 
 
 def production_statements(catalog: str = "jev_demo") -> list[tuple[str, str]]:
