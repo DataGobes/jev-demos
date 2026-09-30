@@ -108,6 +108,7 @@ jev-demo-5/
 | secret `jev_demo.jev.typesafe_api_key` | the TypeSafe key | **the user** |
 | table `jev_demo.jev.judgments` (Delta) | cache + ledger | deploy |
 | view `jev_demo.jev.requests` | one row per pack | deploy |
+| table `jev_demo.jev.hook_runs` (Delta) | one row per (invocation, test): tested, missing, oversized, inserted, mode, model | deploy |
 | schema `jev_demo.jaffle_shop`, `jev_demo.jaffle_shop_dbt_test__audit` | dbt models, stored failures | dbt |
 | schema `jev_demo.production` + volume `raw` | production reviews (source files) | deploy (confirm-first) |
 
@@ -189,6 +190,12 @@ CREATE TABLE IF NOT EXISTS jev_demo.jev.judgments (
 `jev_demo.jev.requests` = one row per `pack_uuid` (rows, tokens, est tokens, attempts, error,
 timestamps, invocation_id, mode, answered_model).
 
+`jev_demo.jev.hook_runs` (amended 2026-09-30): the hook counts tested and missing states before its
+INSERT and inserted rows after it, writes one row per (invocation_id, test_name), and raises if
+inserted ≠ missing − oversized + oversized (i.e. every missing state got exactly one row). The
+summary line reads `hook_runs` and `requests` for the invocation, so it also works when every row
+was cached and nothing was inserted.
+
 ## 7. Packing and token budget
 
 - Per-row estimate: `ceil((length(state) + length(question_instructions_and_criteria)) / 3.0)
@@ -223,7 +230,8 @@ TypeSafe: 1,200 requests/min, 250k tokens/s, 64k tokens/request, all "adjusting 
   an integration test asserts `EXPLAIN` of the generated INSERT contains exactly one
   `EvalPython` operator.
 - Counted per invocation (on-run-end, printed with the summary, failing loudly if violated):
-  1. rows inserted = distinct missing states (computed before the insert and logged),
+  1. rows inserted = distinct missing states (counted by the hook before the insert, stored in
+     `hook_runs`, checked by the hook itself right after the insert),
   2. Σ `pack_rows` over the invocation's packs = rows inserted,
   3. every successful key appears exactly once in `judgments`.
 - Residual gap, stated honestly: a Spark task retry whose first attempt already reached Jev is
@@ -233,8 +241,11 @@ TypeSafe: 1,200 requests/min, 250k tokens/s, 64k tokens/request, all "adjusting 
 
 ## 10. Secrets and SIMULATED mode
 
-- Live mode needs only the UC secret. dbt authenticates to Databricks with OAuth (profile
-  `jev-demo-5`); no token in the repo, no `.env` with the TypeSafe key.
+- Live mode needs only the UC secret. dbt authenticates to Databricks with OAuth; no token in the
+  repo, no `.env` with the TypeSafe key. The workspace host and warehouse HTTP path come from
+  environment variables (`DATABRICKS_HOST`, `JEV_HTTP_PATH`), printed by `scripts/jev_env.py` from
+  the CLI profile `jev-demo-5` (host and warehouse only, never tokens), so the public repo does
+  not name the workspace.
 - `JEV_MODE=demo` (dbt var `jev_mode`, default `live`) switches the hook to
   `noul_pack_demo`. Demo rows carry `mode = 'demo'` in the key and the table, so they are never
   served as live cache hits.
@@ -265,6 +276,8 @@ Jev · once-per-row: 1,057 inserted = 1,057 missing · packs sum 1,057 · 0 dupl
 to demo 04's (a test asserts it). `eval/golden_defects.csv` copied unchanged. The four `jev_expect`
 blocks are copied verbatim (sentences, context, thresholds, criteria). Staging SQL is ported to
 Spark only where the dialect differs (a test compares its row counts and key columns to demo 04).
+Note: Spark's `to_json` omits NULL fields where DuckDB wrote `null`; tested and context columns
+are non-null in every seed, so states are identical.
 
 ### 12.2 Production (Amazon Fine Food Reviews)
 
@@ -276,6 +289,8 @@ Spark only where the dialect differs (a test compares its row counts and key col
 - Planted defects: ~3% of rows with original stars in {1, 2, 4, 5} get flipped across the pole
   (1↔5, 2↔4), seed 42. `eval/production_flips.csv` = `id, original_stars, planted_stars` (no text).
   3-star reviews are never flipped (their mismatch is ambiguous).
+- Production models are disabled unless `--vars '{production: true}'`, so yardstick commands
+  never touch the volume.
 - Loaded as Parquet into volume `jev_demo.production.raw`, exposed by
   `models/production/stg_product_reviews.sql` as `review_id, stars, body` (body = summary +
   text), so the demo 04 reviews sentence applies unchanged:
@@ -340,11 +355,14 @@ TDD with pytest, ruff, uv.
   staging models match demo 04's row counts.
 - `ruff check` clean.
 
-## 16. Confirm-first operations (never done without the user's OK)
+## 16. Confirm-first operations
 
-Deploying `jev_demo.jev` objects and the production schema/volume; dropping `jev_demo.spike`;
-creating `jev-demo-5-prod`; enabling `system.billing`; the dataset download; every live run and
-every integration run (warehouse time); anything with a cost. The user creates the secret.
+Standing OK (user, 2026-09-30): any query on the 2X-Small `jev-demo-5` warehouse, including
+deploying `jev_demo.jev` objects and demo-mode integration runs.
+
+Still confirm-first: every **live** Jev run (TypeSafe billing); the production schema/volume
+upload and `jev-demo-5-prod`; dropping `jev_demo.spike`; enabling `system.billing`; the dataset
+download. The user creates the secret.
 
 ## 17. Out of scope
 
