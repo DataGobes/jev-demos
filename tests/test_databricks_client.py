@@ -55,7 +55,7 @@ def test_dbt_env_returns_host_path_and_token(monkeypatch):
     assert env == {
         "DATABRICKS_HOST": "adb-1.azuredatabricks.net",
         "JEV_HTTP_PATH": "/sql/1.0/warehouses/wid9",
-        "DBT_DATABRICKS_TOKEN": "tok-123",
+        "DBT_ENV_SECRET_DATABRICKS_TOKEN": "tok-123",
     }
 
 

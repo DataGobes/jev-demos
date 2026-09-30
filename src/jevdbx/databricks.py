@@ -54,7 +54,7 @@ def dbt_env(
     return {
         "DATABRICKS_HOST": host,
         "JEV_HTTP_PATH": f"/sql/1.0/warehouses/{wid}",
-        "DBT_DATABRICKS_TOKEN": token,
+        "DBT_ENV_SECRET_DATABRICKS_TOKEN": token,
     }
 
 
