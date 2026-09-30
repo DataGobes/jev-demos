@@ -192,7 +192,7 @@ timestamps, invocation_id, mode, answered_model).
 
 `jev_demo.jev.hook_runs` (amended 2026-09-30): the hook counts tested and missing states before its
 INSERT and inserted rows after it, writes one row per (invocation_id, test_name), and raises if
-inserted ≠ missing − oversized + oversized (i.e. every missing state got exactly one row). The
+inserted ≠ missing (every missing state, oversized ones included, gets exactly one row). The
 summary line reads `hook_runs` and `requests` for the invocation, so it also works when every row
 was cached and nothing was inserted.
 
