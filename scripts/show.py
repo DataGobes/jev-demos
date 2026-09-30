@@ -186,9 +186,9 @@ def render_row_body(
 
 
 def current_run(sql):
-    """Provenance of the latest invocation of the yardstick tests, or None if none recorded."""
-    inv = score.latest_invocation(sql, list(score.TESTS))
-    return score.load_run(sql, inv, score.load_budget()) if inv else None
+    """Provenance of the latest invocation of the yardstick tests, or None when there is none or
+    it is partial (never shown as the scored run)."""
+    return score.current_run(sql, list(score.TESTS), score.load_budget())
 
 
 def render_rows(

@@ -54,6 +54,9 @@ PROD_TEST = "product_reviews_body_matches_stars"
 PROD_ID = "review_id"
 
 PRECISION_MIN = RECALL_MIN = 0.85
+PENDING_REASONS = {"audited precision: audit pending", "rerun not checked (use --rerun)"}
+_ANSI = re.compile(r"\x1b\[[0-9;]*m")
+_DONE = re.compile(r"Done\.\s.*?ERROR=(\d+)")
 _ONCE_RE = re.compile(r"once-per-row VIOLATED")
 _SAFE = re.compile(r"^[A-Za-z0-9_.-]+$")
 
@@ -61,6 +64,10 @@ _SAFE = re.compile(r"^[A-Za-z0-9_.-]+$")
 # ---------------------------------------------------------------------------------------------
 # pure: metrics
 # ---------------------------------------------------------------------------------------------
+
+
+class NotCaptured(ValueError):
+    """The scored run's provenance could not be established. Never append such a run."""
 
 
 @dataclass(frozen=True)
@@ -262,6 +269,13 @@ def gate(results: GateResults, run: Run | None) -> tuple[bool, list[str]]:
     return (len(reasons) == 0, reasons)
 
 
+def gate_word(ok: bool, reasons: list[str]) -> str:
+    """PASS, PENDING (only evidence still missing: audit labels, rerun check) or FAIL."""
+    if ok:
+        return "PASS"
+    return "PENDING" if reasons and all(r in PENDING_REASONS for r in reasons) else "FAIL"
+
+
 def refuse_append_if_simulated(run: Run | None) -> None:
     """No simulated number ever goes into docs/eval-results.md."""
     if run is None:
@@ -378,6 +392,45 @@ def labels_from_audit_sample(path: Path) -> tuple[int, int, dict[int, str]] | No
     return len(labels), total, labels
 
 
+@dataclass(frozen=True)
+class AuditLabels:
+    labels: dict[int, str] | None
+    source: str | None  # "sample" (data/production_audit.csv) | "labels" (committed file)
+    pending: str | None  # why the audit is pending, if it is
+
+
+def resolve_audit_labels(labels_path: Path, sample_path: Path) -> AuditLabels:
+    """The labels to score with. The hand-labelled sample wins when it is newer than the
+    committed labels file (a relabelled sample must not be shadowed by stale labels)."""
+    labels_path, sample_path = Path(labels_path), Path(sample_path)
+    have_labels = labels_path.exists()
+    sample = labels_from_audit_sample(sample_path)
+    newer = sample is not None and (
+        not have_labels or sample_path.stat().st_mtime > labels_path.stat().st_mtime)
+    if newer:
+        labelled, total, found = sample
+        if total == 0 or labelled < total:
+            return AuditLabels(None, None, f"{labelled} of {total} rows labelled in "
+                                           f"{sample_path.name}")
+        bad = {v for v in found.values() if v not in ("real", "ok")}
+        if bad:
+            raise ValueError(f"{sample_path.name}: label must be 'real' or 'ok', got {sorted(bad)}")
+        return AuditLabels(found, "sample", None)
+    if have_labels:
+        return AuditLabels(read_audit_labels(labels_path), "labels", None)
+    return AuditLabels(None, None, f"{sample_path.name} not found "
+                                   "(run scripts/audit_sample.py, label it)")
+
+
+def write_audit_labels(labels: dict[int, str], path: Path) -> None:
+    """The committed labels file: id and label only (no review text)."""
+    with open(path, "w", newline="") as f:
+        w = csv.writer(f, lineterminator="\n")
+        w.writerow(["id", "label"])
+        for i in sorted(labels):
+            w.writerow([i, labels[i]])
+
+
 def audit_for(flagged: set[int], planted: set[int], audit: dict[int, str]) -> dict[int, str]:
     """The labels that are about rows still flagged-but-unplanted."""
     unplanted = flagged - planted
@@ -427,7 +480,8 @@ def production_gate(
     m: ProductionMetrics, run: Run | None, rerun_requests: int | None
 ) -> tuple[bool, list[str]]:
     """Recall >= 0.85, audited precision >= 0.85, F1 above the lexicon baseline, 0 errors,
-    once-per-row OK and (when asked for) a rerun with 0 requests."""
+    once-per-row OK and a rerun with 0 requests. Without the rerun check (or the audit labels) the
+    gate is PENDING, never PASS."""
     reasons = _run_reasons(run)
     if m.recall < RECALL_MIN:
         reasons.append(f"recall on planted flips {m.recall:.2f} < 0.85")
@@ -442,7 +496,9 @@ def production_gate(
         reasons.append(
             f"Jev f1 {m.jev_raw.f1:.2f} does not beat baseline f1 {m.baseline.f1:.2f}"
         )
-    if rerun_requests:
+    if rerun_requests is None:
+        reasons.append("rerun not checked (use --rerun)")
+    elif rerun_requests:
         reasons.append(f"rerun made {rerun_requests} requests (expected 0)")
     return (len(reasons) == 0, reasons)
 
@@ -482,27 +538,63 @@ def load_budget() -> int:
     return int(vars_.get("jev_pack_token_budget", 0))
 
 
-def load_run(sql, invocation_id: str, budget: int) -> Run:
-    """Provenance of one dbt invocation. The id comes from hook_runs (a uuid)."""
+def require_new_invocation(before: str | None, after: str | None) -> str:
+    """The run we scored must be one this command started, not an older invocation."""
+    if after is None or after == before:
+        raise NotCaptured("no new invocation in hook_runs after the dbt build "
+                          "(the build judged nothing, or hook_runs was not written)")
+    return after
+
+
+def table_unjudged(sql, tests: list[str]) -> int:
+    """Rows with jev_p NULL, counted directly in each stored-failure table."""
+    total = 0
+    for test in tests:
+        res = _query(sql, f"select count_if(jev_p is null) from {AUDIT_SCHEMA}.{test}",
+                     f"{AUDIT_SCHEMA}.{test}")
+        total += int(res.rows[0][0])
+    return total
+
+
+def unjudged_consistent(ledger_states: int, table_rows: int) -> bool:
+    """Ledger unjudged counts states, tables count rows (rows repeat states): both are zero
+    together, and rows can't be fewer than the failed states."""
+    return (ledger_states == 0) == (table_rows == 0) and table_rows >= ledger_states
+
+
+def load_run(sql, invocation_id: str, budget: int, tests: list[str]) -> Run:
+    """Provenance of one dbt invocation, for exactly the scored `tests`. Raises NotCaptured if
+    the invocation's hook_runs do not cover every test or carry no valid mode."""
     inv = _lit(invocation_id)
+    names = _in_list(tests)
     h = _query(sql, (
-        "select count(*), coalesce(sum(tested), 0), coalesce(sum(missing), 0), "
+        "select count(distinct test_name), coalesce(sum(tested), 0), coalesce(sum(missing), 0), "
         "coalesce(sum(inserted), 0), coalesce(sum(oversized), 0), max(mode), max(requested_model) "
-        f"from {LEDGER}.hook_runs where invocation_id = {inv}"), "hook_runs").rows[0]
+        f"from {LEDGER}.hook_runs where invocation_id = {inv} and test_name in ({names})"),
+        "hook_runs").rows[0]
+    if int(h[0]) != len(tests):
+        raise NotCaptured(f"invocation {invocation_id} ran {int(h[0])} of {len(tests)} scored "
+                          "tests (partial invocation)")
+    mode = h[5]
+    if mode not in ("live", "demo"):
+        raise NotCaptured(f"hook_runs mode is {mode!r}, expected 'live' or 'demo'")
     r = _query(sql, (
         "select count(*), coalesce(sum(pack_tokens), 0), coalesce(sum(pack_est_tokens), 0), "
         "coalesce(sum(pack_rows), 0), coalesce(sum(greatest(attempts - 1, 0)), 0), "
         "coalesce(sum(greatest(size(filter(retry_statuses, s -> s = 429)), 0)), 0), "
         "count_if(error is not null), "
         "coalesce((unix_micros(max(finished_at)) - unix_micros(min(started_at))) / 1e6, 0), "
-        f"max(answered_model) from {LEDGER}.requests where invocation_id = {inv}"),
+        f"max(answered_model) from {LEDGER}.requests "
+        f"where invocation_id = {inv} and test_name in ({names})"),
         "requests").rows[0]
     j = _query(sql, (
-        f"select (select count_if(p is null) from {LEDGER}.judgments where invocation_id = {inv}), "
+        f"select (select count_if(p is null) from {LEDGER}.judgments "
+        f"where invocation_id = {inv} and test_name in ({names})), "
         f"(select count(*) from (select key from {LEDGER}.judgments where p is not null "
+        f"and mode = {_lit(mode)} and test_name in ({names}) "
         "group by key having count(*) > 1))"), "judgments").rows[0]
     return Run(
-        mode=h[5] or "live", requested_model=h[6] or "", answered_model=r[8],
+        mode=mode, requested_model=h[6] or "", answered_model=r[8],
         invocation_id=invocation_id, tested=int(h[1]), missing=int(h[2]), inserted=int(h[3]),
         oversized=int(h[4]), unjudged=int(j[0]), packs=int(r[0]), pack_rows=int(r[3]),
         tokens=int(r[1]), est_tokens=int(r[2]), retries=int(r[4]), throttled=int(r[5]),
@@ -510,26 +602,57 @@ def load_run(sql, invocation_id: str, budget: int) -> Run:
     )
 
 
+def current_run(sql, tests: list[str], budget: int) -> Run | None:
+    """The latest invocation of `tests` as a Run, or None if there is none or it is partial."""
+    inv = latest_invocation(sql, tests)
+    if inv is None:
+        return None
+    try:
+        return load_run(sql, inv, budget, tests)
+    except NotCaptured:
+        return None
+
+
 # ---------------------------------------------------------------------------------------------
 # running dbt
 # ---------------------------------------------------------------------------------------------
 
 
+def check_dbt_result(returncode: int, stdout: str, stderr: str) -> str:
+    """stdout of a dbt build that exited 0 and whose final line reports ERROR=0; otherwise
+    NotCaptured with the output tail."""
+    clean = _ANSI.sub("", stdout)
+    tail = f"\n--- stdout (tail) ---\n{clean[-4000:]}\n--- stderr (tail) ---\n{stderr[-4000:]}"
+    if returncode != 0:
+        raise NotCaptured(f"dbt build failed (exit status {returncode}){tail}")
+    done = _DONE.findall(clean)
+    if not done:
+        raise NotCaptured(f"dbt build printed no final 'Done.' line{tail}")
+    if int(done[-1]) > 0:
+        raise NotCaptured(f"dbt build ended with ERROR={done[-1]}{tail}")
+    return stdout
+
+
 def run_dbt(*, production: bool, mode: str | None) -> str:
-    """dbt build via scripts/dbtw.py; returns stdout. dbt exits non-zero on test errors; we only
-    fail here if the run did not get as far as its `Done.` line."""
+    """dbt build via scripts/dbtw.py; returns stdout, or raises NotCaptured (non-zero exit,
+    ERROR=n > 0 on dbt's final line, or no final line)."""
     env = {**os.environ, "DBT_SEND_ANONYMOUS_USAGE_STATS": "false"}
     if mode is not None:
         env["JEV_MODE"] = mode
     cmd = [sys.executable, str(ROOT / "scripts" / "dbtw.py"), *dbt_args(production)]
     result = subprocess.run(cmd, cwd=ROOT, env=env, capture_output=True, text=True)
-    if "Done." not in result.stdout:
-        raise SystemExit(
-            "dbt build produced no 'Done.' line; the run did not complete.\n"
-            f"--- stdout (tail) ---\n{result.stdout[-4000:]}\n"
-            f"--- stderr (tail) ---\n{result.stderr[-4000:]}"
-        )
-    return result.stdout
+    return check_dbt_result(result.returncode, result.stdout, result.stderr)
+
+
+def warehouse_name(sql, configured: str) -> str:
+    """The warehouse's name for the log: a configured id is resolved, never written."""
+    if not re.fullmatch(r"[0-9a-f]{12,}", configured):
+        return configured
+    for w in sql.client.warehouses.list():
+        if w.id == configured:
+            return w.name
+    raise SystemExit("cannot resolve the configured warehouse id to a warehouse name; "
+                     "set JEV_WAREHOUSE to the warehouse name")
 
 
 def _effective_mode(arg: str | None) -> str:
@@ -559,14 +682,11 @@ def _mode_budget(run: Run | None) -> str:
 
 
 def _print_gate(console: Console, ok: bool, reasons: list[str]) -> None:
-    if ok:
-        console.print("[bold green]GATE PASS[/bold green]")
-        return
-    pending = reasons == ["audited precision: audit pending"]
-    console.print("[bold yellow]GATE PENDING[/bold yellow]" if pending
-                  else "[bold red]GATE FAIL[/bold red]")
+    word = gate_word(ok, reasons)
+    colour = {"PASS": "green", "PENDING": "yellow", "FAIL": "red"}[word]
+    console.print(f"[bold {colour}]GATE {word}[/bold {colour}]")
     for reason in reasons:
-        console.print(f"[red]- {reason}[/red]")
+        console.print(f"[{colour}]- {reason}[/{colour}]")
 
 
 def _reference_lines(ref: dict, key: str) -> tuple[str, dict]:
@@ -609,13 +729,13 @@ def print_report(console: Console, results: GateResults, run: Run | None, ref: d
     cmp.add_column("Jev P/R", justify="right")
     cmp.add_column("04 P/R", justify="right")
     cmp.add_column("regex F1", justify="right")
-    cmp.add_column("04 F1", justify="right")
+    cmp.add_column("04 F1 (from P/R)", justify="right")
     for name, (jev, baseline) in results.items():
         t = r04["tests"].get(name)
         cmp.add_row(
             name, f"{jev.precision:.2f}/{jev.recall:.2f}",
             f"{t['jev']['precision']:.2f}/{t['jev']['recall']:.2f}" if t else "-",
-            f"{baseline.f1:.2f}", f"{t['baseline']['f1']:.2f}" if t else "-")
+            f"{baseline.f1:.2f}", f"{t['baseline']['f1_derived']:.2f}" if t else "-")
     console.print(cmp)
 
     if run is None:
@@ -670,7 +790,9 @@ def print_production_report(
         console.print(
             f"once-per-row {'OK' if run.once_per_row_ok else 'VIOLATED'} · {run.errors:,} errors"
             f" · {run.tokens:,} tokens (est/actual {run.est_ratio or 0:.2f})")
-    if rerun_requests is not None:
+    if rerun_requests is None:
+        console.print("rerun: not checked (use --rerun)")
+    else:
         console.print(f"rerun: {rerun_requests:,} requests (expected 0)")
     ok, reasons = production_gate(m, run, rerun_requests)
     _print_gate(console, ok, reasons)
@@ -717,7 +839,7 @@ def append_report(
             f"| {jev.hard_neg_flagged} | {baseline.precision:.2f} | {baseline.recall:.2f} "
             f"| {baseline.hard_neg_flagged} |")
     lines.append("")
-    gate_line = f"**Gate: {'PASS' if ok else 'FAIL'}**"
+    gate_line = f"**Gate: {gate_word(ok, reasons)}**"
     if not ok:
         gate_line += " — " + "; ".join(reasons)
     lines += [gate_line, ""]
@@ -751,7 +873,7 @@ def append_production_report(
         "- rerun requests " + ("not run" if rerun_requests is None else str(rerun_requests)),
         "",
     ]
-    gate_line = f"**Gate: {'PASS' if ok else 'FAIL'}**"
+    gate_line = f"**Gate: {gate_word(ok, reasons)}**"
     if not ok:
         gate_line += " — " + "; ".join(reasons)
     lines += [gate_line, ""]
@@ -763,54 +885,46 @@ def append_production_report(
 # ---------------------------------------------------------------------------------------------
 
 
-def _audit_labels(console: Console) -> dict[int, str] | None:
-    labels = read_audit_labels(LABELS_PATH)
-    if labels is not None:
-        return labels
-    sample = labels_from_audit_sample(AUDIT_SAMPLE_PATH)
-    if sample is None:
-        console.print(f"[yellow]audit pending: {AUDIT_SAMPLE_PATH.relative_to(ROOT)} not found "
-                      "(run scripts/audit_sample.py, label it)[/yellow]")
-        return None
-    labelled, total, found = sample
-    if total == 0 or labelled < total:
-        console.print(f"[yellow]audit pending: {labelled} of {total} rows labelled in "
-                      f"{AUDIT_SAMPLE_PATH.relative_to(ROOT)}[/yellow]")
-        return None
-    bad = {v for v in found.values() if v not in ("real", "ok")}
-    if bad:
-        raise SystemExit(f"{AUDIT_SAMPLE_PATH}: label must be 'real' or 'ok', got {sorted(bad)}")
-    with open(LABELS_PATH, "w", newline="") as f:
-        w = csv.writer(f, lineterminator="\n")
-        w.writerow(["id", "label"])
-        for i in sorted(found):
-            w.writerow([i, found[i]])
-    console.print(f"wrote {LABELS_PATH.relative_to(ROOT)} (id, label only): commit it")
-    return found
-
-
 def _obtain_run(sql, args, tests: list[str], console: Console, *, production: bool):
-    """Optionally (--fresh, --run) run dbt, then read the provenance of the latest invocation.
-    Returns (run, rerun_requests)."""
+    """Optionally (--run) run dbt, then read the provenance of the invocation this run made.
+
+    Returns (run, rerun_requests). `run` is None ("not captured", reason on stderr) unless the
+    run was started here, left a new invocation, covers every scored test and is in the
+    requested mode. A failing --rerun raises NotCaptured."""
     mode = args.mode
     violated = False
-    if args.run:
-        if args.fresh:
-            res = sql.run(fresh_sql(_effective_mode(mode), tests))
-            if res.state != "SUCCEEDED":
-                raise SystemExit(f"--fresh failed: {res.error}")
-        violated = dbt_reported_violation(run_dbt(production=production, mode=mode))
-    inv = latest_invocation(sql, tests)
-    run = load_run(sql, inv, load_budget()) if inv else None
-    if run is not None and violated:
-        run = replace(run, dbt_reported_violation=True)
+    try:
+        if args.run:
+            before = latest_invocation(sql, tests)
+            if args.fresh:
+                res = sql.run(fresh_sql(_effective_mode(mode), tests))
+                if res.state != "SUCCEEDED":
+                    raise SystemExit(f"--fresh failed: {res.error}")
+            violated = dbt_reported_violation(run_dbt(production=production, mode=mode))
+            inv = require_new_invocation(before, latest_invocation(sql, tests))
+        else:
+            inv = latest_invocation(sql, tests)
+        run = load_run(sql, inv, load_budget(), tests) if inv else None
+        if run is not None:
+            if args.run and run.mode != _effective_mode(mode):
+                raise NotCaptured(
+                    f"hook_runs mode is {run.mode!r} but this run was started in "
+                    f"{_effective_mode(mode)!r}")
+            rows = table_unjudged(sql, tests)
+            if not unjudged_consistent(run.unjudged, rows):
+                raise NotCaptured(
+                    f"unjudged mismatch: the ledger has {run.unjudged} unjudged states, the "
+                    f"stored-failure tables {rows} rows with jev_p NULL")
+            if violated:
+                run = replace(run, dbt_reported_violation=True)
+    except NotCaptured as e:
+        print(f"run not captured: {e}", file=sys.stderr)
+        return None, None
     rerun_requests = None
-    if args.run and args.rerun:
+    if args.run and args.rerun and run is not None:
         run_dbt(production=production, mode=mode)
-        inv2 = latest_invocation(sql, tests)
-        if inv2 is None or inv2 == (run.invocation_id if run else None):
-            raise SystemExit("--rerun: the second build left no new invocation in hook_runs")
-        rerun_requests = load_run(sql, inv2, load_budget()).packs
+        inv2 = require_new_invocation(run.invocation_id, latest_invocation(sql, tests))
+        rerun_requests = load_run(sql, inv2, load_budget(), tests).packs
     return run, rerun_requests
 
 
@@ -825,35 +939,58 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--production", action="store_true", help="score the production run")
     parser.add_argument("--rerun", action="store_true",
                         help="with --run: build again and require 0 requests")
-    parser.add_argument("--append", action="store_true", help="append to docs/eval-results.md")
+    parser.add_argument("--append", action="store_true",
+                        help="with --run: append to docs/eval-results.md (LIVE runs only)")
     args = parser.parse_args(argv)
-    if (args.fresh or args.rerun) and not args.run:
-        parser.error("--fresh and --rerun need --run")
+    if (args.fresh or args.rerun or args.append) and not args.run:
+        parser.error("--fresh, --rerun and --append need --run "
+                     "(a recorded result must come from the run scored here)")
 
     console = Console()
     sql = Sql()
-    warehouse = os.environ.get("JEV_WAREHOUSE", DEFAULT_WAREHOUSE)
+    warehouse = (warehouse_name(sql, os.environ.get("JEV_WAREHOUSE", DEFAULT_WAREHOUSE))
+                 if args.append else None)
     ref = load_demo04_reference()
 
-    if args.production:
-        if not FLIPS_PATH.exists():
-            print(f"Missing {FLIPS_PATH.relative_to(ROOT)}: run scripts/fetch_reviews.py first",
-                  file=sys.stderr)
-            return 2
-        with open(FLIPS_PATH, newline="") as f:
-            planted = {int(r["id"]) for r in csv.DictReader(f)}
-        run, rerun_requests = _obtain_run(sql, args, [PROD_TEST], console, production=True)
-        flagged = load_flagged(sql, PROD_TEST, PROD_ID, judged_only=True)
-        baseline = load_flagged(sql, f"baseline_{PROD_TEST}", PROD_ID)
-        labels = _audit_labels(console)
-        audit = audit_for(flagged, planted, labels) if labels is not None else None
-        m = production_metrics(flagged, planted, baseline, audit)
-        print_production_report(console, m, run, rerun_requests)
-        if args.append:
-            append_production_report(DOCS_PATH, m, run, warehouse, rerun_requests)
-            console.print(f"Appended run to {DOCS_PATH.relative_to(ROOT)}")
-        return 0
+    try:
+        if args.production:
+            return _main_production(console, sql, args, warehouse)
+        return _main_yardstick(console, sql, args, warehouse, ref)
+    except NotCaptured as e:
+        print(f"run not captured: {e}", file=sys.stderr)
+        return 1
 
+
+def _main_production(console: Console, sql, args, warehouse: str | None) -> int:
+    if not FLIPS_PATH.exists():
+        print(f"Missing {FLIPS_PATH.relative_to(ROOT)}: run scripts/fetch_reviews.py first",
+              file=sys.stderr)
+        return 2
+    with open(FLIPS_PATH, newline="") as f:
+        planted = {int(r["id"]) for r in csv.DictReader(f)}
+    run, rerun_requests = _obtain_run(sql, args, [PROD_TEST], console, production=True)
+    flagged = load_flagged(sql, PROD_TEST, PROD_ID, judged_only=True)
+    baseline = load_flagged(sql, f"baseline_{PROD_TEST}", PROD_ID)
+    try:
+        audit_labels = resolve_audit_labels(LABELS_PATH, AUDIT_SAMPLE_PATH)
+    except ValueError as e:
+        raise SystemExit(str(e)) from None
+    if audit_labels.pending:
+        console.print(f"[yellow]audit pending: {audit_labels.pending}[/yellow]")
+    audit = (audit_for(flagged, planted, audit_labels.labels)
+             if audit_labels.labels is not None else None)
+    m = production_metrics(flagged, planted, baseline, audit)
+    print_production_report(console, m, run, rerun_requests)
+    if args.append:
+        append_production_report(DOCS_PATH, m, run, warehouse, rerun_requests)
+        console.print(f"Appended run to {DOCS_PATH.relative_to(ROOT)}")
+        if audit_labels.source == "sample":
+            write_audit_labels(audit_labels.labels, LABELS_PATH)
+            console.print(f"wrote {LABELS_PATH.relative_to(ROOT)} (id, label only): commit it")
+    return 0
+
+
+def _main_yardstick(console: Console, sql, args, warehouse: str | None, ref: dict) -> int:
     golden = load_golden(GOLDEN_PATH)
     run, _ = _obtain_run(sql, args, list(TESTS), console, production=False)
     results: GateResults = {}

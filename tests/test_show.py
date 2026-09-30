@@ -216,3 +216,14 @@ def test_shipped_schema_has_the_four_yardstick_tests_and_score_knows_their_ids()
     assert {t["name"] for t in tests} == set(show.score.TESTS)
     assert show.FEATURED_TEST in show.score.TESTS
     assert set(show.SHORT_NAMES) == set(show.score.TESTS)
+
+
+def test_current_run_does_not_show_a_partial_invocation_as_the_scored_run(monkeypatch):
+    monkeypatch.setattr(show.score, "load_budget", lambda: 48_000)
+    sql = FakeSql({
+        "order by recorded_at desc limit 1": Result("SUCCEEDED", rows=[["inv"]]),
+        "from jev_demo.jev.hook_runs": Result("SUCCEEDED", rows=[
+            ["3", "10", "10", "10", "0", "live", "jev-1.13.0"]]),
+    })
+    assert show.current_run(sql) is None
+    assert "SIMULATED" in show.score.simulated_banner(show.current_run(sql))

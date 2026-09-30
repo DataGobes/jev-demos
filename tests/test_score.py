@@ -232,18 +232,87 @@ def test_latest_invocation_none_when_no_hook_runs():
     assert score.latest_invocation(sql, ["a"]) is None
 
 
-def test_load_run_assembles_provenance_from_ledger_tables():
-    sql = FakeSql({
+TESTS4 = list(score.TESTS)
+
+
+def ledger_sql(distinct_tests="4", mode="demo", dups="0", unjudged="0"):
+    return FakeSql({
         "from jev_demo.jev.hook_runs": Result("SUCCEEDED", rows=[
-            ["3", "1057", "1057", "1057", "0", "demo", "jev-1.13.0"]]),
+            [distinct_tests, "1057", "1057", "1057", "0", mode, "jev-1.13.0"]]),
         "from jev_demo.jev.requests": Result("SUCCEEDED", rows=[
             ["5", "31000", "30000", "1057", "2", "1", "0", "1.3", "jev-1.13.0"]]),
-        "from jev_demo.jev.judgments where invocation_id": Result("SUCCEEDED", rows=[["0", "0"]]),
+        "from jev_demo.jev.judgments where invocation_id": Result(
+            "SUCCEEDED", rows=[[unjudged, dups]]),
     })
-    r = score.load_run(sql, "inv-1", budget=48_000)
+
+
+def test_load_run_assembles_provenance_from_ledger_tables():
+    r = score.load_run(ledger_sql(), "inv-1", 48_000, TESTS4)
     assert r.mode == "demo" and r.simulated and r.judgments == 1057
     assert (r.packs, r.tokens, r.est_tokens, r.retries, r.throttled) == (5, 31000, 30000, 2, 1)
     assert r.answered_model == "jev-1.13.0" and r.span_s == 1.3 and r.budget == 48_000
+
+
+def test_load_run_queries_are_scoped_to_the_scored_tests_and_mode():
+    sql = ledger_sql()
+    score.load_run(sql, "inv-1", 48_000, TESTS4)
+    for q in sql.seen:
+        assert "test_name in ('customers_full_name_is_a_person'" in q, q
+    dups_q = next(q for q in sql.seen if "having count(*) > 1" in q)
+    assert "mode = 'demo'" in dups_q
+
+
+def test_load_run_partial_coverage_is_not_captured():
+    with pytest.raises(score.NotCaptured, match="3 of 4"):
+        score.load_run(ledger_sql(distinct_tests="3"), "inv-1", 48_000, TESTS4)
+
+
+@pytest.mark.parametrize("mode", [None, "", "simulated"])
+def test_load_run_without_a_valid_mode_raises_instead_of_defaulting_to_live(mode):
+    sql = ledger_sql()
+    sql.answers["from jev_demo.jev.hook_runs"] = Result("SUCCEEDED", rows=[
+        ["4", "1057", "1057", "1057", "0", mode, "jev-1.13.0"]])
+    with pytest.raises(score.NotCaptured, match="mode"):
+        score.load_run(sql, "inv-1", 48_000, TESTS4)
+
+
+def test_not_captured_is_a_value_error():
+    assert issubclass(score.NotCaptured, ValueError)
+
+
+def test_require_new_invocation():
+    assert score.require_new_invocation("old", "new") == "new"
+    assert score.require_new_invocation(None, "new") == "new"
+    with pytest.raises(score.NotCaptured, match="no new invocation"):
+        score.require_new_invocation("old", "old")
+    with pytest.raises(score.NotCaptured, match="no new invocation"):
+        score.require_new_invocation(None, None)
+
+
+def test_check_dbt_result():
+    done = "12:00:00  Done. PASS=30 WARN=3 ERROR=0 SKIP=0 NO-OP=0 TOTAL=33\n"
+    assert score.check_dbt_result(0, done, "") == done
+    with pytest.raises(score.NotCaptured, match="exit status 1") as e:
+        score.check_dbt_result(1, done, "boom on stderr")
+    assert "boom on stderr" in str(e.value) and "PASS=30" in str(e.value)
+    with pytest.raises(score.NotCaptured, match="ERROR=2"):
+        score.check_dbt_result(0, "\x1b[0mDone. PASS=3 WARN=0 ERROR=2 SKIP=0 TOTAL=5\n", "")
+    with pytest.raises(score.NotCaptured, match="Done"):
+        score.check_dbt_result(0, "no final line", "")
+
+
+def test_unjudged_consistency_between_ledger_states_and_table_rows():
+    assert score.unjudged_consistent(0, 0)
+    assert score.unjudged_consistent(3, 5)  # rows repeat states
+    assert not score.unjudged_consistent(0, 2)  # table shows unjudged rows the ledger never saw
+    assert not score.unjudged_consistent(2, 0)
+    assert not score.unjudged_consistent(5, 3)  # more failed states than rows is impossible
+
+
+def test_table_unjudged_counts_null_scores_in_each_stored_failure_table():
+    sql = FakeSql({"count_if(jev_p is null)": Result("SUCCEEDED", rows=[["2"]])})
+    assert score.table_unjudged(sql, ["a", "b"]) == 4
+    assert all("jaffle_shop_dbt_test__audit." in q for q in sql.seen)
 
 
 # -- dbt command / fresh / queries -------------------------------------------------------------
@@ -354,8 +423,18 @@ def test_production_gate_reasons():
 
 def test_production_gate_pending_audit_is_not_a_pass():
     m = score.production_metrics(**prod_inputs(audit=None))
-    ok, reasons = score.production_gate(m, live_run(), rerun_requests=None)
+    ok, reasons = score.production_gate(m, live_run(), rerun_requests=0)
     assert not ok and reasons == ["audited precision: audit pending"]
+
+
+def test_production_gate_is_pending_without_the_rerun_check():
+    m = score.production_metrics(**prod_inputs())
+    ok, reasons = score.production_gate(m, live_run(), rerun_requests=None)
+    assert not ok and reasons == ["rerun not checked (use --rerun)"]
+    assert score.gate_word(ok, reasons) == "PENDING"
+    assert score.gate_word(True, []) == "PASS"
+    assert score.gate_word(False, ["run was not LIVE"]) == "FAIL"
+    assert score.gate_word(False, ["rerun not checked (use --rerun)", "run was not LIVE"]) == "FAIL"
 
 
 def test_production_gate_f1_must_beat_baseline():
@@ -450,7 +529,7 @@ def test_audit_for_keeps_only_labels_of_still_flagged_unplanted_rows():
     assert score.audit_for(set(), set(), labels) == {}
 
 
-# -- rendering (smoke: no crash, honest labels) ---------------------------------------------------
+# -- rendering (smoke: no crash, honest labels) ------------------------------------------------
 
 
 def _render(fn, *args):
@@ -463,7 +542,7 @@ def _render(fn, *args):
 
 def test_print_production_report_pending_and_audited():
     pending = score.production_metrics(**prod_inputs(audit=None))
-    text = _render(score.print_production_report, pending, live_run(), None)
+    text = _render(score.print_production_report, pending, live_run(), 0)
     assert "audit pending" in text and "GATE PENDING" in text and "SIMULATED" not in text
     audited = score.production_metrics(**prod_inputs())
     text = _render(score.print_production_report, audited, live_run(), 0)
@@ -483,5 +562,222 @@ def test_print_report_compares_with_demo04_and_labels_unique_states():
                                                           pack_rows=5, packs=1), ref)
     assert "vs demo 04 (live/pack=64/nested)" in text
     assert "unique states" in text and "18 requests" in text
+    assert "04 F1 (from P/R)" in text
     sim = _render(score.print_report, results, score.Run(mode="demo"), ref)
     assert "SIMULATED" in sim
+
+
+def test_print_production_report_without_rerun_is_pending():
+    m = score.production_metrics(**prod_inputs())
+    text = _render(score.print_production_report, m, live_run(), None)
+    assert "GATE PENDING" in text and "rerun not checked (use --rerun)" in text
+    assert "GATE PASS" not in text
+
+
+def test_append_production_report_records_pending_when_rerun_not_checked(tmp_path):
+    path = tmp_path / "eval-results.md"
+    m = score.production_metrics(**prod_inputs())
+    score.append_production_report(path, m, live_run(tested=1, missing=1, inserted=1,
+                                                     pack_rows=1), warehouse="w",
+                                   rerun_requests=None)
+    text = path.read_text()
+    assert "**Gate: PENDING**" in text and "PASS" not in text.split("**Gate")[1]
+
+
+def test_demo04_reference_marks_f1_as_derived():
+    ref = score.load_demo04_reference()
+    for run in ref["runs"].values():
+        for t in run["tests"].values():
+            for side in ("jev", "baseline"):
+                assert "f1" not in t[side] and "f1_derived" in t[side]
+
+
+# -- R15: provenance belongs to the scored run -------------------------------------------------
+
+
+class Args:
+    def __init__(self, **kw):
+        self.run, self.fresh, self.rerun, self.mode = True, False, False, None
+        self.__dict__.update(kw)
+
+
+class SeqSql:
+    """A warehouse whose hook_runs latest-invocation answers follow a script."""
+
+    def __init__(self, latest, *, distinct="4", mode="demo", table_unjudged="0", unjudged="0"):
+        self.latest = list(latest)
+        self.fixed = ledger_sql(distinct_tests=distinct, mode=mode, unjudged=unjudged)
+        self.fixed.answers["count_if(jev_p is null)"] = Result(
+            "SUCCEEDED", rows=[[table_unjudged]])
+        self.seen = self.fixed.seen
+
+    def run(self, sql, timeout_s=900):
+        if "order by recorded_at desc limit 1" in sql:
+            self.seen.append(sql)
+            inv = self.latest.pop(0)
+            return Result("SUCCEEDED", rows=[[inv]] if inv else [])
+        return self.fixed.run(sql, timeout_s)
+
+
+@pytest.fixture
+def dbt_calls(monkeypatch):
+    calls = []
+
+    def fake(*, production, mode):
+        calls.append((production, mode))
+        return "Done. PASS=1 WARN=0 ERROR=0 SKIP=0 TOTAL=1\n"
+
+    monkeypatch.setattr(score, "run_dbt", fake)
+    monkeypatch.setattr(score, "load_budget", lambda: 48_000)
+    monkeypatch.setenv("JEV_MODE", "demo")
+    return calls
+
+
+def obtain(sql, args, **kw):
+    from rich.console import Console
+
+    return score._obtain_run(sql, args, TESTS4, Console(record=True), production=False, **kw)
+
+
+def test_obtain_run_takes_the_new_invocation_of_this_run(dbt_calls):
+    sql = SeqSql(["old", "new"])
+    run, rerun = obtain(sql, Args())
+    assert run.invocation_id == "new" and rerun is None and dbt_calls == [(False, None)]
+
+
+def test_obtain_run_rejects_a_stale_invocation(dbt_calls, capsys):
+    sql = SeqSql(["same", "same"])
+    run, _ = obtain(sql, Args())
+    assert run is None
+    assert "no new invocation" in capsys.readouterr().err
+
+
+def test_obtain_run_rejects_partial_test_coverage(dbt_calls, capsys):
+    run, _ = obtain(SeqSql(["old", "new"], distinct="3"), Args())
+    assert run is None and "3 of 4" in capsys.readouterr().err
+
+
+def test_obtain_run_rejects_a_mode_other_than_the_one_requested(dbt_calls, capsys):
+    run, _ = obtain(SeqSql(["old", "new"], mode="demo"), Args(mode="live"))
+    assert run is None and "mode" in capsys.readouterr().err
+
+
+def test_obtain_run_reports_dbt_failure_as_not_captured(monkeypatch, capsys):
+    def boom(*, production, mode):
+        raise score.NotCaptured("dbt build ended with ERROR=1\n--- stdout (tail) ---\nxyz")
+
+    monkeypatch.setattr(score, "run_dbt", boom)
+    monkeypatch.setattr(score, "load_budget", lambda: 48_000)
+    run, _ = obtain(SeqSql(["old", "new"]), Args())
+    err = capsys.readouterr().err
+    assert run is None and "ERROR=1" in err and "xyz" in err
+
+
+def test_obtain_run_unjudged_mismatch_with_the_stored_tables_is_not_captured(dbt_calls, capsys):
+    run, _ = obtain(SeqSql(["old", "new"], table_unjudged="3", unjudged="0"), Args())
+    assert run is None and "unjudged" in capsys.readouterr().err
+    ok, _ = obtain(SeqSql(["old", "new"], table_unjudged="3", unjudged="2"), Args())
+    assert ok is not None and ok.unjudged == 2
+
+
+def test_obtain_run_without_run_flag_uses_latest_and_does_not_run_dbt(dbt_calls):
+    run, _ = obtain(SeqSql(["latest"]), Args(run=False))
+    assert run.invocation_id == "latest" and dbt_calls == []
+
+
+def test_obtain_run_rerun_needs_its_own_new_invocation(dbt_calls, capsys):
+    # second build leaves no new invocation -> the rerun check cannot pass
+    with pytest.raises(score.NotCaptured, match="no new invocation"):
+        obtain(SeqSql(["old", "new", "new"]), Args(rerun=True))
+
+
+def test_obtain_run_rerun_counts_the_second_builds_requests(dbt_calls):
+    run, rerun = obtain(SeqSql(["old", "new", "newer"]), Args(rerun=True))
+    assert run.invocation_id == "new" and rerun == 5 and len(dbt_calls) == 2
+
+
+def test_append_requires_run():
+    with pytest.raises(SystemExit) as e:
+        score.main(["--append"])
+    assert e.value.code == 2
+    with pytest.raises(SystemExit) as e:
+        score.main(["--production", "--append"])
+    assert e.value.code == 2
+
+
+def test_current_run_is_none_for_a_partial_invocation():
+    assert score.current_run(SeqSql(["inv"], distinct="3"), TESTS4, 48_000) is None
+    assert score.current_run(SeqSql([None]), TESTS4, 48_000) is None
+    assert score.current_run(SeqSql(["inv"]), TESTS4, 48_000).invocation_id == "inv"
+
+
+# -- warehouse name ----------------------------------------------------------------------------
+
+
+class FakeWarehouses:
+    def __init__(self, items):
+        self.items = items
+
+    def list(self):
+        from types import SimpleNamespace
+
+        return [SimpleNamespace(id=i, name=n) for i, n in self.items]
+
+
+class FakeClientSql:
+    def __init__(self, items):
+        from types import SimpleNamespace
+
+        self.client = SimpleNamespace(warehouses=FakeWarehouses(items))
+
+
+def test_warehouse_name_passes_names_through_and_resolves_ids():
+    sql = FakeClientSql([("0123456789abcdef", "jev-demo-5")])
+    assert score.warehouse_name(sql, "jev-demo-5") == "jev-demo-5"
+    assert score.warehouse_name(sql, "0123456789abcdef") == "jev-demo-5"
+    with pytest.raises(SystemExit, match="warehouse"):
+        score.warehouse_name(sql, "ffffffffffffffff")
+
+
+# -- audit labels: newest wins, written only on append -----------------------------------------
+
+
+def _sample(path, rows):
+    path.write_text("id,stars,body,label\n" + "".join(f"{i},1,x,{label}\n" for i, label in rows))
+
+
+def test_resolve_audit_labels_prefers_a_newer_sample(tmp_path):
+    import os
+
+    labels, sample = tmp_path / "labels.csv", tmp_path / "sample.csv"
+    labels.write_text("id,label\n1,ok\n")
+    _sample(sample, [(1, "real"), (2, "ok")])
+    os.utime(labels, (1_000, 1_000))
+    os.utime(sample, (2_000, 2_000))
+    got = score.resolve_audit_labels(labels, sample)
+    assert got.labels == {1: "real", 2: "ok"} and got.source == "sample" and got.pending is None
+    os.utime(sample, (500, 500))  # older sample: the committed labels win
+    got = score.resolve_audit_labels(labels, sample)
+    assert got.labels == {1: "ok"} and got.source == "labels"
+
+
+def test_resolve_audit_labels_pending_cases(tmp_path):
+    labels, sample = tmp_path / "labels.csv", tmp_path / "sample.csv"
+    got = score.resolve_audit_labels(labels, sample)
+    assert got.labels is None and "not found" in got.pending
+    _sample(sample, [(1, "real"), (2, "")])
+    got = score.resolve_audit_labels(labels, sample)
+    assert got.labels is None and "1 of 2" in got.pending
+
+
+def test_resolve_audit_labels_rejects_bad_labels_in_a_newer_sample(tmp_path):
+    labels, sample = tmp_path / "labels.csv", tmp_path / "sample.csv"
+    _sample(sample, [(1, "maybe")])
+    with pytest.raises(ValueError, match="label"):
+        score.resolve_audit_labels(labels, sample)
+
+
+def test_write_audit_labels_writes_id_and_label_only(tmp_path):
+    out = tmp_path / "labels.csv"
+    score.write_audit_labels({2: "ok", 1: "real"}, out)
+    assert out.read_text() == "id,label\n1,real\n2,ok\n"

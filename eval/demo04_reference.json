@@ -1,6 +1,6 @@
 {
   "source": "~/Projects/jev-demo-4/docs/eval-results.md (gated live runs; copied by hand, numbers as printed there)",
-  "note": "demo 04 prints 'N judgments · M unique': M is the number of distinct (test, state) pairs, which is what demo 05 calls 'judgments'. f1 is computed from the printed 2-decimal P and R (demo 04 does not print F1). precision/recall/hard_neg are as printed.",
+  "note": "demo 04 prints 'N judgments · M unique': M is the number of distinct (test, state) pairs, which is what demo 05 calls 'judgments'. f1_derived is computed from the printed 2-decimal P and R (demo 04 does not print F1). precision/recall/hard_neg are as printed.",
   "compare_to": "live/pack=64/nested",
   "runs": {
     "live/pack=1": {
@@ -17,13 +17,13 @@
           "jev": {
             "precision": 0.96,
             "recall": 0.96,
-            "f1": 0.96,
+            "f1_derived": 0.96,
             "hard_neg": 1
           },
           "baseline": {
             "precision": 0.71,
             "recall": 0.6,
-            "f1": 0.65,
+            "f1_derived": 0.65,
             "hard_neg": 6
           }
         },
@@ -32,13 +32,13 @@
           "jev": {
             "precision": 1.0,
             "recall": 1.0,
-            "f1": 1.0,
+            "f1_derived": 1.0,
             "hard_neg": 0
           },
           "baseline": {
             "precision": 0.45,
             "recall": 0.75,
-            "f1": 0.56,
+            "f1_derived": 0.56,
             "hard_neg": 6
           }
         },
@@ -47,13 +47,13 @@
           "jev": {
             "precision": 1.0,
             "recall": 1.0,
-            "f1": 1.0,
+            "f1_derived": 1.0,
             "hard_neg": 0
           },
           "baseline": {
             "precision": 0.39,
             "recall": 0.92,
-            "f1": 0.55,
+            "f1_derived": 0.55,
             "hard_neg": 8
           }
         },
@@ -62,13 +62,13 @@
           "jev": {
             "precision": 1.0,
             "recall": 1.0,
-            "f1": 1.0,
+            "f1_derived": 1.0,
             "hard_neg": 0
           },
           "baseline": {
             "precision": 0.48,
             "recall": 0.86,
-            "f1": 0.62,
+            "f1_derived": 0.62,
             "hard_neg": 13
           }
         }
@@ -88,13 +88,13 @@
           "jev": {
             "precision": 0.96,
             "recall": 0.92,
-            "f1": 0.94,
+            "f1_derived": 0.94,
             "hard_neg": 1
           },
           "baseline": {
             "precision": 0.71,
             "recall": 0.6,
-            "f1": 0.65,
+            "f1_derived": 0.65,
             "hard_neg": 6
           }
         },
@@ -103,13 +103,13 @@
           "jev": {
             "precision": 1.0,
             "recall": 1.0,
-            "f1": 1.0,
+            "f1_derived": 1.0,
             "hard_neg": 0
           },
           "baseline": {
             "precision": 0.45,
             "recall": 0.75,
-            "f1": 0.56,
+            "f1_derived": 0.56,
             "hard_neg": 6
           }
         },
@@ -118,13 +118,13 @@
           "jev": {
             "precision": 1.0,
             "recall": 1.0,
-            "f1": 1.0,
+            "f1_derived": 1.0,
             "hard_neg": 0
           },
           "baseline": {
             "precision": 0.39,
             "recall": 0.92,
-            "f1": 0.55,
+            "f1_derived": 0.55,
             "hard_neg": 8
           }
         },
@@ -133,13 +133,13 @@
           "jev": {
             "precision": 0.93,
             "recall": 1.0,
-            "f1": 0.96,
+            "f1_derived": 0.96,
             "hard_neg": 1
           },
           "baseline": {
             "precision": 0.48,
             "recall": 0.86,
-            "f1": 0.62,
+            "f1_derived": 0.62,
             "hard_neg": 13
           }
         }
@@ -159,13 +159,13 @@
           "jev": {
             "precision": 0.96,
             "recall": 0.96,
-            "f1": 0.96,
+            "f1_derived": 0.96,
             "hard_neg": 1
           },
           "baseline": {
             "precision": 0.71,
             "recall": 0.6,
-            "f1": 0.65,
+            "f1_derived": 0.65,
             "hard_neg": 6
           }
         },
@@ -174,13 +174,13 @@
           "jev": {
             "precision": 1.0,
             "recall": 1.0,
-            "f1": 1.0,
+            "f1_derived": 1.0,
             "hard_neg": 0
           },
           "baseline": {
             "precision": 0.45,
             "recall": 0.75,
-            "f1": 0.56,
+            "f1_derived": 0.56,
             "hard_neg": 6
           }
         },
@@ -189,13 +189,13 @@
           "jev": {
             "precision": 1.0,
             "recall": 1.0,
-            "f1": 1.0,
+            "f1_derived": 1.0,
             "hard_neg": 0
           },
           "baseline": {
             "precision": 0.39,
             "recall": 0.92,
-            "f1": 0.55,
+            "f1_derived": 0.55,
             "hard_neg": 8
           }
         },
@@ -204,13 +204,13 @@
           "jev": {
             "precision": 0.93,
             "recall": 1.0,
-            "f1": 0.96,
+            "f1_derived": 0.96,
             "hard_neg": 1
           },
           "baseline": {
             "precision": 0.48,
             "recall": 0.86,
-            "f1": 0.62,
+            "f1_derived": 0.62,
             "hard_neg": 13
           }
         }
