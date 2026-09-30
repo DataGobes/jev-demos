@@ -135,7 +135,8 @@ def test_baselines_flag_same_rows_as_demo04(sql, cold_build, name):
 
 def test_oversized_rows_are_reported_not_sent(sql, cold_build):
     clear_demo_rows(sql)
-    res = dbt("build", "--select", "+stg_reviews", "--vars", "{jev_row_token_limit: 40}")
+    res = dbt("build", "--select", "+stg_reviews", "reviews_body_matches_stars",
+                "--vars", "{jev_row_token_limit: 40}")
     assert res.returncode == 0, res.stdout[-3000:]
     # The hook judges distinct states: 400 reviews have 241 distinct (body, stars) states.
     states = sql.run("select count(distinct body, stars) from jev_demo.jaffle_shop.stg_reviews")
@@ -157,7 +158,8 @@ def test_oversized_rows_are_reported_not_sent(sql, cold_build):
                        "and test_name = 'reviews_body_matches_stars'").scalar())
     assert 0 < over < 241
     clear_demo_rows(sql)
-    res = dbt("build", "--select", "stg_reviews", "--vars", f"{{jev_row_token_limit: {limit}}}")
+    res = dbt("build", "--select", "stg_reviews", "reviews_body_matches_stars",
+                "--vars", f"{{jev_row_token_limit: {limit}}}")
     assert res.returncode == 0, res.stdout[-3000:]
     assert f"packs sum {241 - over:,} (+{over:,} too long)" in res.stdout, res.stdout[-3000:]
     judged, unjudged = sql.run(
@@ -165,3 +167,22 @@ def test_oversized_rows_are_reported_not_sent(sql, cold_build):
         "from jev_demo.jev.judgments where mode = 'demo'").rows[0]
     assert (int(judged), int(unjudged)) == (241 - over, over)
     clear_demo_rows(sql)
+
+
+def test_build_excluding_the_semantic_tests_makes_no_judgment(sql, cold_build):
+    # Judging happens only when the jev_expect tests are selected (dbt's selected_resources): a
+    # build that builds the tested models but excludes the tests never calls the function.
+    clear_demo_rows(sql)
+    hook_runs = "select count(*) from jev_demo.jev.hook_runs where mode = 'demo'"
+    before = int(sql.run(hook_runs).scalar())
+    res = dbt("build", "--exclude", "tag:semantic", "tag:baseline")
+    assert res.returncode == 0, res.stdout[-3000:]
+    assert "Jev ·" not in res.stdout, res.stdout[-3000:]
+    assert int(sql.run("select count(*) from jev_demo.jev.judgments "
+                       "where mode = 'demo'").scalar()) == 0
+    assert int(sql.run(hook_runs).scalar()) == before
+    # a plain `dbt run` of the tested models does not judge either
+    res = dbt("run", "--select", "stg_reviews")
+    assert res.returncode == 0, res.stdout[-3000:]
+    assert int(sql.run("select count(*) from jev_demo.jev.judgments "
+                       "where mode = 'demo'").scalar()) == 0

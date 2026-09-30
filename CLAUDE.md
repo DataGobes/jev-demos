@@ -20,6 +20,8 @@ dated inside it).
   - demo mode (SIMULATED, no Jev call): `JEV_MODE=demo uv run python scripts/dbtw.py build --exclude tag:production tag:production_baseline`
   - yardstick, live: `uv run python scripts/dbtw.py build --exclude tag:production tag:production_baseline`
   - production, live: `uv run python scripts/dbtw.py build --vars '{production: true}' --select +tag:production tag:production_baseline`
+- Judging happens only when the `jev_expect` tests are selected (`build --select +tag:semantic`);
+  `dbt run` or a build that excludes them never calls Jev (the hook reads `selected_resources`).
 - Tests: `uv run pytest -q` (offline) · integration on the dev warehouse, demo mode only:
   `uv run pytest -m databricks -q`
 - Lint: `uv run ruff check`

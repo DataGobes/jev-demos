@@ -52,8 +52,8 @@ else
 fi
 
 # Preflight (not recorded): fresh models, standard tests and the regex baselines for the scorecard.
-# Model builds run the judging post-hook, so this also fills the judgments cache; --cold then
-# forgets this mode's judgments so beat 4 judges every state on camera.
+# Nothing is judged here (the jev_expect tests are excluded); --cold forgets this mode's judgments
+# from earlier runs so beat 4 judges every state on camera.
 # stdout is silenced but stderr is not, so a broken build still shows and fails the script.
 if [[ $NOTEBOOK == 0 ]]; then
   dbt seed --quiet >/dev/null
@@ -124,9 +124,9 @@ else
   clear 2>/dev/null || true
 fi
 
-# Beat 1. The standard tests and baselines, on Databricks. `dbt test`, not `dbt build`: a model
-# build runs the judging post-hook, which would call Jev here instead of in beat 4.
-beat "dbt test --exclude tag:semantic tag:baseline" \
+# Beat 1. The standard build and tests on Databricks. The judging post-hook only judges when the
+# jev_expect tests are selected, so this build (which excludes them) makes no Jev call.
+beat "dbt build --exclude tag:semantic tag:baseline" \
   "Same project. Now on Databricks."
 # Beat 2
 beat "python scripts/show.py tests" \

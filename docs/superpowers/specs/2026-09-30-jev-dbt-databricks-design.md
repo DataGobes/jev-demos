@@ -172,6 +172,10 @@ dbt build
   That covers "sentence changed, only `dbt test` was run". It never silently passes.
 - **Hooks and selection:** `dbt build --select +tag:semantic` builds the tested models (hooks run)
   and then the tests. Models without `jev_expect` tests get a no-op hook (renders to nothing).
+  *Amended 2026-09-30:* the hook judges only `jev_expect` tests that are in dbt's
+  `selected_resources` for the invocation, so judging happens only when the tests are selected
+  (`dbt build --select +tag:semantic`), never on a plain `dbt run` or a build that excludes them
+  (e.g. the recording's beat 1, `dbt build --exclude tag:semantic`).
 - **Concurrency of dbt threads:** hooks of different models append disjoint keys.
   *Amended 2026-09-30:* blind appends do conflict here. Two hooks running at once failed with
   `DELTA_CONCURRENT_APPEND.ROW_LEVEL_CHANGES` (measured) whenever each hook's cache read

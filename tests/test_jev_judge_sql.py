@@ -63,3 +63,26 @@ def test_demo_mode_uses_demo_function():
 @pytest.mark.slow
 def test_model_without_semantic_tests_renders_nothing():
     assert render("jev_render_judge", {"model_name": "stg_orders"}).strip() == ""
+
+
+@pytest.mark.slow
+def test_judges_only_tests_selected_in_this_invocation():
+    # dbt's selected_resources lists the node ids of the invocation. The hook passes it, so a
+    # build that excludes the jev_expect tests (or a plain `dbt run`) renders nothing to judge.
+    name = "reviews_body_matches_stars"
+    both = render("jev_render_judge", {"model_name": "stg_reviews", "selected_names": [name]})
+    assert "noul_pack(" in both
+    excluded = render("jev_render_judge",
+                      {"model_name": "stg_reviews", "selected_names": ["stg_reviews"]})
+    assert excluded.strip() == ""
+    other = render("jev_render_judge",
+                   {"model_name": "stg_reviews", "selected_names": ["tickets_body_has_no_pii"]})
+    assert other.strip() == ""
+
+
+@pytest.mark.slow
+def test_hook_passes_selected_resources():
+    from pathlib import Path
+
+    src = (Path(__file__).parents[1] / "jaffle_shop/macros/jev_judge.sql").read_text()
+    assert "jev_tests_for(model.unique_id, selected_resources)" in src

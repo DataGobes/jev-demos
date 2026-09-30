@@ -74,6 +74,9 @@ dbt build
   after it; the summary checks that inserted = missing, that the packs' rows sum to the rows
   inserted, and that no key appears twice. A violation fails the run. The physical plan shows a
   single `PhotonScalarUDF` after the pack aggregation.
+- **When it judges.** The hook judges only the `jev_expect` tests that are selected in the
+  invocation (dbt's `selected_resources`): `dbt build --select +tag:semantic`. A plain `dbt run`,
+  or a build that excludes the tests, builds the models and never calls Jev.
 - **Never a silent pass.** If a tested row has no successful judgment (the sentence changed and
   only `dbt test` ran, a pack failed), the test returns it with `jev_p = NULL` and the summary says
   so.
@@ -141,8 +144,8 @@ NULL.
 
 ```bash
 uv run python scripts/dbtw.py seed
-# standard tests and the regex baselines (the semantic tests are tagged `semantic`)
-uv run python scripts/dbtw.py build --exclude tag:semantic tag:production tag:production_baseline
+# standard tests and the regex baselines (the semantic tests are tagged `semantic`); no Jev call
+uv run python scripts/dbtw.py build --exclude tag:semantic
 # the four jev_expect tests: models first (the post-hook judges), then the tests
 uv run python scripts/dbtw.py build --select +tag:semantic
 uv run python scripts/show.py rows        # flagged rows with their probability
@@ -248,7 +251,7 @@ tests. Only numbers from logged live runs appear in this repo; SIMULATED output 
 
 ## Recording
 
-`scripts/record.sh [--notebook] [--no-captions]` types out each beat and waits for a keypress:
+`scripts/record.sh [--cold] [--notebook] [--no-production] [--no-captions]` types out each beat and waits for a keypress:
 the standard build on Databricks, the `jev_expect` blocks, the Jev function (`DESCRIBE FUNCTION
 EXTENDED`), the semantic build with its summary line, the flagged rows, the scorecard, and the
 production run with its rerun. `--notebook` prints how to run the bundle job instead of running

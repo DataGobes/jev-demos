@@ -8,12 +8,16 @@
   at once (the function is Arrow-batched: packs in one partition run one after another).
 -#}
 
-{% macro jev_tests_for(node_id) %}
+{#- The jev_expect tests attached to a node. With `selected` (a list of unique_ids: dbt's
+    `selected_resources`) only tests selected in this invocation count, so judging happens only when
+    the tests are selected (`dbt build --select +tag:semantic`), never on a plain `dbt run` or a build
+    that excludes them. `none` = every enabled test (used by offline rendering). -#}
+{% macro jev_tests_for(node_id, selected=none) %}
   {%- set tests = [] -%}
   {%- for n in graph.nodes.values() -%}
     {%- if n.resource_type == 'test' and n.attached_node == node_id
           and n.test_metadata and n.test_metadata.name == 'jev_expect'
-          and n.config.enabled -%}
+          and n.config.enabled and (selected is none or n.unique_id in selected) -%}
       {%- do tests.append(n) -%}
     {%- endif -%}
   {%- endfor -%}
@@ -122,7 +126,7 @@ where invocation_id = {{ jev_sql_string(invocation_id) }} and test_name = {{ jev
 
 {% macro jev_judge() %}
   {%- if not execute or flags.WHICH not in ['run', 'build'] -%}{{ return('') }}{%- endif -%}
-  {%- for t in jev_tests_for(model.unique_id) -%}
+  {%- for t in jev_tests_for(model.unique_id, selected_resources) -%}
     {%- set s = jev_judge_sql(t, this) -%}
     {%- set c = run_query(s['count']) -%}
     {%- set tested = c.columns[0].values()[0] | int -%}

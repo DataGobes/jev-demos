@@ -8,10 +8,19 @@
   {{ print('-- BEGIN\n' ~ jev_key_expr(jev_state_expr(column_name, context), q) ~ '\n-- END') }}
 {% endmacro %}
 
-{% macro jev_render_judge(model_name) %}
+{#- `selected_names`: optional list of node names; stands in for dbt's selected_resources (which
+    holds unique_ids) when given -- see jev_tests_for. -#}
+{% macro jev_render_judge(model_name, selected_names=none) %}
   {%- set node = graph.nodes['model.jaffle_shop.' ~ model_name] -%}
+  {%- set selected = none -%}
+  {%- if selected_names is not none -%}
+    {%- set selected = [] -%}
+    {%- for n in graph.nodes.values() -%}
+      {%- if n.name in selected_names -%}{%- do selected.append(n.unique_id) -%}{%- endif -%}
+    {%- endfor -%}
+  {%- endif -%}
   {%- set parts = [] -%}
-  {%- for t in jev_tests_for(node.unique_id) -%}
+  {%- for t in jev_tests_for(node.unique_id, selected) -%}
     {%- set s = jev_judge_sql(t, node.relation_name) -%}
     {%- do parts.append('-- count\n' ~ s['count'] ~ '\n-- insert\n' ~ s['insert'] ~ '\n-- inserted\n' ~ s['inserted']) -%}
   {%- endfor -%}
