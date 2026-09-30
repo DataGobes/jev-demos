@@ -12,7 +12,7 @@ dependencies = [
 ]
 
 [dependency-groups]
-dev = ["pytest>=8", "ruff>=0.12", "dbt-duckdb==1.11.0"]
+dev = ["pytest>=8", "ruff>=0.12", "dbt-duckdb==1.11.0", "duckdb>=1.5"]
 
 [build-system]
 requires = ["hatchling"]

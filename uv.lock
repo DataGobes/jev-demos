@@ -662,6 +662,7 @@ dependencies = [
 [package.dev-dependencies]
 dev = [
     { name = "dbt-duckdb" },
+    { name = "duckdb" },
     { name = "pytest" },
     { name = "ruff" },
 ]
@@ -678,6 +679,7 @@ requires-dist = [
 [package.metadata.requires-dev]
 dev = [
     { name = "dbt-duckdb", specifier = "==1.11.0" },
+    { name = "duckdb", specifier = ">=1.5" },
     { name = "pytest", specifier = ">=8" },
     { name = "ruff", specifier = ">=0.12" },
 ]
