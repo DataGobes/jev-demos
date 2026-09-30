@@ -71,7 +71,7 @@ jev-demo-5/
   pyproject.toml            uv project, package `jevdbx` under src/
   src/jevdbx/
     noul_pack.py            the UC function's Python body, a real module (single source of truth)
-    demo_values.py          deterministic hash values for SIMULATED mode (port of demo 04 DemoBackend)
+    demo_pack.py            the SIMULATED function body: deterministic hash values (port of demo 04 DemoBackend)
     deploy.py               renders CREATE SCHEMA/TABLE/VIEW/FUNCTION SQL from the modules above
     databricks.py           tiny Statement Execution API client (databricks-sdk, profile jev-demo-5)
     pricing.py              PRICE_PER_MTOK_USD with a link to docs.typesafe.ai/models
@@ -90,18 +90,23 @@ jev-demo-5/
     make_seeds.py, pools/   copied from demo 04 (seed=42)
     deploy.py               CLI: prints or (with --apply) runs the platform DDL, confirm-first
     fetch_reviews.py        download (after asking) + sample 100k + strip + plant flips
-    audit_sample.py         writes the blind audit CSV (review + stars only)
+    audit_sample.py         writes the blind audit CSV data/production_audit.csv (review + stars only)
     score.py                scorecard: yardstick (golden key) and production (flips + audit)
     record.sh, show.py      recording, demo 04 style
+    jev_env.py, dbtw.py     host/warehouse from the CLI profile; dbt with a short-lived token
   eval/
     golden_defects.csv      copied from demo 04, unchanged
     production_flips.csv    review ids + original/new stars of planted flips (no text)
-    production_audit.csv    the user's blind labels
+    production_audit_labels.csv  id, label of the user's blind audit (written by score.py --append
+                            from the labelled data/production_audit.csv, which holds text and stays
+                            gitignored)
   docs/
     eval-results.md         every scored live run, next to demo 04's numbers
     superpowers/specs, superpowers/plans
   tests/                    pytest
 ```
+
+*Amended 2026-10-01:* file names corrected to the repo (`demo_pack.py`, the audit files).
 
 ## 5. Unity Catalog objects
 
@@ -143,6 +148,12 @@ already rewritten to `` `record.<col>` ``). Output: a JSON string
   4xx other than 429 is not retried.
 - On final failure: `values = null`, `error = "HTTP <code>: <body[:300]>"` or the exception type.
   **Never** the request, headers or key. A test asserts the key string never appears in any output.
+  *Amended 2026-10-01:* the key is replaced by `[redacted]` **before** the body is cut to 300
+  characters (a key straddling the cut would otherwise leave its prefix), and an empty key redacts
+  nothing.
+- *Added 2026-10-01:* `scripts/deploy.py --smoke` makes one fixed 2-row call of the deployed
+  function and prints values, tokens, model and error. For `noul_pack` it is a live Jev call:
+  confirm-first, and the first thing to run after deploying it (`--smoke --demo` calls the twin).
 - The module `src/jevdbx/noul_pack.py` defines `handler(records, question, model, *, get_key,
   urlopen, sleep, now, uuid4)`; the deployed body is the module source plus a two-line shim that
   binds those to `databricks.secrets.get`, `urllib.request.urlopen`, `time.sleep`, `time.time`,
@@ -175,6 +186,12 @@ dbt build
 - **Test guard:** if any tested row has no successful judgment for this question, the test
   returns those rows with `jev_p = NULL` and the summary says `N unjudged — run dbt build`.
   That covers "sentence changed, only `dbt test` was run". It never silently passes.
+  *Amended 2026-10-01:* the summary line is printed by `dbt build`/`dbt run` only (it reads the
+  hook's ledger); after a `dbt test` the unjudged rows show as failing rows with `jev_p = NULL`
+  and no summary line. Every returned row also carries `jev_mode` and `jev_invocation_id` (in a
+  build, the hook's invocation); `score.py` and `show.py` treat stored failures from another mode
+  or invocation as not captured, and the blind audit samples only a LIVE, single-invocation table
+  and exports neither column.
 - **Hooks and selection:** `dbt build --select +tag:semantic` builds the tested models (hooks run)
   and then the tests. Models without `jev_expect` tests get a no-op hook (renders to nothing).
   *Amended 2026-09-30:* the hook judges only `jev_expect` tests that are in dbt's
@@ -250,6 +267,9 @@ TypeSafe: 1,200 requests/min, 250k tokens/s, 64k tokens/request, all "adjusting 
   exponential backoff of §5.1 applies.
 - There is no global pacer across executors. The server's 429 is the coordination signal. The
   spec and README say so; the production run reports whether 429s occurred.
+- *Amended 2026-10-01:* production builds (`score.py --production`, the notebook's production
+  selection, the README) pass `jev_max_concurrency: 2`: the retry path has never been exercised
+  live (§3), so the first 100k-row run keeps fewer packs in flight under the 250k tokens/s limit.
 
 ## 9. One evaluation per row
 
@@ -365,12 +385,26 @@ reframe). The golden key, pools and baselines are never edited to make Jev win.
   interval. Raw precision against planted flips only is also reported.
 - F1 above the demo 04 review lexicon baseline, ported to Spark SQL, not tuned.
 - Operational: 0 errors after retries; the three once-per-row checks pass; ledger tokens vs
-  TypeSafe bill logged; rerun makes **0** requests; +5,000 new rows judges exactly 5,000.
+  TypeSafe bill logged; rerun makes **0** requests; +5,000 rows loaded → the new distinct
+  (body, stars) states are judged, nothing else (counts are distinct states, not rows: repeated
+  texts are cache hits).
 
 *Amended 2026-09-30:* `score.py --append` requires `--run` and a new, fully covering invocation of
 the scored tests (provenance must belong to the run being scored); a dbt run with errors is "not
 captured" and nothing is appended. The production gate stays **PENDING** (not PASS) until the
 audit is labelled and `--rerun` has run, because the rerun with 0 requests is a gate item.
+
+*Amended 2026-10-01:* the billed runs are the scored ones. The production run is four logged
+steps: (a) part 1 loaded → `score.py --production --run --fresh --mode live --append` (PENDING
+until the audit and the rerun); (b) the user labels the audit; (c) part 2 uploaded →
+`score.py --production --run --mode live --increment --append`, which counts the production model
+before and after the build and logs `increment: N new distinct states judged (M rows loaded)`
+(inserted = missing, and no more states judged than rows loaded); (d) `--rerun` →
+the PASS/FAIL entry. Recall counts only the planted flips loaded in `stg_product_reviews`
+(`planted flips loaded: X of Y`). Every append records the invocation and the cached share, and
+when judgments were cached, the invocations they came from with their states, requests, tokens,
+cost and Jev span. A yardstick `--append` requires 0% cached (in practice `--fresh`) and refuses
+otherwise. `--run` requires an explicit `--mode`.
 
 Every scored live run is appended to `docs/eval-results.md` with date, warehouse, budget,
 requests, retries, tokens, Jev cost, DBUs, wall time and the numbers.
@@ -387,6 +421,9 @@ requests, retries, tokens, Jev cost, DBUs, wall time and the numbers.
 5. Failing rows with `jev_p` (`scripts/show.py`).
 6. Scorecard: Jev vs regex baseline, and vs demo 04.
 7. Production: 100k real reviews, summary (packs, tokens/s, cost); rerun → 0 requests.
+   *(Amended 2026-10-01: the rerun is fully cached, so its cost line is $0. Beat 7 prints the last
+   logged production entry of `docs/eval-results.md` verbatim (`show.py production`) for cost and
+   throughput, then runs the rerun only to show 0 requests.)*
 
 Only numbers from logged live runs appear on screen. `record.sh` has a demo-mode smoke test
 (`JEV_MODE=demo`), never used as the recording.
@@ -436,6 +473,9 @@ Local dbt (uv) stays for development and tests. For the demo and the production 
 - `databricks.yml` (Databricks Asset Bundle): uploads the project and defines job
   `jev_semantic_tests` with that notebook task on serverless compute. `databricks bundle deploy`
   / `databricks bundle run` from the repo; the repo stays the source of truth.
+- *Amended 2026-10-01:* the notebook shows the summary line and the failing rows with `jev_p`;
+  the scorecard is `scripts/score.py` (the golden key and the audit labels stay out of the
+  workspace). Its production selection passes `jev_max_concurrency: 2` like `score.py`.
 - Recording: beats 4–7 may be shown from the notebook or the job run page instead of the terminal.
 - Demo mode through the notebook is covered by the standing OK; live runs stay confirm-first.
 

@@ -80,15 +80,20 @@ dbt build
   judge either (dbt leaves `selected_resources` empty on a retry): rerun
   `dbt build --select +tag:semantic`.
 - **Never a silent pass.** If a tested row has no successful judgment (the sentence changed and
-  only `dbt test` ran, a pack failed), the test returns it with `jev_p = NULL` and the summary says
-  so.
+  only `dbt test` ran, a pack failed), the test returns it with `jev_p = NULL`, so it shows up as a
+  failing row. After a `dbt build` the summary line also counts it (`· U unjudged`); `dbt test`
+  prints no summary line (the summary reads the judging hook's ledger, and only a build judges).
+- **Provenance on every flagged row.** Each stored-failure row carries `jev_mode` (live|demo) and
+  `jev_invocation_id`. In a `dbt build` the tests and the judging hook share the invocation, so
+  `scripts/score.py` and `scripts/show.py` refuse to present stored failures from another
+  invocation or mode under a run's LIVE provenance.
 - **LIVE or SIMULATED.** Every summary line says which. `JEV_MODE=demo` uses the demo function.
 
 The summary line, after every build:
 
 ```
-Jev · <N> judgments · <X>% cached · <R> requests · <r> retries · <s> Jev · $<c> · LIVE jev-1.13.0 budget=48k
-Jev · once-per-row OK: <n> inserted = <n> missing · packs sum <n> · 0 duplicate keys · LIVE
+Jev · <N> judgments · <X>% cached · <R> requests · <r> retries (<t>× 429) · <s> s Jev · $<c> · LIVE jev-1.13.0 budget=48k
+Jev · once-per-row OK · LIVE: <n> inserted = <n> missing · packs sum <n> (+<o> too long) · 0 duplicate keys
 ```
 
 "N judgments" counts distinct (test, state) pairs with a successful judgment. Demo 04 called the
@@ -119,17 +124,32 @@ judgments with demo 04's unique count.
    uv run python scripts/deploy.py --apply --only schema judgments hook_runs requests noul_pack_demo
    ```
 
-   Create the TypeSafe key as a Unity Catalog secret **yourself**, from your own shell (the value
-   is read from your environment; nothing in this repo reads or stores it):
+   Create the TypeSafe key as a Unity Catalog secret **yourself**, from your own shell. The key
+   never appears in a command line (where `ps` could show it), a file or your shell history: `read
+   -s` takes it without echo, `jq` builds the request body from the environment, and the CLI reads
+   that body from standard input. Nothing in this repo reads or stores it.
 
    ```bash
-   databricks secrets-uc create-secret typesafe_api_key jev_demo jev "$TYPESAFE_API_KEY" -p jev-demo-5
+   read -rs TS_KEY && export TS_KEY
+   jq -n '{name: "typesafe_api_key", catalog_name: "jev_demo", schema_name: "jev", value: env.TS_KEY}' \
+     | databricks secrets-uc create-secret --json @/dev/stdin -p jev-demo-5 > /dev/null
+   unset TS_KEY
    ```
 
-   Then deploy the live function, which references the secret by name:
+   (`--json @/dev/stdin` is read by the CLI as a file; `> /dev/null` keeps the response off the
+   screen.) Then deploy the live function, which references the secret by name:
 
    ```bash
    uv run python scripts/deploy.py --apply --only noul_pack
+   ```
+
+   The first thing to run after deploying it: one 2-row call of the function on the dev warehouse,
+   printing its values, tokens, model and error (never the key). It is a live Jev call, billed by
+   TypeSafe, so run it deliberately:
+
+   ```bash
+   uv run python scripts/deploy.py --smoke          # LIVE: one call of noul_pack
+   uv run python scripts/deploy.py --smoke --demo   # the same call of noul_pack_demo (SIMULATED)
    ```
 
    (`deploy.py --apply` with no `--only` runs everything in that order; the last statement fails
@@ -180,12 +200,18 @@ databricks bundle run jev_semantic_tests --params mode=demo,selection=yardstick
 
 `scripts/score.py` reads the stored failures, joins them against the hidden
 `eval/golden_defects.csv`, and prints precision/recall/F1 for Jev vs the regex baseline, plus
-provenance (mode, model, requests, tokens, retries, 429s) from the ledger. `--append` (needs
-`--run`, live only) adds the run to `docs/eval-results.md`; a simulated run is refused.
+provenance (mode, model, requests, tokens, retries, 429s) from the ledger. `--run` builds first
+and needs an explicit `--mode live|demo`. `--append` (needs `--run`, live only) adds the run to
+`docs/eval-results.md`; a simulated run is refused, and so is a yardstick run with any cached
+state (a yardstick entry judges every state in the run it scores: `--fresh`).
 
 ```bash
 uv run python scripts/score.py --run --fresh --mode live --append    # live: billed by TypeSafe
 ```
+
+The comparison with demo 04 uses its `live/pack=64/nested` run (64 rows per request). Demo 05
+cuts packs by estimated tokens instead (budget 48k, cap 256 rows), about 120–256 rows per pack on
+these tests, so the request counts are not like for like; the accuracy columns are.
 
 ## The production run
 
@@ -200,22 +226,41 @@ non-3-star rows (1↔5, 2↔4), and splits 95,000 + 5,000. The data files are gi
 `eval/production_flips.csv` (ids and stars, no text) is committed.
 
 1. Download and sample: `uv run python scripts/fetch_reviews.py --download --out data/` (or
-   `--source` for a file you already have).
+   `--source` for a file you already have). `<br />` tags become newlines and HTML entities are
+   unescaped (markup artifacts of the source, the same for Jev and the baseline).
 2. `uv run python scripts/deploy.py --production --apply`, then
-   `uv run python scripts/fetch_reviews.py --out data/ --source data/finefoods.txt.gz --upload`.
+   `uv run python scripts/fetch_reviews.py --out data/ --source data/finefoods.txt.gz --upload`
+   (part 1, 95,000 rows).
 3. A larger serverless warehouse (for the recorded run, `jev-demo-5-prod`, Small), then
    `eval "$(uv run python scripts/jev_env.py --warehouse jev-demo-5-prod)"`.
-4. `uv run python scripts/dbtw.py build --vars '{production: true}' --select +tag:production tag:production_baseline`
-   judges the 95,000.
+4. Judge part 1 and log it (the billed run is the scored one):
+   `uv run python scripts/score.py --production --run --fresh --mode live --append`. It builds with
+   `--vars '{production: true, jev_max_concurrency: 2}' --select +tag:production tag:production_baseline`.
+   Recall counts only the planted flips that are loaded (`planted flips loaded: X of Y`). The gate
+   reads PENDING: the audit and the rerun are still missing.
 5. Audit: `uv run python scripts/audit_sample.py` writes ~100 flagged-but-unplanted reviews
    (text and stars only, no score) to `data/production_audit.csv`. You label each `real` (text
    and stars disagree) or `ok`, without seeing Jev's probability. Precision is extrapolated from
    that sample with a 95% Wilson interval; raw precision against the planted flips is reported
    too.
-6. `fetch_reviews.py --upload-part2`, rebuild: exactly the 5,000 new reviews are judged. Rebuild
-   again: 0 requests.
-7. `uv run python scripts/score.py --production --run --rerun --mode live --append`. The
-   production gate reads PENDING until the audit is labelled and the rerun has run.
+6. The increment: `uv run python scripts/fetch_reviews.py --out data/ --upload-part2` (+5,000
+   rows), then `uv run python scripts/score.py --production --run --mode live --increment --append`.
+   Only the new distinct (body, stars) states are judged, nothing else; the entry logs
+   `increment: N new distinct states judged (M rows loaded)`. N can be below 5,000: reviews repeat
+   texts, and a state already judged is a cache hit.
+7. The rerun check: `uv run python scripts/score.py --production --run --rerun --mode live --append`
+   builds once (nothing new to judge) and again, and requires the second build to make 0 requests.
+   With the audit labelled, this entry reads PASS or FAIL.
+
+Every entry records the dbt invocation, the cached share and, when judgments were cached, the
+invocations they came from, each with its states, requests, tokens, cost and Jev span, so the
+last entry also carries the cost of the billed runs.
+
+Production builds pass `jev_max_concurrency: 2` (two packs in flight per statement instead of
+four). TypeSafe allows 250k tokens/s, and a handful of 48k-token packs finishing within the same
+second can exceed it. The retry path (429 and backoff) is tested offline but has never been
+exercised live, so the first 100,000-row run keeps fewer packs in flight rather than relying on
+it.
 
 ## Results
 
@@ -230,7 +275,7 @@ tests. Only numbers from logged live runs appear in this repo; SIMULATED output 
   Callers need `EXECUTE`; nobody else needs `READ SECRET`.
 - **No global pacer.** TypeSafe allows 1,200 requests/min and 250k tokens/s (64k tokens per
   request), adjusting dynamically. There is no pacer across executors. `REPARTITION(n)` caps the
-  packs in flight per statement, but dbt runs 4 threads, so up to 4 hooks run at once (up to
+  packs in flight per statement (`jev_max_concurrency`: 4, 2 for the production run), but dbt runs 4 threads, so up to 4 hooks run at once (up to
   `4 × n` packs). The coordination is the server's 429 and the in-function backoff
   (`retry-after` honoured as a floor, capped at 60 s). Each run reports its retries and 429s.
 - **Concurrent hooks.** Two hooks appending to the same Delta table conflict
@@ -263,7 +308,10 @@ in.
 
 Record right after a scored run (`score.py --run --append`, live), and without `--cold`: the
 accuracy numbers on screen (flagged rows, scorecard) are then the logged run's, and beat 4 shows a
-fully cached rerun. `--cold` judges every state again on camera, a new live run (billed) whose
+fully cached rerun. Beat 7 prints the last logged production entry of `docs/eval-results.md`
+verbatim (`scripts/show.py production`: planted flips, audited precision, cost and throughput of
+the billed runs), then runs the production build once more on camera, only to show 0 requests;
+that rerun's own cost line is $0 because nothing is judged. `--cold` judges every state again on camera, a new live run (billed) whose
 numbers are not in `docs/eval-results.md` until it is scored and appended; use it only for a take
 you will log the same way.
 

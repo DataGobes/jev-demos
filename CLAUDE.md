@@ -14,24 +14,33 @@ dated inside it).
   (production warehouse: `--warehouse jev-demo-5-prod`)
 - Platform DDL, print only: `uv run python scripts/deploy.py` · apply to the dev warehouse
   (standing OK, see below): `uv run python scripts/deploy.py --apply [--only noul_pack noul_pack_demo]` ·
-  production schema + volume (confirm-first): `uv run python scripts/deploy.py --production --apply`
+  production schema + volume (confirm-first): `uv run python scripts/deploy.py --production --apply` ·
+  first step after deploying `noul_pack` (a live Jev call, confirm-first):
+  `uv run python scripts/deploy.py --smoke` (`--smoke --demo` calls the SIMULATED twin)
 - dbt: always through `scripts/dbtw.py` (adds `--profiles-dir . --target dev` and a short-lived
   token from the logged-in CLI profile; runs in `jaffle_shop/`):
   - demo mode (SIMULATED, no Jev call): `JEV_MODE=demo uv run python scripts/dbtw.py build --exclude tag:production tag:production_baseline`
   - yardstick, live: `uv run python scripts/dbtw.py build --exclude tag:production tag:production_baseline`
-  - production, live: `uv run python scripts/dbtw.py build --vars '{production: true}' --select +tag:production tag:production_baseline`
+  - production, live: `uv run python scripts/dbtw.py build --vars '{production: true, jev_max_concurrency: 2}' --select +tag:production tag:production_baseline`
+    (2 packs in flight: 250k tokens/s at TypeSafe, retries never exercised live)
 - Judging happens only when the `jev_expect` tests are selected (`build --select +tag:semantic`);
   `dbt run`, `dbt retry` (dbt leaves `selected_resources` empty) or a build that excludes them never
   calls Jev (the hook reads `selected_resources`); rerun `dbt build --select +tag:semantic`.
 - Tests: `uv run pytest -q` (offline) · integration on the dev warehouse, demo mode only:
   `uv run pytest -m databricks -q`
 - Lint: `uv run ruff check`
-- Views: `uv run python scripts/show.py tests|rows|score|function`
+- Views: `uv run python scripts/show.py tests|rows|score|function|production`
 - Scorecard: `uv run python scripts/score.py` (what is stored) · a fresh live run, appended to
   `docs/eval-results.md`: `uv run python scripts/score.py --run --fresh --mode live --append`
-  (`--append` needs `--run`) · production: `uv run python scripts/score.py --production --run --rerun --mode live --append`
-- Production data: `scripts/fetch_reviews.py` (`--source`, `--upload`, `--upload-part2`;
-  `--download` only after the user said yes), `scripts/audit_sample.py` (blind audit CSV)
+  (`--append` needs `--run`; `--run` needs an explicit `--mode`; a yardstick append refuses any
+  cached state) · production, four logged steps (each live one confirm-first):
+  (a) part 1: `score.py --production --run --fresh --mode live --append`, (b) the user labels the
+  audit, (c) after `--upload-part2`: `score.py --production --run --mode live --increment --append`,
+  (d) `score.py --production --run --rerun --mode live --append`
+- Stored failures carry `jev_mode` and `jev_invocation_id`; score.py/show.py refuse rows that are
+  not the scored invocation's.
+- Production data: `scripts/fetch_reviews.py` (`--source`), `scripts/audit_sample.py` (blind audit
+  CSV). `--download`, `--upload` and `--upload-part2` each need the user's yes first.
 - Bundle (dbt inside Databricks, serverless notebook job): `databricks bundle validate` is fine;
   `databricks bundle deploy` / `databricks bundle run jev_semantic_tests` are confirm-first
 - Recording: `scripts/record.sh [--cold] [--notebook] [--no-production] [--no-captions]` · smoke test, demo mode only,
@@ -71,8 +80,9 @@ dated inside it).
 ## Confirm-first vs standing OK
 - Standing OK (user, 2026-09-30): any query on the 2X-Small dev warehouse `jev-demo-5`,
   including `deploy.py --apply` for the `jev_demo.jev` objects and demo-mode dbt and integration runs.
-- Ask first, every time: live Jev runs (TypeSafe billing), `deploy.py --production --apply` and the
-  production volume upload, creating a warehouse (`jev-demo-5-prod`), any download
+- Ask first, every time: live Jev runs (TypeSafe billing, including `deploy.py --smoke`),
+  `deploy.py --production --apply` and the production volume uploads (`--upload`, `--upload-part2`), creating a warehouse (`jev-demo-5-prod`), any download
   (`fetch_reviews.py --download`), `databricks bundle deploy` / `bundle run` (creates a job),
   reading `system.billing`, dropping schemas (`jev_demo.spike`).
-- The user creates the UC secret and labels the audit sample. Claude does neither.
+- The user creates the UC secret (README: `read -s` + `jq` + `--json @/dev/stdin`, so the key is
+  never in argv) and labels the audit sample. Claude does neither and never runs that command.

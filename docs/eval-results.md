@@ -2,22 +2,26 @@
 
 Every scored **live** run of demo 05, newest last. Written by `scripts/score.py --append`, which
 only accepts a run it started itself (`--run`), in live mode, with every scored test covered by a
-new invocation and no dbt errors. A SIMULATED (demo-mode) run is never written here, and never
-quoted as a result anywhere.
+new invocation, every stored-failure row written by that invocation (`jev_invocation_id`,
+`jev_mode`) and no dbt errors. A yardstick entry judges every state it scores (0% cached,
+`--fresh`). A SIMULATED (demo-mode) run is never written here, and never quoted as a result
+anywhere.
 
 Each entry has demo 04's columns (defects, Jev and regex precision/recall, hard negatives
 flagged) plus what is specific to Databricks, written by `score.py`: the warehouse, the pack token
 budget, requests, retries and 429s, actual tokens, the estimated-to-actual token ratio, the Jev
 cost, the Jev span in seconds (the summary line's "s Jev", the span of the packs' timestamps) and
-the once-per-row counters. Warehouse DBUs (from `system.billing.usage`, once that schema is
+the once-per-row counters, the dbt invocation, the cached share and, when judgments were cached,
+the invocations they came from (states, requests, tokens, cost, Jev span of each). Warehouse DBUs (from `system.billing.usage`, once that schema is
 enabled) and the dbt wall time are not written by `score.py`; they are added to the entry by hand.
 
 Gate, yardstick run (unchanged from demo 04): live, no errors, Jev precision >= 0.85 and recall
 >= 0.85 on every test, Jev F1 above the regex baseline on every test. Gate, production run:
-recall on planted flips >= 0.85, audited precision >= 0.85, F1 above the lexicon baseline,
-0 errors, the three once-per-row checks, a rerun with 0 requests and +5,000 new rows judging
-exactly 5,000. The production gate reads **PENDING** until the audit is labelled and `--rerun`
-has run.
+recall on the loaded planted flips >= 0.85, audited precision >= 0.85, F1 above the lexicon
+baseline, 0 errors, the three once-per-row checks, a rerun with 0 requests, and +5,000 rows
+loaded judging the new distinct (body, stars) states and nothing else (counts are distinct
+states, not rows). The production gate reads **PENDING** until the audit is labelled and
+`--rerun` has run.
 
 Wording, threshold or criteria changes to a `jev_expect` block, and any golden-key correction,
 are logged here with before/after numbers.
@@ -39,6 +43,9 @@ How to read them:
   and recall, so it can be off by a rounding step.
 - `live/pack=1` sent one request per state (the recording pack in demo 04); `pack=32` and
   `pack=64` used the `nested` layout.
+- The comparison uses `live/pack=64/nested` (64 rows per request). Demo 05 cuts packs by estimated
+  tokens (budget 48k, cap 256 rows), about 120–256 rows per pack on these tests, so request counts
+  are not like for like; the accuracy columns are.
 
 ### live/pack=1 (logged 2026-09-24T21:12:55Z)
 
@@ -76,6 +83,10 @@ Demo 04: 1,300 judgments · 1,057 unique (distinct test/state pairs) · 18 reque
 ## Runs
 
 No live demo 05 run has been made yet. `score.py --append` adds entries below this line, newest
-last. The first entries will be the yardstick run
-(`scripts/score.py --run --fresh --mode live --append`) and then the production run
-(`scripts/score.py --production --run --rerun --mode live --append`).
+last. The first entry will be the yardstick run
+(`scripts/score.py --run --fresh --mode live --append`), then the production run in four steps:
+(a) part 1, `scripts/score.py --production --run --fresh --mode live --append` (PENDING);
+(b) the audit labels; (c) part 2, `scripts/score.py --production --run --mode live --increment
+--append` (`increment: N new distinct states judged (M rows loaded)`); (d) the rerun check,
+`scripts/score.py --production --run --rerun --mode live --append` (PASS or FAIL). The recording
+prints the last production entry (`scripts/show.py production`).
