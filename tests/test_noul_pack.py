@@ -1,4 +1,6 @@
+import io
 import json
+from pathlib import Path
 
 import pytest
 
@@ -84,7 +86,10 @@ def test_empty_records_makes_no_call():
 def test_retries_then_succeeds(status):
     res, http, sleeps, _ = run([(status, b"busy", {}), ok([0.5, 0.5])])
     assert res["values"] == [0.5, 0.5] and res["attempts"] == 2
+    assert res["error"] is None
     assert [r["status"] for r in res["retries"]] == [status]
+    assert res["retries"][0]["attempt"] == 1
+    assert isinstance(res["retries"][0]["t"], float)
     assert len(http.calls) == 2 and len(sleeps) == 1
 
 
@@ -95,7 +100,7 @@ def test_connection_error_is_retried_with_status_none():
 
 def test_retry_after_header_is_honoured():
     _, _, sleeps, _ = run([(429, b"slow down", {"retry-after": "7"}), ok([0.1, 0.2])])
-    assert 7 * 0.5 <= sleeps[0] <= 7 * 1.5
+    assert 7 <= sleeps[0] <= 10.5  # retry_after is floor: 7 * (1.0 + 0.5*rand), rand in [0, 1)
 
 
 @pytest.mark.parametrize("status", [400, 401, 403, 422])
@@ -134,15 +139,121 @@ def test_key_never_appears_in_any_output():
         _, _, _, raw = run(script)
         assert KEY not in raw
 
+    # Ruling R7: key in connection error message is redacted
+    http_conn_error = FakeHttp([ConnectionError(f"reset {KEY}")] * 6)
+    out = noul_pack.handler(
+        RECS, Q, "jev-1.13.0",
+        get_key=lambda: KEY, post=http_conn_error, sleep=lambda _: None,
+        now=lambda: 1.0, new_id=lambda: "uuid-1",
+    )
+    assert KEY not in out
+
+    # Ruling R7: key in server error body is redacted
+    http_key_in_body = FakeHttp([(401, b"bad key " + KEY.encode(), {})])
+    out = noul_pack.handler(
+        RECS, Q, "jev-1.13.0",
+        get_key=lambda: KEY, post=http_key_in_body, sleep=lambda _: None,
+        now=lambda: 1.0, new_id=lambda: "uuid-1",
+    )
+    assert KEY not in out
+
 
 def test_backoff_bounds():
     assert noul_pack.backoff_seconds(1, None, 0.5) == pytest.approx(1.5)
     assert noul_pack.backoff_seconds(3, None, 0.5) == pytest.approx(6.0)
-    assert noul_pack.backoff_seconds(10, None, 0.5) == pytest.approx(20.0)  # capped
-    assert noul_pack.backoff_seconds(1, "4", 0.0) == pytest.approx(2.0)  # 4 * 0.5
+    # exponential capped at 20
+    assert noul_pack.backoff_seconds(10, None, 0.5) == pytest.approx(20.0)
+    # retry_after floor: 4 * 1.0
+    assert noul_pack.backoff_seconds(1, "4", 0.0) == pytest.approx(4.0)
+    # unparsable → exponential
     assert noul_pack.backoff_seconds(1, "garbage", 0.5) == pytest.approx(1.5)
+    # retry_after capped at 60
+    assert noul_pack.backoff_seconds(1, "3600", 0.0) == pytest.approx(60.0)
+    # negative → exponential
+    assert noul_pack.backoff_seconds(1, "-5", 0.5) == pytest.approx(1.5)
+    # nan → exponential
+    assert noul_pack.backoff_seconds(1, "nan", 0.5) == pytest.approx(1.5)
+    # inf → exponential
+    assert noul_pack.backoff_seconds(1, "inf", 0.5) == pytest.approx(1.5)
+
+
+def test_urllib_post(monkeypatch):
+    import urllib.error
+    import urllib.request
+
+    # Success case: 200 response
+    class FakeResponse:
+        status = 200
+
+        def read(self):
+            return b"hello"
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            pass
+
+        @property
+        def headers(self):
+            return {"Content-Type": "application/json", "Retry-After": "5"}
+
+    def fake_urlopen_200(req, timeout=None):
+        return FakeResponse()
+
+    monkeypatch.setattr("urllib.request.urlopen", fake_urlopen_200)
+    status, body, headers = noul_pack.urllib_post(
+        "https://example.com", b"body", {"Auth": "Bearer x"}, 10.0
+    )
+    assert status == 200 and body == b"hello"
+    assert headers == {"content-type": "application/json", "retry-after": "5"}
+
+    # Error case: 429 HTTPError
+    def fake_urlopen_429(req, timeout=None):
+        raise urllib.error.HTTPError(
+            "https://example.com", 429, "busy",
+            {"Retry-After": "3"},
+            io.BytesIO(b"slow"),
+        )
+
+    monkeypatch.setattr("urllib.request.urlopen", fake_urlopen_429)
+    status, body, headers = noul_pack.urllib_post(
+        "https://example.com", b"body", {"Auth": "Bearer x"}, 10.0
+    )
+    assert status == 429 and body == b"slow"
+    assert headers == {"retry-after": "3"}
+
+
+def test_build_request_malformed_record_or_question():
+    # Malformed record JSON
+    http = FakeHttp([])
+    sleeps = []
+    clock = iter(range(1000, 2000))
+    out = noul_pack.handler(
+        ["{invalid json"], Q, "jev-1.13.0",
+        get_key=lambda: KEY, post=http, sleep=sleeps.append,
+        now=lambda: float(next(clock)), new_id=lambda: "uuid-1",
+    )
+    parsed = json.loads(out)
+    assert parsed["values"] is None
+    assert parsed["error"].startswith("bad input:")
+    assert len(http.calls) == 0
+
+    # Missing instructions key
+    http = FakeHttp([])
+    sleeps = []
+    clock = iter(range(1000, 2000))
+    out = noul_pack.handler(
+        RECS, json.dumps({}), "jev-1.13.0",
+        get_key=lambda: KEY, post=http, sleep=sleeps.append,
+        now=lambda: float(next(clock)), new_id=lambda: "uuid-1",
+    )
+    parsed = json.loads(out)
+    assert parsed["values"] is None
+    assert parsed["error"].startswith("bad input:")
+    assert len(http.calls) == 0
 
 
 def test_source_is_embeddable():
-    src = open(noul_pack.__file__).read()
+    src = Path(noul_pack.__file__).read_text()
     assert "from __future__" not in src and "$$" not in src

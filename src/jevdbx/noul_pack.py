@@ -41,12 +41,14 @@ def build_request(records, question, model):
 
 def backoff_seconds(attempt, retry_after, rand):
     """Seconds to wait after failed attempt `attempt` (1-based), jittered by rand in [0, 1)."""
-    try:
-        base = float(retry_after) if retry_after is not None else None
-    except ValueError:
-        base = None
-    if base is None:
-        base = min(BACKOFF_CAP_S, BACKOFF_BASE_S * 2 ** (attempt - 1))
+    if retry_after is not None:
+        try:
+            retry_val = float(retry_after)
+            if retry_val >= 0 and retry_val == retry_val and retry_val != float('inf'):
+                return min(60.0, retry_val * (1.0 + 0.5 * rand))
+        except (ValueError, OverflowError):
+            pass
+    base = min(BACKOFF_CAP_S, BACKOFF_BASE_S * 2 ** (attempt - 1))
     return base * (0.5 + rand)
 
 
@@ -71,8 +73,14 @@ def handler(records, question, model, *, get_key, post, sleep, now, new_id, rand
     if not records:
         out["values"] = []
         return json.dumps(out)
-    body = json.dumps(build_request(records, question, model)).encode()
-    headers = {"Authorization": "Bearer " + get_key(), "Content-Type": "application/json"}
+    key = get_key()
+    try:
+        body = json.dumps(build_request(records, question, model)).encode()
+    except (ValueError, KeyError, TypeError) as exc:
+        out["error"] = f"bad input: {type(exc).__name__}: {str(exc)[:ERROR_BODY_CHARS]}"
+        out["finished"] = now()
+        return json.dumps(out)
+    headers = {"Authorization": "Bearer " + key, "Content-Type": "application/json"}
     for attempt in range(1, MAX_ATTEMPTS + 1):
         out["attempts"] = attempt
         retry_after = None
@@ -80,18 +88,23 @@ def handler(records, question, model, *, get_key, post, sleep, now, new_id, rand
             status, raw, resp_headers = post(API_URL, body, headers, REQUEST_TIMEOUT_S)
             retry_after = resp_headers.get("retry-after")
         except Exception as exc:  # noqa: BLE001 -- connection errors and timeouts are retried
-            status, raw = None, f"{type(exc).__name__}: {exc}".encode()
+            status, raw = None, f"connection error: {type(exc).__name__}".encode()
         if status == 200:
             parsed = _parse(raw, len(records))
             out["values"], out["input_tokens"], out["model"], out["error"] = parsed
             break
         detail = raw.decode("utf-8", "replace")[:ERROR_BODY_CHARS]
-        out["error"] = f"HTTP {status}: {detail}"
+        if status is None:
+            out["error"] = detail
+        else:
+            out["error"] = f"HTTP {status}: {detail}"
         if not _retryable(status) or attempt == MAX_ATTEMPTS:
             break
         out["retries"].append({"attempt": attempt, "status": status, "t": now()})
         sleep(backoff_seconds(attempt, retry_after, rand()))
     out["finished"] = now()
+    if out["error"]:
+        out["error"] = out["error"].replace(key, "[redacted]")
     return json.dumps(out)
 
 
