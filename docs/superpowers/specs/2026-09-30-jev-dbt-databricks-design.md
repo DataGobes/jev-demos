@@ -43,6 +43,11 @@ imported into `jev-demos` as `05-dbt-databricks/`. It is not a package.
 | Audit labels | the **user** labels ~100 flagged-but-unplanted rows, blind to `jev_p` |
 | Pins | Python 3.13, uv, `dbt-databricks==1.12.5`, which caps dbt-core below 1.12.4 (so dbt-core 1.12.3, not demo 04's 1.12.5), `databricks-sdk` as resolved. dbt Fusion is not used, as in demo 04 |
 
+*Amended 2026-10-01:* the workspace name and region, the dev warehouse id and the catalog's storage
+path were removed from this table (the repo is public); they come from the CLI profile or are looked
+up by name. `tests/test_no_workspace_identifiers.py` scans every tracked file for them. Earlier
+commits still contain them: rewriting history is the user's decision before publishing.
+
 ## 3. Spike results (2026-09-30, live, in `jev_demo.spike`, throwaway)
 
 | Probe | Result |
