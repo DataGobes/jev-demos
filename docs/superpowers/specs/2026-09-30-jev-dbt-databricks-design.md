@@ -364,7 +364,24 @@ Still confirm-first: every **live** Jev run (TypeSafe billing); the production s
 upload and `jev-demo-5-prod`; dropping `jev_demo.spike`; enabling `system.billing`; the dataset
 download. The user creates the secret.
 
-## 17. Out of scope
+## 17. Running dbt inside Databricks (added 2026-09-30, user suggestion)
+
+Local dbt (uv) stays for development and tests. For the demo and the production run, dbt runs
+**inside Databricks**:
+
+- `notebooks/jev_semantic_tests.py` (Databricks source-format notebook, serverless): `%pip install`
+  the pinned `dbt-databricks`, write a `profiles.yml` at run time (host from the workspace, the
+  warehouse HTTP path from a widget/lookup, the notebook's short-lived run token passed to the dbt
+  subprocess as an environment variable, never displayed), run `dbt build` for the chosen
+  selection and mode (widgets: `mode` demo|live, `selection` yardstick|production), then display
+  the summary line, failing rows with `jev_p` and the scorecard.
+- `databricks.yml` (Databricks Asset Bundle): uploads the project and defines job
+  `jev_semantic_tests` with that notebook task on serverless compute. `databricks bundle deploy`
+  / `databricks bundle run` from the repo; the repo stays the source of truth.
+- Recording: beats 4–7 may be shown from the notebook or the job run page instead of the terminal.
+- Demo mode through the notebook is covered by the standing OK; live runs stay confirm-first.
+
+## 18. Out of scope
 
 Publishing to jev-demos until asked; Score/Choice variants; grants for other users beyond the
 README note; dbt Fusion; a global cross-executor pacer; LinkedIn copy.
