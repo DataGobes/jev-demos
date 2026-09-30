@@ -130,7 +130,8 @@ where invocation_id = {{ jev_sql_string(invocation_id) }} and test_name = {{ jev
           ~ jev_sql_string(model.name) ~ ", " ~ jev_sql_string(jev_mode()) ~ ", "
           ~ jev_sql_string(var('jev_model')) ~ ", " ~ tested ~ ", " ~ missing ~ ", "
           ~ oversized ~ ", " ~ inserted ~ ", current_timestamp())") -%}
-    {%- do log("Jev · " ~ t.name ~ " · " ~ tested ~ " tested · " ~ missing ~ " judged now · "
+    {%- do log("Jev · " ~ ('SIMULATED' if jev_mode() == 'demo' else 'LIVE') ~ " · " ~ t.name ~ " · "
+              ~ tested ~ " tested · " ~ (missing - oversized) ~ " judged now · "
               ~ oversized ~ " too long", info=True) -%}
     {%- if inserted != missing -%}
       {{ exceptions.raise_compiler_error("jev_judge: " ~ t.name ~ ": inserted " ~ inserted

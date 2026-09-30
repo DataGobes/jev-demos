@@ -17,3 +17,8 @@
   {%- endfor -%}
   {{ print('-- BEGIN\n' ~ (parts | join('\n')) ~ '\n-- END') }}
 {% endmacro %}
+
+{% macro jev_render_summary_lines(s) %}
+  {%- set out = jev_summary_lines(s) -%}
+  {{ print('-- BEGIN\n' ~ out.line1 ~ '\n' ~ out.line2 ~ '\n' ~ out.ok ~ '\n-- END') }}
+{% endmacro %}
