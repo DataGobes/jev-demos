@@ -1,0 +1,29 @@
+name: jaffle_shop
+version: "1.0.0"
+profile: jaffle_shop
+model-paths: ["models"]
+seed-paths: ["seeds"]
+macro-paths: ["macros"]
+test-paths: ["tests"]
+
+on-run-end:
+  - "{{ jev_summary() }}"
+
+vars:
+  jev_catalog: jev_demo
+  jev_schema: jev
+  jev_mode: live            # override with env JEV_MODE=demo (SIMULATED)
+  jev_model: jev-1.13.0     # pinned; part of the cache key
+  jev_pack_token_budget: 48000
+  jev_pack_max_rows: 256
+  jev_row_token_limit: 30000
+  jev_max_concurrency: 4
+  jev_price_per_mtok_usd: 0.042   # https://docs.typesafe.ai/models
+  production: false         # --vars '{production: true}' enables models/production
+
+models:
+  jaffle_shop:
+    +materialized: table
+    +post-hook: "{{ jev_judge() }}"
+    production:
+      +enabled: "{{ var('production', false) }}"
