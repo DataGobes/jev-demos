@@ -257,3 +257,35 @@ def test_build_request_malformed_record_or_question():
 def test_source_is_embeddable():
     src = Path(noul_pack.__file__).read_text()
     assert "from __future__" not in src and "$$" not in src
+
+
+# -- F8: redaction happens before truncation; an empty key is never "redacted" ------------------
+
+
+def _call(script, key=KEY):
+    http = FakeHttp(script)
+    return json.loads(noul_pack.handler(
+        RECS, Q, "jev-1.13.0", get_key=lambda: key, post=http, sleep=lambda _: None,
+        now=lambda: 1.0, new_id=lambda: "uuid-1"))
+
+
+def test_a_body_that_echoes_the_key_is_redacted_with_a_marker():
+    res = _call([(401, b"invalid key: " + KEY.encode(), {})])
+    assert "[redacted]" in res["error"] and KEY not in res["error"]
+
+
+def test_a_key_straddling_the_truncation_point_leaves_no_prefix():
+    body = b"x" * (noul_pack.ERROR_BODY_CHARS - 5) + KEY.encode() + b" tail"
+    res = _call([(401, body, {})])
+    detail = res["error"].removeprefix("HTTP 401: ")
+    assert len(detail) == noul_pack.ERROR_BODY_CHARS
+    # redacted first, then cut: the cut lands inside the marker, never inside the key
+    assert not any(detail.endswith(KEY[:k]) for k in range(1, len(KEY) + 1))
+    assert detail.endswith("[reda")
+
+
+def test_an_empty_key_produces_no_redaction_markers():
+    res = _call([(401, b"no key configured", {})], key="")
+    assert res["error"] == "HTTP 401: no key configured"
+    res = _call([ConnectionError("x")] * 6, key="")
+    assert "[redacted]" not in res["error"]

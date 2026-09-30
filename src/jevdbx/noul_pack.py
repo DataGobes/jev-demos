@@ -62,6 +62,12 @@ def urllib_post(url, body, headers, timeout):
         return e.code, e.read(), {k.lower(): v for k, v in (e.headers or {}).items()}
 
 
+def _redact(text, key):
+    """The key replaced by a marker. An empty key redacts nothing (replacing "" would put a marker
+    between every character)."""
+    return text.replace(key, "[redacted]") if key else text
+
+
 def _retryable(status):
     return status is None or status in RETRYABLE_STATUSES or status >= 500
 
@@ -93,7 +99,8 @@ def handler(records, question, model, *, get_key, post, sleep, now, new_id, rand
             parsed = _parse(raw, len(records))
             out["values"], out["input_tokens"], out["model"], out["error"] = parsed
             break
-        detail = raw.decode("utf-8", "replace")[:ERROR_BODY_CHARS]
+        # redact before cutting: a key straddling the cut would otherwise leave its prefix
+        detail = _redact(raw.decode("utf-8", "replace"), key)[:ERROR_BODY_CHARS]
         if status is None:
             out["error"] = detail
         else:
@@ -104,7 +111,7 @@ def handler(records, question, model, *, get_key, post, sleep, now, new_id, rand
         sleep(backoff_seconds(attempt, retry_after, rand()))
     out["finished"] = now()
     if out["error"]:
-        out["error"] = out["error"].replace(key, "[redacted]")
+        out["error"] = _redact(out["error"], key)
     return json.dumps(out)
 
 
