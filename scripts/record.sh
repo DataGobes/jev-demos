@@ -5,8 +5,9 @@
 # Usage: scripts/record.sh [--cold] [--notebook] [--no-production] [--no-captions]
 #   --cold           forget this mode's judgments for the four tests before beat 4, so the
 #                    semantic build is a real cold run (a live cold run re-bills ~1,000 states)
-#   --notebook       dbt runs inside Databricks as the bundle job: print how to run it instead of
-#                    running dbt locally (this script never deploys or runs the bundle)
+#   --notebook       beats 4 and 7 print how to run the bundle job instead of running dbt locally
+#                    (beat 1 still runs dbt locally; this script never deploys or runs the bundle;
+#                    --cold is ignored)
 #   --no-production  skip beat 7 (live mode only; it is always skipped in demo mode)
 #   --no-captions    no title card, captions or end card
 #
@@ -36,6 +37,11 @@ case "$MODE" in
   *) echo "JEV_MODE must be live or demo, got '$MODE'" >&2; exit 2 ;;
 esac
 [[ $MODE == demo ]] && PRODUCTION=0
+if [[ $NOTEBOOK == 1 && $COLD == 1 ]]; then
+  echo "--cold is ignored with --notebook (the preflight does not run); to start cold, clear" \
+    "this mode's judgments for the four tests before recording." >&2
+  COLD=0
+fi
 TYPE_DELAY="${TYPE_DELAY:-0.03}"
 export DBT_SEND_ANONYMOUS_USAGE_STATS=false
 PROD_WAREHOUSE="${JEV_PROD_WAREHOUSE:-jev-demo-5-prod}"
@@ -93,6 +99,8 @@ beat() {
 notebook_beat() {
   local selection="$1" cap="$2" run
   run="databricks bundle run jev_semantic_tests --params mode=$MODE,selection=$selection"
+  # the job's warehouse parameter defaults to the dev warehouse
+  [[ $selection == production ]] && run="$run,warehouse=$PROD_WAREHOUSE"
   read -rsn1
   clear 2>/dev/null || true
   type_cmd "$run"

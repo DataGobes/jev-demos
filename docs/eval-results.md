@@ -6,9 +6,11 @@ new invocation and no dbt errors. A SIMULATED (demo-mode) run is never written h
 quoted as a result anywhere.
 
 Each entry has demo 04's columns (defects, Jev and regex precision/recall, hard negatives
-flagged) plus what is specific to Databricks: the warehouse, the pack token budget, requests,
-retries and 429s, actual tokens, the estimated-to-actual token ratio, the Jev cost, the warehouse
-DBUs (from `system.billing.usage`, once that schema is enabled) and the once-per-row counters.
+flagged) plus what is specific to Databricks, written by `score.py`: the warehouse, the pack token
+budget, requests, retries and 429s, actual tokens, the estimated-to-actual token ratio, the Jev
+cost, the Jev span in seconds (the summary line's "s Jev", the span of the packs' timestamps) and
+the once-per-row counters. Warehouse DBUs (from `system.billing.usage`, once that schema is
+enabled) and the dbt wall time are not written by `score.py`; they are added to the entry by hand.
 
 Gate, yardstick run (unchanged from demo 04): live, no errors, Jev precision >= 0.85 and recall
 >= 0.85 on every test, Jev F1 above the regex baseline on every test. Gate, production run:
@@ -31,8 +33,8 @@ How to read them:
 
 - Demo 04 prints `N judgments · M unique`. **M is the number of distinct (test, state) pairs**
   (1,057); N (1,300) counts rows, repeats included. Demo 05's "N judgments" counts distinct
-  (test, state) pairs with a successful judgment, so demo 05's 1,057 is comparable with demo 04's
-  1,057 unique, not with its 1,300.
+  (test, state) pairs with a successful judgment, so demo 05's judgment count is comparable with demo 04's
+  unique count (1,057), not with its 1,300.
 - Demo 04 does not print F1. The F1 column is derived here from the printed, 2-decimal precision
   and recall, so it can be off by a rounding step.
 - `live/pack=1` sent one request per state (the recording pack in demo 04); `pack=32` and

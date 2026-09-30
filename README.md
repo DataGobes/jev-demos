@@ -76,7 +76,9 @@ dbt build
   single `PhotonScalarUDF` after the pack aggregation.
 - **When it judges.** The hook judges only the `jev_expect` tests that are selected in the
   invocation (dbt's `selected_resources`): `dbt build --select +tag:semantic`. A plain `dbt run`,
-  or a build that excludes the tests, builds the models and never calls Jev.
+  or a build that excludes the tests, builds the models and never calls Jev. `dbt retry` does not
+  judge either (dbt leaves `selected_resources` empty on a retry): rerun
+  `dbt build --select +tag:semantic`.
 - **Never a silent pass.** If a tested row has no successful judgment (the sentence changed and
   only `dbt test` ran, a pack failed), the test returns it with `jev_p = NULL` and the summary says
   so.
@@ -244,19 +246,26 @@ tests. Only numbers from logged live runs appear in this repo; SIMULATED output 
   Loud, not silent. Real rows are far smaller (the 16k-token mark is ~50k characters).
 - **Cost.** Jev: input tokens × $0.042 per million (`src/jevdbx/pricing.py`,
   [docs.typesafe.ai/models](https://docs.typesafe.ai/models)). Warehouse DBUs from
-  `system.billing.usage` once that schema is enabled. Query overhead (13–27 s per statement)
-  dominates wall time, not Jev.
+  `system.billing.usage` once that schema is enabled. Query overhead (13–27 s per statement,
+  measured in the spike, spec §3) dominates wall time, not Jev.
 - **Model pinned** to `jev-1.13.0` (dbt var `jev_model`), not the `jev-latest` alias; it is part of
   the cache key.
 
 ## Recording
 
-`scripts/record.sh [--cold] [--notebook] [--no-production] [--no-captions]` types out each beat and waits for a keypress:
-the standard build on Databricks, the `jev_expect` blocks, the Jev function (`DESCRIBE FUNCTION
+`scripts/record.sh [--cold] [--notebook] [--no-production] [--no-captions]` types out each beat and
+waits for a keypress: the standard build on Databricks, the `jev_expect` blocks, the Jev function (`DESCRIBE FUNCTION
 EXTENDED`), the semantic build with its summary line, the flagged rows, the scorecard, and the
-production run with its rerun. `--notebook` prints how to run the bundle job instead of running
-dbt locally (nothing is deployed by the script). Captions, a title card and an end card are built
+production run with its rerun. With `--notebook`, beats 4 and 7 print how to run the bundle
+job instead of running dbt locally (nothing is deployed by the script; beat 1 still runs dbt
+locally, and `--cold` is ignored with a notice). Captions, a title card and an end card are built
 in.
+
+Record right after a scored run (`score.py --run --append`, live), and without `--cold`: the
+accuracy numbers on screen (flagged rows, scorecard) are then the logged run's, and beat 4 shows a
+fully cached rerun. `--cold` judges every state again on camera, a new live run (billed) whose
+numbers are not in `docs/eval-results.md` until it is scored and appended; use it only for a take
+you will log the same way.
 
 Terminal size: 90 columns x 30 rows, a large font.
 

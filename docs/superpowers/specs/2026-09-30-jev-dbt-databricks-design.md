@@ -175,7 +175,8 @@ dbt build
   *Amended 2026-09-30:* the hook judges only `jev_expect` tests that are in dbt's
   `selected_resources` for the invocation, so judging happens only when the tests are selected
   (`dbt build --select +tag:semantic`), never on a plain `dbt run` or a build that excludes them
-  (e.g. the recording's beat 1, `dbt build --exclude tag:semantic`).
+  (e.g. the recording's beat 1, `dbt build --exclude tag:semantic tag:baseline`). `dbt retry` leaves
+  `selected_resources` empty, so it does not judge either.
 - **Concurrency of dbt threads:** hooks of different models append disjoint keys.
   *Amended 2026-09-30:* blind appends do conflict here. Two hooks running at once failed with
   `DELTA_CONCURRENT_APPEND.ROW_LEVEL_CHANGES` (measured) whenever each hook's cache read
@@ -371,7 +372,10 @@ requests, retries, tokens, Jev cost, DBUs, wall time and the numbers.
 
 ## 14. Recording (`scripts/record.sh`, demo 04 style)
 
-1. `dbt build --exclude tag:semantic`: all green, on Databricks. *"Same project. Now on Databricks."*
+1. `dbt build --exclude tag:semantic tag:baseline`: all green, on Databricks; no Jev call (the
+   hook only judges selected `jev_expect` tests). *"Same project. Now on Databricks."*
+   *(Amended 2026-09-30: `tag:baseline` excluded too, matching `scripts/record.sh`; the baselines
+   are built and stored by the unrecorded preflight.)*
 2. The `jev_expect` blocks in `schema.yml`, identical to demo 04. *"Same sentences."*
 3. `DESCRIBE FUNCTION EXTENDED jev_demo.jev.noul_pack`. *"Jev is a governed function; the key never leaves Databricks."*
 4. `dbt build --select +tag:semantic`: WARN counts + summary line.
