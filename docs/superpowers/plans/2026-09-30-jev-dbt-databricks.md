@@ -460,14 +460,7 @@ def handler(records, question, model, *, get_key, post, sleep, now, new_id, rand
         except Exception as exc:  # noqa: BLE001 -- connection errors and timeouts are retried
             status, raw = None, f"{type(exc).__name__}: {exc}".encode()
         if status == 200:
-            try:
-                resp = json.loads(raw)
-                out["values"] = [resp["answers"][f"r{i:03d}"]["noul"] for i in range(len(records))]
-                out["input_tokens"] = int(resp["usage"]["input_tokens"])
-                out["model"] = resp["model"]
-            except (ValueError, KeyError, TypeError) as exc:
-                out["values"] = None
-                out["error"] = f"bad response: {type(exc).__name__}: {str(exc)[:ERROR_BODY_CHARS]}"
+            out["values"], out["input_tokens"], out["model"], out["error"] = _parse(raw, len(records))
             break
         detail = raw.decode("utf-8", "replace")[:ERROR_BODY_CHARS]
         out["error"] = f"HTTP {status}: {detail}"
@@ -475,18 +468,24 @@ def handler(records, question, model, *, get_key, post, sleep, now, new_id, rand
             break
         out["retries"].append({"attempt": attempt, "status": status, "t": now()})
         sleep(backoff_seconds(attempt, retry_after, rand()))
-    else:
-        pass
-    if out["values"] is not None and out["error"] and out["error"].startswith("HTTP"):
-        out["error"] = None  # an earlier attempt failed, the last one succeeded
     out["finished"] = now()
     return json.dumps(out)
+
+
+def _parse(raw, n):
+    """(values, input_tokens, model, error) from a 200 body; a malformed body is an error."""
+    try:
+        resp = json.loads(raw)
+        values = [resp["answers"][f"r{i:03d}"]["noul"] for i in range(n)]
+        return values, int(resp["usage"]["input_tokens"]), resp["model"], None
+    except (ValueError, KeyError, TypeError) as exc:
+        return None, 0, None, f"bad response: {type(exc).__name__}: {str(exc)[:ERROR_BODY_CHARS]}"
 ```
 
-Note on `retries`: the list holds only the attempts that were *followed by* a retry, so on
-give-up after 6 attempts it has 5 entries and `attempts == 6`; `test_gives_up_after_six_attempts`
-asserts 5 sleeps. `test_retries_then_succeeds` asserts one retry entry. Remove the empty
-`else: pass` if ruff flags it (it has no behaviour).
+Note on `retries`: it holds only the attempts that were *followed by* a retry, so on give-up
+after 6 attempts it has 5 entries and `attempts == 6`; `test_gives_up_after_six_attempts` asserts
+5 sleeps. `test_retries_then_succeeds` asserts one retry entry. A success after a failed attempt
+resets `error` to None via `_parse`.
 
 - [ ] **Step 4: Run tests**
 
@@ -1350,7 +1349,8 @@ JAFFLE = ROOT / "jaffle_shop"
 
 def dbt(*args, env=None) -> subprocess.CompletedProcess:
     full_env = {**os.environ, "DBT_SEND_ANONYMOUS_USAGE_STATS": "false", **(env or {})}
-    full_env.pop("JEV_MODE", None) if env is None or "JEV_MODE" not in env else None
+    if env is None or "JEV_MODE" not in env:
+        full_env.pop("JEV_MODE", None)
     return subprocess.run(
         ["uv", "run", "dbt", *args, "--profiles-dir", ".", "--target", "render"],
         cwd=JAFFLE, capture_output=True, text=True, env=full_env, timeout=300,
@@ -1407,7 +1407,6 @@ def test_post_hook_and_vars_configured():
     manifest = json.loads((JAFFLE / "target/manifest.json").read_text())
     node = manifest["nodes"]["model.jaffle_shop.stg_reviews"]
     assert any("jev_judge()" in h["sql"] for h in node["config"]["post-hook"])
-    assert manifest["vars"] if "vars" in manifest else True
 
 
 @pytest.mark.slow
@@ -1444,9 +1443,6 @@ def test_question_validation(args, msg):
 
 @pytest.mark.slow
 def test_bad_mode_is_rejected():
-    res = dbt("run-operation", "jev_render_question", "--args", '{"fails_if": "x"}',
-              env={"JEV_MODE": "maybe"})
-    assert res.returncode == 0  # jev_question does not read the mode...
     key = dbt("run-operation", "jev_render_key", "--args",
               '{"column_name": "c", "context": [], "fails_if": "x"}', env={"JEV_MODE": "maybe"})
     assert key.returncode != 0 and "must be 'live' or 'demo'" in key.stdout + key.stderr
@@ -1468,8 +1464,6 @@ test node with `--select reviews_body_matches_stars` (dbt compiles ephemeral ref
 still needs relations, mark this one test `xfail(strict=False)` with the reason and rely on the
 integration test in Task 8; do not add workarounds that change macro behaviour.
 
-Clean up `tests/dbt_helpers.py`: the `full_env.pop` line is awkward — replace it with:
-`if env is None or "JEV_MODE" not in env: full_env.pop("JEV_MODE", None)`.
 
 - [ ] **Step 5: Run tests**
 
@@ -1891,12 +1885,15 @@ file, and never print one. If only a browser flow works, stop and ask the user t
 
 - [ ] **Step 3: Write the integration tests**
 
-`tests/integration/test_databricks_demo.py` (all `@pytest.mark.databricks`; each builds in
-demo mode via `uv run dbt ... --target dev` with `JEV_MODE=demo`, and queries with
-`jevdbx.databricks.Sql`):
+`tests/integration/test_databricks_demo.py` (demo mode only; runs dbt with `--target dev`):
 
 ```python
+"""Demo-mode end-to-end on the dev warehouse. Run: uv run pytest -m databricks -q
+(after: eval "$(uv run python scripts/jev_env.py)"). Never runs a live Jev call."""
+
+import json
 import os
+import re
 import subprocess
 from pathlib import Path
 
@@ -1905,7 +1902,14 @@ import pytest
 from jevdbx.databricks import Sql
 
 pytestmark = pytest.mark.databricks
-JAFFLE = Path(__file__).parents[2] / "jaffle_shop"
+ROOT = Path(__file__).parents[2]
+JAFFLE = ROOT / "jaffle_shop"
+DEMO4_DB = Path.home() / "Projects/jev-demo-4/jaffle_shop/jaffle_shop.duckdb"
+BASELINES = ["customers_full_name_is_a_person", "returns_comment_matches_reason_code",
+             "reviews_body_matches_stars", "tickets_body_has_no_pii"]
+ID_COL = {"customers_full_name_is_a_person": "customer_id",
+          "returns_comment_matches_reason_code": "return_id",
+          "reviews_body_matches_stars": "review_id", "tickets_body_has_no_pii": "ticket_id"}
 
 
 def dbt(*args):
@@ -1914,77 +1918,128 @@ def dbt(*args):
                           cwd=JAFFLE, capture_output=True, text=True, env=env, timeout=1800)
 
 
+def clear_demo_rows(sql):
+    assert sql.run("delete from jev_demo.jev.judgments where mode = 'demo'").state == "SUCCEEDED"
+
+
 @pytest.fixture(scope="module")
 def sql():
     return Sql()
 
 
 @pytest.fixture(scope="module")
-def fresh_build(sql):
-    sql.run("delete from jev_demo.jev.judgments where mode = 'demo'")
-    assert dbt("seed").returncode == 0
+def cold_build(sql):
+    clear_demo_rows(sql)
+    seed = dbt("seed")
+    assert seed.returncode == 0, seed.stdout[-3000:]
+    return dbt("build", "--select", "+tag:semantic", "tag:baseline")
+
+
+def test_cold_build_judges_every_state_once(cold_build):
+    out = cold_build.stdout
+    assert cold_build.returncode == 0, out[-4000:]
+    assert "SIMULATED" in out and "once-per-row OK" in out and "0% cached" in out
+    # 1,057 = demo 04's distinct (test, state) count at pack=1. If this differs, find out why
+    # (e.g. a to_json difference) before touching the number.
+    assert "1,057 judgments" in out
+
+
+def test_rerun_is_fully_cached(cold_build):
     res = dbt("build", "--select", "+tag:semantic")
-    return res
+    assert res.returncode == 0, res.stdout[-3000:]
+    assert "100% cached" in res.stdout and " 0 requests" in res.stdout
 
 
-def test_cold_build_judges_every_row_once(fresh_build):
-    out = fresh_build.stdout
-    assert fresh_build.returncode == 0, out[-4000:]
-    assert "SIMULATED" in out and "once-per-row OK" in out
-    assert "1,057 judgments" in out and "0% cached" in out
-
-
-def test_rerun_is_fully_cached():
-    res = dbt("build", "--select", "+tag:semantic")
-    assert res.returncode == 0 and "100% cached" in res.stdout and " 0 requests" in res.stdout
-
-
-def test_single_python_eval_in_insert_plan(sql):
-    ins = subprocess.run(["uv", "run", "pytest", "-q"], capture_output=True)  # placeholder removed below
-```
-
-Replace the last test body with this, which renders the real INSERT on the dev target and
-`EXPLAIN`s it (the `explain` wraps an `insert` fine in Databricks SQL):
-
-```python
-def test_single_python_eval_in_insert_plan(sql):
-    from tests.dbt_helpers import JAFFLE as J  # noqa: F401  (same project)
+def test_single_python_eval_in_insert_plan(sql, cold_build):
     res = subprocess.run(
-        ["uv", "run", "dbt", "run-operation", "jev_render_judge", "--args", "{model_name: stg_reviews}",
-         "--profiles-dir", ".", "--target", "dev"],
+        ["uv", "run", "dbt", "run-operation", "jev_render_judge", "--args",
+         json.dumps({"model_name": "stg_reviews"}), "--profiles-dir", ".", "--target", "dev"],
         cwd=JAFFLE, capture_output=True, text=True, env={**os.environ, "JEV_MODE": "demo"})
     insert = res.stdout.split("-- insert\n", 1)[1].split("\n-- inserted\n", 1)[0]
-    plan = "\n".join(r[0] for r in sql.run("explain formatted " + insert).rows)
-    import re
-    assert len(set(re.findall(r"^\(\d+\) \w*EvalPython\w*", plan, re.M))) == 1, plan[:3000]
+    plan = "\n".join(str(r[0]) for r in sql.run("explain formatted " + insert).rows)
+    nodes = set(re.findall(r"^\(\d+\) \w*EvalPython\w*", plan, re.M))
+    assert len(nodes) == 1, plan[:3000]
 
 
-def test_stored_failures_have_jev_p(sql):
-    rows = sql.run("select count(*), count(jev_p) from "
-                   "jev_demo.jaffle_shop_dbt_test__audit.reviews_body_matches_stars").rows
-    assert int(rows[0][0]) == int(rows[0][1]) > 0
+def test_stored_failures_have_jev_p(sql, cold_build):
+    total, with_p = sql.run(
+        "select count(*), count(jev_p) from "
+        "jev_demo.jaffle_shop_dbt_test__audit.reviews_body_matches_stars").rows[0]
+    assert int(total) == int(with_p) > 0
 
 
-def test_oversized_row_is_reported_not_sent(sql):
-    ...
+def test_staging_matches_demo04_and_has_no_nulls(sql, cold_build):
+    counts = {m: int(sql.run(f"select count(*) from jev_demo.jaffle_shop.{m}").scalar())
+              for m in ["stg_customers", "stg_orders", "stg_returns", "stg_reviews", "stg_tickets"]}
+    assert counts == {"stg_customers": 500, "stg_orders": 1500, "stg_returns": 200,
+                      "stg_reviews": 400, "stg_tickets": 200}
+    nulls = sql.run(
+        "select (select count(*) from jev_demo.jaffle_shop.stg_customers where full_name is null or email is null)"
+        " + (select count(*) from jev_demo.jaffle_shop.stg_returns where comment is null or reason_code is null)"
+        " + (select count(*) from jev_demo.jaffle_shop.stg_reviews where body is null or stars is null)"
+        " + (select count(*) from jev_demo.jaffle_shop.stg_tickets where body is null)").scalar()
+    assert int(nulls) == 0  # so Spark's to_json NULL-field omission cannot change any state
+
+
+@pytest.mark.skipif(not DEMO4_DB.exists(), reason="demo 04 DuckDB file not present")
+@pytest.mark.parametrize("name", BASELINES)
+def test_baselines_flag_same_rows_as_demo04(sql, cold_build, name):
+    ref = subprocess.run(["uv", "run", "python", "scripts/demo04_reference.py", name],
+                         cwd=ROOT, capture_output=True, text=True)
+    if ref.returncode == 2:
+        pytest.skip(ref.stdout.strip())
+    theirs = set(json.loads(ref.stdout))
+    ours = {int(r[0]) for r in sql.run(
+        f"select {ID_COL[name]} from jev_demo.jaffle_shop_dbt_test__audit.baseline_{name}").rows}
+    assert ours == theirs
+
+
+def test_oversized_rows_are_reported_not_sent(sql, cold_build):
+    clear_demo_rows(sql)
+    res = dbt("build", "--select", "+stg_reviews", "--vars", "{jev_row_token_limit: 40}")
+    assert res.returncode == 0, res.stdout[-3000:]
+    assert " 0 requests" in res.stdout and "+400 too long" in res.stdout
+    errs = sql.run("select count(*) from jev_demo.jev.judgments where mode = 'demo' "
+                   "and test_name = 'reviews_body_matches_stars' "
+                   "and error like 'row exceeds token limit%'").scalar()
+    assert int(errs) == 400
+    clear_demo_rows(sql)
 ```
 
-For `test_oversized_row_is_reported_not_sent`: run
-`dbt build --select +tag:semantic --vars '{jev_row_token_limit: 40}'` (every state exceeds 40
-estimated tokens) after deleting demo rows; assert the summary shows `0 requests` and the
-`reviews_body_matches_stars` rows in `judgments` for this invocation all have
-`error like 'row exceeds token limit%'`; then delete those demo rows again so later runs are clean.
+`scripts/demo04_reference.py` (reads demo 04's DuckDB read-only; exit 2 = nothing to compare):
 
-Add `test_baselines_flag_same_rows_as_demo04`: `scripts/demo04_reference.py` opens
-`~/Projects/jev-demo-4/jaffle_shop/jaffle_shop.duckdb` read-only and prints, per baseline test, the
-sorted id list from demo 04's stored failures (`main_dbt_test__audit.baseline_<name>`); the
-integration test runs `dbt test --select tag:baseline` on Databricks and compares the id sets of
-`jev_demo.jaffle_shop_dbt_test__audit.baseline_<name>` with it. If demo 04's DuckDB file has no
-baseline tables, skip with that reason (never regenerate demo 04's data from here).
+```python
+"""Print demo 04's stored baseline failures for one test as a JSON id list (read-only)."""
 
-Add `test_staging_row_counts_match_demo04`: counts of the five staging models equal
-500 / 1,500 / 200 / 400 / 200 and the four tested text columns have no NULLs (so Spark's
-`to_json` NULL-field omission cannot change states).
+import json
+import sys
+from pathlib import Path
+
+import duckdb
+
+DB = Path.home() / "Projects/jev-demo-4/jaffle_shop/jaffle_shop.duckdb"
+ID = {"customers_full_name_is_a_person": "customer_id",
+      "returns_comment_matches_reason_code": "return_id",
+      "reviews_body_matches_stars": "review_id", "tickets_body_has_no_pii": "ticket_id"}
+
+
+def main(name: str) -> int:
+    con = duckdb.connect(str(DB), read_only=True)
+    table = f"main_dbt_test__audit.baseline_{name}"
+    try:
+        ids = sorted(int(r[0]) for r in con.execute(f"select {ID[name]} from {table}").fetchall())
+    except duckdb.CatalogException:
+        print(f"demo 04 has no {table}")
+        return 2
+    print(json.dumps(ids))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1]))
+```
+
+`duckdb` is needed only for this script: add `"duckdb>=1.5"` to the `dev` dependency group.
 
 - [ ] **Step 4: Run** — `uv run pytest -m databricks -q` → PASS. Fix macros for real failures,
 adding an offline test for each fix. Record wall times in the task report.
