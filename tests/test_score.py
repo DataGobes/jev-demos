@@ -1,0 +1,487 @@
+import importlib.util
+import json
+from pathlib import Path
+
+import pytest
+
+from jevdbx.databricks import Result
+
+ROOT = Path(__file__).parents[1]
+spec = importlib.util.spec_from_file_location("score", ROOT / "scripts" / "score.py")
+score = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(score)
+
+GOLD = {1: "defect", 2: "defect", 3: "hard_negative", 4: "defect"}
+
+
+def live_run(**kw):
+    return score.Run(mode="live", answered_model="jev-1.13.0", requested_model="jev-1.13.0", **kw)
+
+
+# -- metrics / golden --------------------------------------------------------------------------
+
+
+def test_metrics():
+    m = score.metrics({1, 2, 3, 9}, GOLD)
+    assert (m.flagged, m.tp, m.fp, m.fn, m.hard_neg_flagged) == (4, 2, 2, 1, 1)
+    assert m.precision == 0.5 and round(m.recall, 3) == 0.667
+
+
+def test_metrics_nothing_flagged():
+    m = score.metrics(set(), GOLD)
+    assert (m.precision, m.recall, m.f1) == (0.0, 0.0, 0.0)
+
+
+def test_load_golden_groups_by_test(tmp_path):
+    p = tmp_path / "g.csv"
+    p.write_text("test_name,id,label,note\nt1,1,defect,x\nt1,2,hard_negative,y\nt2,7,defect,z\n")
+    assert score.load_golden(p) == {"t1": {1: "defect", 2: "hard_negative"}, "t2": {7: "defect"}}
+
+
+def test_shipped_golden_key_covers_the_four_yardstick_tests():
+    golden = score.load_golden(ROOT / "eval" / "golden_defects.csv")
+    assert set(golden) == set(score.TESTS)
+
+
+# -- wilson / audited precision ----------------------------------------------------------------
+
+
+def test_wilson_8_of_10():
+    lo, hi = score.wilson(8, 10)
+    assert round(lo, 2) == 0.49 and round(hi, 2) == 0.94
+
+
+def test_wilson_edges():
+    assert score.wilson(0, 0) == (0.0, 1.0)
+    lo, hi = score.wilson(10, 10)
+    assert hi == pytest.approx(1.0) and 0.6 < lo < 0.75
+    lo, hi = score.wilson(0, 10)
+    assert lo == pytest.approx(0.0) and 0.25 < hi < 0.4
+
+
+AUDIT = {i: "real" for i in range(40)} | {i: "ok" for i in range(100, 110)}
+
+
+def test_audited_precision_extrapolates_the_sample_share():
+    point, lo, hi = score.audited_precision(90, 50, AUDIT)
+    assert point == pytest.approx((90 + 40) / (90 + 50))  # 0.929
+    assert lo < point < hi <= 1.0
+    # the interval is Wilson(40, 50) on the unplanted flags, scaled to all flags
+    wlo, whi = score.wilson(40, 50)
+    assert lo == pytest.approx((90 + wlo * 50) / 140) and hi == pytest.approx((90 + whi * 50) / 140)
+
+
+def test_audited_precision_no_unplanted_flags_is_raw_precision():
+    assert score.audited_precision(90, 0, AUDIT) == (1.0, 1.0, 1.0)
+
+
+def test_audited_precision_nothing_flagged():
+    assert score.audited_precision(0, 0, {}) == (0.0, 0.0, 0.0)
+
+
+def test_audited_precision_needs_labels_when_unplanted_flags_exist():
+    with pytest.raises(ValueError, match="audit"):
+        score.audited_precision(90, 50, {})
+
+
+def test_audited_precision_rejects_unknown_labels():
+    with pytest.raises(ValueError, match="label"):
+        score.audited_precision(1, 1, {5: "maybe"})
+
+
+# -- gate --------------------------------------------------------------------------------------
+
+
+def test_gate():
+    good = score.metrics({1, 2, 4}, GOLD)
+    weak = score.metrics({1}, GOLD)
+    ok, reasons = score.gate({"t": (good, weak)}, live_run())
+    assert ok and reasons == []
+    ok, reasons = score.gate({"t": (good, weak)}, score.Run(mode="demo"))
+    assert not ok and "run was not LIVE" in reasons
+    ok, reasons = score.gate({"t": (weak, good)}, live_run())
+    assert not ok and any("recall" in r for r in reasons)
+    assert any("f1" in r and "does not beat baseline" in r for r in reasons)
+    ok, reasons = score.gate({"t": (good, weak)}, live_run(error_packs=2))
+    assert not ok and "run reported errors" in reasons
+
+
+def test_gate_messages_match_demo04_wording():
+    weak = score.metrics({1, 9}, GOLD)  # p=0.5 r=0.333
+    ok, reasons = score.gate({"t": (weak, weak)}, live_run())
+    assert "t: Jev precision 0.50 < 0.85" in reasons
+    assert "t: Jev recall 0.33 < 0.85" in reasons
+    assert "t: Jev f1 0.40 does not beat baseline f1 0.40" in reasons
+    ok, reasons = score.gate({}, None)
+    assert not ok and reasons == ["summary not captured (run with --run)"]
+
+
+def test_gate_unjudged_rows_count_as_errors():
+    good = score.metrics({1, 2, 4}, GOLD)
+    ok, reasons = score.gate({"t": (good, good)}, live_run(unjudged=3))
+    assert "run reported errors" in reasons
+
+
+def test_gate_fails_when_once_per_row_is_violated():
+    good = score.metrics({1, 2, 4}, GOLD)
+    weak = score.metrics({1}, GOLD)
+    # inserted != missing
+    ok, reasons = score.gate({"t": (good, weak)}, live_run(missing=5, inserted=4, pack_rows=4))
+    assert not ok and any("once-per-row" in r for r in reasons)
+    # dbt itself printed VIOLATED
+    ok, reasons = score.gate({"t": (good, weak)}, live_run(dbt_reported_violation=True))
+    assert not ok and any("once-per-row" in r for r in reasons)
+
+
+# -- SIMULATED ---------------------------------------------------------------------------------
+
+
+def test_refuse_append_if_simulated():
+    with pytest.raises(SystemExit) as e:
+        score.refuse_append_if_simulated(score.Run(mode="demo"))
+    assert e.value.code not in (0, None) and "SIMULATED" in str(e.value.code)
+    score.refuse_append_if_simulated(live_run())  # live: no exception
+
+
+def test_refuse_append_without_provenance():
+    with pytest.raises(SystemExit):
+        score.refuse_append_if_simulated(None)
+
+
+def test_simulated_banner_and_title():
+    demo = score.Run(mode="demo")
+    assert "SIMULATED" in score.simulated_banner(demo)
+    assert "SIMULATED" in score.simulated_banner(None)
+    assert score.simulated_banner(live_run()) is None
+    assert score.scorecard_title(demo) == "SIMULATED backend vs regex baseline"
+    assert score.scorecard_title(None) == "SIMULATED backend vs regex baseline"
+    assert score.scorecard_title(live_run()) == "Jev vs regex baseline"
+
+
+# -- run provenance ----------------------------------------------------------------------------
+
+
+def run_line_example(**kw):
+    base = dict(
+        mode="live", answered_model="jev-1.13.0", requested_model="jev-1.13.0", tested=1057,
+        missing=1057, inserted=1057, packs=5, pack_rows=1057, tokens=31_000, est_tokens=30_000,
+        retries=1, throttled=1, span_s=1.3, budget=48_000, invocation_id="abc")
+    return score.Run(**(base | kw))
+
+
+def test_run_derived_numbers():
+    r = run_line_example()
+    assert r.judgments == 1057 and r.cached_pct == 0.0 and r.errors == 0
+    assert r.cost_usd == pytest.approx(31_000 * 0.042 / 1e6)
+    assert r.est_ratio == pytest.approx(30_000 / 31_000)
+    assert r.once_per_row_ok
+    cached = run_line_example(missing=0, inserted=0, packs=0, pack_rows=0, tokens=0, est_tokens=0)
+    assert cached.cached_pct == 100.0 and cached.est_ratio is None and cached.once_per_row_ok
+
+
+def test_run_line_matches_the_dbt_summary_layout():
+    line = score.run_line(run_line_example())
+    assert line == (
+        "Jev · 1,057 judgments · 0% cached · 5 requests · 1 retries (1× 429) · 1.3 s Jev · "
+        "$0.001 · LIVE jev-1.13.0 budget=48k")
+    demo = score.run_line(run_line_example(mode="demo", unjudged=2, error_packs=1))
+    assert "SIMULATED jev-1.13.0 budget=48k" in demo
+    assert demo.endswith(" · 2 unjudged (1 failed requests)")
+
+
+def test_once_per_row_ok_counts_oversized_rows_out_of_the_packs():
+    ok = run_line_example(inserted=1057, missing=1057, oversized=7, pack_rows=1050)
+    assert ok.once_per_row_ok
+    assert not run_line_example(pack_rows=1056).once_per_row_ok
+    assert not run_line_example(dups=1).once_per_row_ok
+
+
+def test_parse_once_per_row_violation():
+    ok = "\x1b[0m12:00  Jev · once-per-row OK · LIVE: 5 inserted = 5 missing\n"
+    bad = "Jev · once-per-row VIOLATED · LIVE: 5 inserted = 6 missing\n"
+    assert score.dbt_reported_violation(ok) is False
+    assert score.dbt_reported_violation(bad) is True
+    assert score.dbt_reported_violation("nothing") is False
+
+
+class FakeSql:
+    """Answers Sql.run by the first key that appears in the statement."""
+
+    def __init__(self, answers):
+        self.answers, self.seen = answers, []
+
+    def run(self, sql, timeout_s=900):
+        self.seen.append(sql)
+        for key, res in self.answers.items():
+            if key in sql:
+                return res
+        raise AssertionError(f"unexpected statement: {sql[:120]}")
+
+
+def test_load_run_reads_the_latest_invocation_of_the_selected_tests():
+    sql = FakeSql({
+        "from jev_demo.jev.hook_runs": Result("SUCCEEDED", rows=[["inv-1"]]),
+    })
+    assert score.latest_invocation(sql, ["a", "b"]) == "inv-1"
+    q = sql.seen[0]
+    assert "order by recorded_at desc limit 1" in q and "test_name in ('a', 'b')" in q
+
+
+def test_latest_invocation_none_when_no_hook_runs():
+    sql = FakeSql({"hook_runs": Result("SUCCEEDED", rows=[])})
+    assert score.latest_invocation(sql, ["a"]) is None
+
+
+def test_load_run_assembles_provenance_from_ledger_tables():
+    sql = FakeSql({
+        "from jev_demo.jev.hook_runs": Result("SUCCEEDED", rows=[
+            ["3", "1057", "1057", "1057", "0", "demo", "jev-1.13.0"]]),
+        "from jev_demo.jev.requests": Result("SUCCEEDED", rows=[
+            ["5", "31000", "30000", "1057", "2", "1", "0", "1.3", "jev-1.13.0"]]),
+        "from jev_demo.jev.judgments where invocation_id": Result("SUCCEEDED", rows=[["0", "0"]]),
+    })
+    r = score.load_run(sql, "inv-1", budget=48_000)
+    assert r.mode == "demo" and r.simulated and r.judgments == 1057
+    assert (r.packs, r.tokens, r.est_tokens, r.retries, r.throttled) == (5, 31000, 30000, 2, 1)
+    assert r.answered_model == "jev-1.13.0" and r.span_s == 1.3 and r.budget == 48_000
+
+
+# -- dbt command / fresh / queries -------------------------------------------------------------
+
+
+def test_dbt_args_yardstick_builds_the_whole_project_minus_production():
+    assert score.dbt_args(production=False) == [
+        "build", "--exclude", "tag:production", "tag:production_baseline"]
+
+
+def test_dbt_args_production_selects_the_production_models_and_tests():
+    assert score.dbt_args(production=True) == [
+        "build", "--vars", "{production: true}",
+        "--select", "+tag:production", "tag:production_baseline"]
+
+
+def test_fresh_sql_deletes_only_this_modes_judgments_for_the_selected_tests():
+    sql = score.fresh_sql("demo", ["a", "b"])
+    assert sql == ("delete from jev_demo.jev.judgments where mode = 'demo' "
+                   "and test_name in ('a', 'b')")
+    with pytest.raises(ValueError):
+        score.fresh_sql("demo; drop", ["a"])
+    with pytest.raises(ValueError):
+        score.fresh_sql("live", ["a'b"])
+
+
+def test_flagged_query_excludes_unjudged_rows_for_jev_tests_only():
+    jev = score.flagged_query("reviews_body_matches_stars", "review_id", judged_only=True)
+    assert jev == ("select review_id from jev_demo.jaffle_shop_dbt_test__audit."
+                   "reviews_body_matches_stars where jev_p is not null")
+    base = score.flagged_query("baseline_reviews_body_matches_stars", "review_id")
+    assert "jev_p" not in base
+
+
+def test_tests_are_the_four_yardstick_tests():
+    assert set(score.TESTS) == {
+        "customers_full_name_is_a_person", "returns_comment_matches_reason_code",
+        "reviews_body_matches_stars", "tickets_body_has_no_pii"}
+
+
+# -- demo 04 reference -------------------------------------------------------------------------
+
+
+def test_demo04_reference_is_the_hand_copied_log():
+    ref = score.load_demo04_reference()
+    assert ref["compare_to"] == "live/pack=64/nested"
+    assert set(ref["runs"]) == {"live/pack=1", "live/pack=32/nested", "live/pack=64/nested"}
+    p64 = ref["runs"]["live/pack=64/nested"]
+    assert (p64["requests"], p64["unique_states"], p64["wall_s"], p64["cost_usd"]) == (
+        18, 1057, 1.2, 0.006)
+    assert p64["source_heading"].endswith("live/pack=64/nested")
+    assert set(p64["tests"]) == set(score.TESTS)
+    t = p64["tests"]["tickets_body_has_no_pii"]
+    assert (t["jev"]["precision"], t["jev"]["recall"]) == (0.93, 1.0)
+    assert (t["baseline"]["precision"], t["baseline"]["recall"]) == (0.48, 0.86)
+    assert ref["runs"]["live/pack=1"]["requests"] == 1057
+
+
+# -- production --------------------------------------------------------------------------------
+
+
+def prod_inputs(**kw):
+    planted = set(range(1, 101))
+    flagged = set(range(1, 91)) | set(range(1000, 1050))  # 90 planted TPs + 50 unplanted
+    base = dict(flagged=flagged, planted=planted, baseline_flagged={1, 2, 3, 2000, 2001},
+                audit=AUDIT)
+    return base | kw
+
+
+def test_production_metrics():
+    m = score.production_metrics(**prod_inputs())
+    assert (m.flagged, m.planted, m.planted_tp, m.unplanted_flagged) == (140, 100, 90, 50)
+    assert m.recall == pytest.approx(0.9)
+    assert m.raw_precision == pytest.approx(90 / 140)
+    assert m.audited_precision == pytest.approx(130 / 140)
+    assert m.audit_lo < m.audited_precision < m.audit_hi
+    assert m.baseline.tp == 3 and m.baseline.fp == 2
+    assert m.jev_raw.f1 > m.baseline.f1
+    assert m.audited_f1 == pytest.approx(
+        2 * m.audited_precision * m.recall / (m.audited_precision + m.recall))
+
+
+def test_production_metrics_audit_pending_without_labels():
+    m = score.production_metrics(**prod_inputs(audit=None))
+    assert m.audited_precision is None and m.audit_lo is None and m.audited_f1 is None
+    assert m.raw_precision == pytest.approx(90 / 140)
+    assert score.production_metrics(**prod_inputs(audit={})).audited_precision is None
+
+
+def test_production_gate_passes():
+    m = score.production_metrics(**prod_inputs())
+    ok, reasons = score.production_gate(m, live_run(), rerun_requests=0)
+    assert ok and reasons == []
+
+
+def test_production_gate_reasons():
+    flagged = set(range(1, 51)) | set(range(1000, 1200))
+    weak = score.production_metrics(**prod_inputs(flagged=flagged))
+    bad_run = live_run(error_packs=1, dbt_reported_violation=True)
+    ok, reasons = score.production_gate(weak, bad_run, rerun_requests=3)
+    assert not ok
+    assert any("recall" in r and "< 0.85" in r for r in reasons)
+    assert any("audited precision" in r for r in reasons)
+    assert "run reported errors" in reasons
+    assert any("once-per-row" in r for r in reasons)
+    assert any("rerun made 3 requests" in r for r in reasons)
+
+
+def test_production_gate_pending_audit_is_not_a_pass():
+    m = score.production_metrics(**prod_inputs(audit=None))
+    ok, reasons = score.production_gate(m, live_run(), rerun_requests=None)
+    assert not ok and reasons == ["audited precision: audit pending"]
+
+
+def test_production_gate_f1_must_beat_baseline():
+    m = score.production_metrics(**prod_inputs(baseline_flagged=set(range(1, 100))))
+    ok, reasons = score.production_gate(m, live_run(), rerun_requests=0)
+    assert not ok and any("does not beat baseline" in r for r in reasons)
+
+
+def test_production_gate_not_live():
+    m = score.production_metrics(**prod_inputs())
+    ok, reasons = score.production_gate(m, score.Run(mode="demo"), rerun_requests=None)
+    assert "run was not LIVE" in reasons
+
+
+# -- audit labels ------------------------------------------------------------------------------
+
+
+def test_read_labels_file(tmp_path):
+    assert score.read_audit_labels(tmp_path / "missing.csv") is None
+    p = tmp_path / "labels.csv"
+    p.write_text("id,label\n5,real\n6,ok\n")
+    assert score.read_audit_labels(p) == {5: "real", 6: "ok"}
+    p.write_text("id,label\n5,real\n6,maybe\n")
+    with pytest.raises(ValueError, match="label"):
+        score.read_audit_labels(p)
+
+
+def test_labels_from_blind_audit(tmp_path):
+    p = tmp_path / "production_audit.csv"
+    p.write_text("id,stars,body,label\n1,5,great,ok\n2,1,\"love, it\",real\n3,1,x,\n")
+    labelled, total, labels = score.labels_from_audit_sample(p)
+    assert (labelled, total) == (2, 3) and labels == {1: "ok", 2: "real"}
+    assert score.labels_from_audit_sample(tmp_path / "none.csv") is None
+
+
+# -- append ------------------------------------------------------------------------------------
+
+
+def yard_results():
+    good = score.metrics({1, 2, 4}, GOLD)
+    weak = score.metrics({1, 3}, GOLD)
+    return {"t": (good, weak)}
+
+
+def test_append_report_shape(tmp_path):
+    path = tmp_path / "eval-results.md"
+    detail = {"t": ([3], [])}
+    run = live_run(tested=10, missing=10, inserted=10, packs=2, pack_rows=10, tokens=1000,
+                   est_tokens=900, retries=1, throttled=1, span_s=0.5, budget=48_000,
+                   invocation_id="abc")
+    score.append_report(path, yard_results(), detail, run, warehouse="jev-demo-5")
+    text = path.read_text()
+    assert "· live/budget=48k" in text.splitlines()[1]
+    assert "Jev · 10 judgments" in text and "LIVE jev-1.13.0 budget=48k" in text
+    assert "warehouse jev-demo-5" in text and "2 requests" in text
+    assert "1 retries (1× 429)" in text and "1,000 tokens" in text and "$0.000042" in text
+    assert "est/actual tokens 0.90" in text
+    assert "| t | 3 | 1.00 | 1.00 | 0 | 0.50 | 0.33 | 1 |" in text
+    assert "**Gate: PASS**" in text
+    assert "- `t`: hard negatives flagged = [3], defects missed = []" in text
+
+
+def test_append_report_refuses_simulated_and_writes_nothing(tmp_path):
+    path = tmp_path / "eval-results.md"
+    with pytest.raises(SystemExit):
+        score.append_report(path, yard_results(), {"t": ([], [])}, score.Run(mode="demo"),
+                            warehouse="w")
+    assert not path.exists()
+
+
+def test_append_production_report(tmp_path):
+    path = tmp_path / "eval-results.md"
+    m = score.production_metrics(**prod_inputs())
+    run = live_run(tested=140, missing=140, inserted=140, packs=3, pack_rows=140, tokens=5000,
+                   est_tokens=4500, span_s=2.0, budget=48_000)
+    score.append_production_report(path, m, run, warehouse="w", rerun_requests=0)
+    text = path.read_text()
+    assert "production" in text.splitlines()[1] and "audited precision 0.93" in text
+    assert "rerun requests 0" in text and "**Gate: PASS**" in text
+    with pytest.raises(SystemExit):
+        score.append_production_report(path, m, score.Run(mode="demo"), warehouse="w",
+                                       rerun_requests=None)
+
+
+def test_json_roundtrip_of_reference_is_valid():
+    json.loads((ROOT / "eval" / "demo04_reference.json").read_text())
+
+
+def test_audit_for_keeps_only_labels_of_still_flagged_unplanted_rows():
+    labels = {1: "real", 5: "ok", 6: "real", 99: "ok"}
+    assert score.audit_for({1, 5, 6}, {1}, labels) == {5: "ok", 6: "real"}
+    assert score.audit_for(set(), set(), labels) == {}
+
+
+# -- rendering (smoke: no crash, honest labels) ---------------------------------------------------
+
+
+def _render(fn, *args):
+    from rich.console import Console
+
+    console = Console(record=True, width=120)
+    fn(console, *args)
+    return console.export_text()
+
+
+def test_print_production_report_pending_and_audited():
+    pending = score.production_metrics(**prod_inputs(audit=None))
+    text = _render(score.print_production_report, pending, live_run(), None)
+    assert "audit pending" in text and "GATE PENDING" in text and "SIMULATED" not in text
+    audited = score.production_metrics(**prod_inputs())
+    text = _render(score.print_production_report, audited, live_run(), 0)
+    assert "audited precision" in text and "GATE PASS" in text and "rerun: 0 requests" in text
+
+
+def test_print_production_report_labels_a_demo_run_simulated():
+    m = score.production_metrics(**prod_inputs())
+    text = _render(score.print_production_report, m, score.Run(mode="demo"), None)
+    assert "SIMULATED" in text and "GATE FAIL" in text and "run was not LIVE" in text
+
+
+def test_print_report_compares_with_demo04_and_labels_unique_states():
+    ref = score.load_demo04_reference()
+    results = {n: (score.metrics(set(), {}), score.metrics(set(), {})) for n in score.TESTS}
+    text = _render(score.print_report, results, live_run(tested=5, missing=5, inserted=5,
+                                                          pack_rows=5, packs=1), ref)
+    assert "vs demo 04 (live/pack=64/nested)" in text
+    assert "unique states" in text and "18 requests" in text
+    sim = _render(score.print_report, results, score.Run(mode="demo"), ref)
+    assert "SIMULATED" in sim
