@@ -54,7 +54,7 @@ def cold_build(sql):
 def test_cold_build_judges_every_state_once(cold_build):
     out = cold_build.stdout
     assert cold_build.returncode == 0, out[-4000:]
-    assert "SIMULATED" in out and "once-per-row OK" in out and "0% cached" in out
+    assert "SIMULATED" in out and "once-per-row OK" in out and "· 0% cached" in out
     # 1,057 = demo 04's distinct (test, state) count at pack=1. If this differs, find out why
     # (e.g. a to_json difference) before touching the number.
     assert "1,057 judgments" in out
@@ -98,6 +98,32 @@ def test_stored_failures_have_jev_p(sql, cold_build):
         "select count(*), count(jev_p) from "
         "jev_demo.jaffle_shop_dbt_test__audit.reviews_body_matches_stars").rows[0]
     assert int(total) == int(with_p) > 0
+
+
+def test_stored_failures_carry_the_mode_and_the_builds_invocation(sql, cold_build):
+    # F5: the latest build (test_rerun_is_fully_cached) wrote both hook_runs and the tables.
+    latest = sql.run("select invocation_id from jev_demo.jev.hook_runs "
+                     "where test_name = 'reviews_body_matches_stars' "
+                     "order by recorded_at desc limit 1").scalar()
+    for name in BASELINES:
+        modes, invs, inv = sql.run(
+            "select collect_set(jev_mode), count(distinct jev_invocation_id), "
+            f"max(jev_invocation_id) from jev_demo.jaffle_shop_dbt_test__audit.{name}").rows[0]
+        assert json.loads(modes) == ["demo"] and int(invs) == 1 and inv == latest, name
+    # and the scorer accepts it as the scored run (demo mode: labelled SIMULATED)
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("score_it", ROOT / "scripts" / "score.py")
+    score = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(score)
+    run = score.current_run(sql, list(score.TESTS), score.load_budget())
+    assert run is not None and run.simulated and run.invocation_id == latest
+    # F3: after the fully cached rerun, every judgment on record came from the cold build: one
+    # source invocation (not the rerun's), holding all 1,057 distinct states, with its requests.
+    assert run.tested == 1057 and run.missing == 0
+    sources = score.load_sources(sql, list(score.TESTS), "demo")
+    assert len(sources) == 1 and sources[0].invocation_id != latest
+    assert sources[0].states == 1057 and sources[0].requests > 0 and sources[0].tokens > 0
 
 
 def test_staging_matches_demo04_and_has_no_nulls(sql, cold_build):
