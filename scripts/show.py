@@ -4,6 +4,7 @@ phone clip: each subcommand fits one screen at roughly 90 columns x 30 rows.
     uv run python scripts/show.py tests    # the jev_expect blocks, syntax-highlighted
     uv run python scripts/show.py rows     # one planted-defect example row per test
     uv run python scripts/show.py score    # compact Jev-vs-regex scorecard
+    uv run python scripts/show.py function # DESCRIBE FUNCTION EXTENDED of the Jev function
 
 Companion to `scripts/score.py` (the full precision/recall table this reuses). Never truncates
 text: rows and tests wrap instead. Stored failures are read from
@@ -14,6 +15,7 @@ from __future__ import annotations
 
 import argparse
 import importlib.util
+import os
 from pathlib import Path
 
 import yaml
@@ -282,6 +284,53 @@ def render_score(console: Console, sql) -> None:
 
 
 # ---------------------------------------------------------------------------
+# function
+# ---------------------------------------------------------------------------
+
+# DESCRIBE FUNCTION EXTENDED also prints the owner (a person), the session configs (150+ lines)
+# and the body; none of that belongs on screen.
+DESCRIBE_KEEP = ("Function", "Input", "Returns", "Comment", "Deterministic", "Language")
+
+
+def function_name(mode: str | None = None) -> str:
+    """The fully-qualified Jev function for the mode (JEV_MODE; demo -> the SIMULATED twin)."""
+    mode = (mode or os.environ.get("JEV_MODE") or "live").lower()
+    return "jev_demo.jev.noul_pack_demo" if mode == "demo" else "jev_demo.jev.noul_pack"
+
+
+def describe_lines(rows: list[str]) -> list[str]:
+    """The lines of a DESCRIBE FUNCTION EXTENDED result worth showing (pure).
+
+    Keeps the `DESCRIBE_KEEP` fields, including the continuation lines of a multi-line field
+    (Input lists one parameter per line); drops Owner, Create Time, Configs and Body."""
+    kept: list[str] = []
+    keep = False
+    for row in rows:
+        first = str(row).split("\n", 1)[0]
+        if first[:1] not in (" ", "\t", "") and ":" in first:
+            keep = first.split(":", 1)[0] in DESCRIBE_KEEP
+            text = first
+        else:
+            text = first  # continuation of the previous field
+        if keep:
+            kept.append(text.rstrip())
+    return kept
+
+
+def render_function(console: Console, sql, name: str | None = None) -> int:
+    name = name or function_name()
+    statement = f"DESCRIBE FUNCTION EXTENDED {name}"
+    res = sql.run(statement)
+    if res.state != "SUCCEEDED":
+        console.print(f"[bold red]{name}: {res.error or res.state}[/bold red]")
+        return 1
+    console.print(f"[dim]> {statement}[/dim]")
+    for line in describe_lines([r[0] for r in res.rows]):
+        console.print(line, markup=False, highlight=False, soft_wrap=True)
+    return 0
+
+
+# ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
 
@@ -292,6 +341,7 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("tests", help="the jev_expect blocks, syntax-highlighted")
     sub.add_parser("rows", help="one planted-defect example row per test")
     sub.add_parser("score", help="compact Jev-vs-regex scorecard")
+    sub.add_parser("function", help="DESCRIBE FUNCTION EXTENDED of the Jev function")
     args = parser.parse_args(argv)
 
     console = Console()
@@ -306,6 +356,8 @@ def main(argv: list[str] | None = None) -> int:
         render_rows(console, sql)
     elif args.command == "score":
         render_score(console, sql)
+    elif args.command == "function":
+        return render_function(console, sql)
     return 0
 
 

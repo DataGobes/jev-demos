@@ -227,3 +227,61 @@ def test_current_run_does_not_show_a_partial_invocation_as_the_scored_run(monkey
     })
     assert show.current_run(sql) is None
     assert "SIMULATED" in show.score.simulated_banner(show.current_run(sql))
+
+
+DESCRIBE_ROWS = [
+    "Function:        jev_demo.jev.noul_pack_demo",
+    "Input:           records  ARRAY<STRING>\n                 question STRING       ",
+    "                 question STRING       ",
+    "                 model    STRING       ",
+    "Returns:         STRING",
+    "Comment:         SIMULATED stand-in for noul_pack.",
+    "Deterministic:   false",
+    "Configs:         spark.sql.ansi.enabled=false",
+    "                 spark.sql.session.timeZone=Etc/UTC",
+    "Owner:           someone@example.com",
+    "Create Time:     Wed Sep 30 20:19:27 UTC 2026",
+    'Body:            \n"""Body of the function: def handler(x): return x"""',
+    "Language:        Python",
+    "Parameter Style: Scalar",
+]
+
+
+def test_describe_lines_keep_the_contract_and_drop_owner_configs_and_body():
+    text = "\n".join(show.describe_lines(DESCRIBE_ROWS))
+    assert "Function:" in text and "model    STRING" in text and "Language:        Python" in text
+    for dropped in ("someone@example.com", "spark.sql", "Create Time", "Body", "handler"):
+        assert dropped not in text
+
+
+def test_function_name_follows_the_mode(monkeypatch):
+    monkeypatch.delenv("JEV_MODE", raising=False)
+    assert show.function_name() == "jev_demo.jev.noul_pack"
+    assert show.function_name("demo") == "jev_demo.jev.noul_pack_demo"
+    monkeypatch.setenv("JEV_MODE", "demo")
+    assert show.function_name() == "jev_demo.jev.noul_pack_demo"
+
+
+def test_render_function_prints_the_statement_and_the_kept_lines():
+    from io import StringIO
+
+    from rich.console import Console
+
+    sql = FakeSql({"DESCRIBE FUNCTION EXTENDED": Result(
+        "SUCCEEDED", rows=[[r] for r in DESCRIBE_ROWS])})
+    out = StringIO()
+    assert show.render_function(Console(file=out, width=90), sql, "jev_demo.jev.x") == 0
+    text = out.getvalue()
+    assert "> DESCRIBE FUNCTION EXTENDED jev_demo.jev.x" in text
+    assert "someone@example.com" not in text
+
+
+def test_render_function_reports_a_missing_function():
+    from io import StringIO
+
+    from rich.console import Console
+
+    sql = FakeSql({"DESCRIBE FUNCTION": Result("FAILED", error="UNRESOLVED_ROUTINE")})
+    out = StringIO()
+    assert show.render_function(Console(file=out, width=90), sql, "jev_demo.jev.x") == 1
+    assert "UNRESOLVED_ROUTINE" in out.getvalue()
