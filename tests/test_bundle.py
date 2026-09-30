@@ -60,3 +60,29 @@ def test_notebook_selections_match_the_scorer():
     for widget in ('"mode"', '"selection"', '"warehouse"'):
         assert "dbutils.widgets" in src and widget in src
     assert "displayHTML" in src and "Jev ·" in src and "jev_p" in src
+
+
+def test_notebook_gets_the_token_lazily_inside_dbt_env_sdk_auth_first():
+    src = _notebook()
+    body = src.split("def dbt_env()", 1)[1].split("# COMMAND ----------", 1)[0]
+    assert "config.authenticate()" in body
+    assert "Bearer" in body
+    assert "apiToken().get()" in body  # fallback, same function
+    assert body.index("config.authenticate()") < body.index("apiToken().get()")
+    assert not re.search(r"^ctx\s*=", src, re.M)  # no eager cell-level context
+    assert "apiToken" not in src.split("def dbt_env()", 1)[0]
+    assert "dapi" not in src and "personal access" not in src.lower()
+
+
+def test_notebook_keeps_dbt_working_files_out_of_the_synced_folder():
+    src = _notebook()
+    assert 'tempfile.mkdtemp(prefix="jev-dbt-")' in src
+    assert '"DBT_TARGET_PATH"' in src and '"DBT_LOG_PATH"' in src
+
+
+def test_notebook_fails_clearly_and_captions_the_mode():
+    src = _notebook()
+    assert "project.is_dir()" in src and "dbt project not found at" in src
+    assert "next((x for x in w.warehouses.list()" in src and ", None)" in src
+    assert "SIMULATED (demo)" in src and "probabilities are not Jev judgments" in src
+    assert "Mode: LIVE" in src
