@@ -1,10 +1,11 @@
 """No workspace identifiers in any tracked file (the repo is headed for the public jev-demos).
 
-Scans every file `git ls-files` lists for: 16-hex warehouse ids, Azure Databricks hosts, abfss://
+Scans every file `git ls-files` lists for: 16-hex warehouse ids, Azure Databricks hosts, abfss
 URLs, ADLS hosts, GUIDs (tenant/subscription/workspace ids), and the storage-account and workspace
 names used during development. Those two names are matched by sha256 of each word, so this file
 does not spell them out. Exclusions are explicit: the seed CSVs (generated data) and the fake
-values in the test fixtures listed in ALLOWED.
+values in the test fixtures listed in ALLOWED. The fixture values below are split into pieces so
+this file does not match itself.
 
 A dbt invocation id is a random per-run UUID, not a workspace identifier: a GUID written as
 `invocation <uuid>` (how scripts/score.py logs it in docs/eval-results.md) is allowed.
@@ -33,9 +34,9 @@ FORBIDDEN_WORD_HASHES = {
 }
 # (path, exact matched text): fake values in test fixtures.
 ALLOWED = {
-    ("tests/test_score.py", "0123456789abcdef"),
-    ("tests/test_score.py", "ffffffffffffffff"),
-    ("tests/test_databricks_client.py", "azuredatabricks.net"),
+    ("tests/test_score.py", "0123456789" + "abcdef"),
+    ("tests/test_score.py", "f" * 16),
+    ("tests/test_databricks_client.py", "azuredatabricks" + ".net"),
 }
 SKIP = re.compile(r"^jaffle_shop/seeds/.*\.csv$")
 
@@ -59,15 +60,15 @@ def findings(path: str, text: str) -> list[str]:
 
 
 def test_the_scanner_catches_each_pattern():
+    guid = "01234567-89ab-" + "cdef-0123-456789abcdef"
     samples = [
-        "warehouse 0a1b2c3d4e5f6a7b", "adb-9.9.azuredatabricks.net", "abfss" + "://c@x",
-        "x.dfs.core.windows.net", "tenant 01234567-89ab-cdef-0123-456789abcdef",
-        "jevdemo" + "7ucneu",
+        "warehouse 0a1b2c3d" + "4e5f6a7b", "adb-9.9.azuredatabricks" + ".net", "abfss" + "://c@x",
+        "x.dfs.core" + ".windows.net", "tenant " + guid, "jevdemo" + "7ucneu",
     ]
     for s in samples:
         assert findings("docs/x.md", s), s
-    assert not findings("docs/x.md", "invocation 01234567-89ab-cdef-0123-456789abcdef")
-    assert findings("tests/test_score.py", "0123456789abcdef") == []
+    assert not findings("docs/x.md", "invocation " + guid)
+    assert findings("tests/test_score.py", "0123456789" + "abcdef") == []
 
 
 def test_no_workspace_identifiers_in_tracked_files():

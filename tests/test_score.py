@@ -948,10 +948,10 @@ def test_load_sources():
 def test_every_append_records_invocation_and_cached_share(tmp_path):
     path = tmp_path / "e.md"
     run = live_run(tested=10, missing=10, inserted=10, packs=2, pack_rows=10,
-                   invocation_id="0f0e0d0c-0b0a-4908-8706-050403020100")
+                   invocation_id="inv-a1")
     score.append_report(path, yard_results(), {"t": ([], [])}, run, warehouse="w")
     text = path.read_text()
-    assert "invocation 0f0e0d0c-0b0a-4908-8706-050403020100" in text
+    assert "- invocation inv-a1" in text
     assert "cached 0% (0 of 10 states from earlier invocations; 10 judged in this run)" in text
 
 
