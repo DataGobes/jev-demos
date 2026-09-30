@@ -1,0 +1,30 @@
+# Runs the Jev semantic dbt tests inside Databricks (serverless notebook job).
+# No host or warehouse id here: the target's workspace comes from the CLI profile and the
+# warehouse is looked up by name at run time (job parameter `warehouse`).
+bundle:
+  name: jev-demo-5
+
+sync:
+  include: ["jaffle_shop/**", "notebooks/**", "src/**", "pyproject.toml"]
+  exclude: ["jaffle_shop/target/**", "jaffle_shop/logs/**", "data/**", ".venv/**"]
+
+targets:
+  dev:
+    mode: development
+    default: true
+    workspace:
+      profile: jev-demo-5
+
+resources:
+  jobs:
+    jev_semantic_tests:
+      name: jev-semantic-tests
+      parameters:
+        - {name: mode, default: demo}
+        - {name: selection, default: yardstick}
+        - {name: warehouse, default: jev-demo-5}
+      tasks:
+        # No cluster is specified, so the task runs on serverless compute.
+        - task_key: dbt_build
+          notebook_task:
+            notebook_path: ./notebooks/jev_semantic_tests.py

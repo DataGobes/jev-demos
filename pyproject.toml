@@ -35,3 +35,8 @@ src = ["src", "scripts"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
+
+[tool.ruff.lint.per-file-ignores]
+# Databricks notebooks: dbutils/spark/display/displayHTML are injected globals, and imports
+# come after the %pip cell and the widget cells.
+"notebooks/*.py" = ["F821", "E402"]
