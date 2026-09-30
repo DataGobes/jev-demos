@@ -16,6 +16,7 @@ import csv
 import gzip
 import random
 import sys
+import urllib.request
 from collections.abc import Iterable, Iterator
 from pathlib import Path
 
@@ -45,8 +46,8 @@ def parse_snap(lines: Iterable[str]) -> Iterator[dict]:
                 yield _record(n, rec)
                 rec = {}
             continue
-        key, _, value = line.partition(": ")
-        rec[key] = value
+        key, _, value = line.partition(":")  # keys hold no colon; values may
+        rec[key] = value.removeprefix(" ")
     if rec:
         n += 1
         yield _record(n, rec)
@@ -60,7 +61,8 @@ def parse_kaggle_csv(path: Path) -> Iterator[dict]:
 
 
 def sample(rows: list[dict], n: int, seed: int) -> list[dict]:
-    picked = random.Random(seed).sample(rows, n)
+    ordered = sorted(rows, key=lambda r: r["id"])  # the draw must not depend on input order
+    picked = random.Random(seed).sample(ordered, n)
     return sorted(picked, key=lambda r: r["id"])
 
 
@@ -104,6 +106,23 @@ def _write_parquet(rows: list[dict], path: Path) -> None:
     pq.write_table(table, path)
 
 
+def download(url: str, dest: Path) -> None:
+    """Stream `url` to `dest` via `dest.part`, printing URL, destination and size first."""
+    part = dest.with_name(dest.name + ".part")
+    try:
+        with urllib.request.urlopen(url) as resp:
+            length = resp.headers.get("Content-Length")
+            size = f"{int(length):,} bytes" if length else "size unknown"
+            print(f"downloading {url} -> {dest} ({size})")
+            with open(part, "wb") as fh:
+                while chunk := resp.read(1 << 20):
+                    fh.write(chunk)
+        part.replace(dest)
+    except BaseException:
+        part.unlink(missing_ok=True)
+        raise
+
+
 def _upload(out: Path, names: tuple[str, ...]) -> None:
     from jevdbx.databricks import _client
 
@@ -132,12 +151,8 @@ def main(argv=None) -> int:
         _upload(args.out, (PART2,))
         return 0
     if args.download:
-        import urllib.request
-
-        dest = args.out / "finefoods.txt.gz"
-        print(f"downloading {URL} -> {dest}")
-        urllib.request.urlretrieve(URL, dest)
-        args.source = dest
+        args.source = args.out / "finefoods.txt.gz"
+        download(URL, args.source)
     if not args.source:
         ap.error("--source or --download required")
     rows = _read_source(args.source)
@@ -145,6 +160,7 @@ def main(argv=None) -> int:
     a, b = split(planted, args.first)
     _write_parquet(a, args.out / PART1)
     _write_parquet(b, args.out / PART2)
+    (ROOT / "eval").mkdir(parents=True, exist_ok=True)
     with open(ROOT / "eval/production_flips.csv", "w", newline="") as f:
         w = csv.DictWriter(f, ["id", "original_stars", "planted_stars"], lineterminator="\n")
         w.writeheader()

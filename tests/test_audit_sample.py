@@ -24,3 +24,10 @@ def test_pick_audit_returns_everything_when_short():
 def test_pick_audit_does_not_depend_on_set_iteration_order():
     flagged = set(range(1000, 0, -1))
     assert au.pick_audit(flagged, set(), 50, 7) == au.pick_audit(set(sorted(flagged)), set(), 50, 7)
+
+
+def test_flagged_query_skips_unjudged_rows_and_never_selects_the_score():
+    sql = au.flagged_query("cat.sch.tbl").lower()
+    select_list, _, rest = sql.partition(" from ")
+    assert "jev_p" not in select_list and "jev_p is not null" in rest
+    assert rest.startswith("cat.sch.tbl") and "review_id" in select_list

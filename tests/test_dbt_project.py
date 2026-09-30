@@ -115,7 +115,7 @@ def test_production_jev_expect_arguments_equal_demo04_and_ours():
             "arguments"]
 
 
-def test_production_baseline_is_the_reviews_baseline_with_two_changes():
+def test_production_baseline_is_the_reviews_baseline_with_only_ref_and_config_changed():
     base = (JAFFLE / "tests/baseline/baseline_reviews_body_matches_stars.sql").read_text()
     prod = (JAFFLE / "tests/production_baseline"
             / "baseline_product_reviews_body_matches_stars.sql").read_text()

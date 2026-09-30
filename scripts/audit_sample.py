@@ -30,13 +30,18 @@ def pick_audit(flagged: set[int], planted: set[int], n: int, seed: int) -> list[
     return sorted(random.Random(seed).sample(candidates, n))
 
 
+def flagged_query(table: str) -> str:
+    """Judged failures only (unjudged rows have jev_p NULL); jev_p is not selected (blind audit)."""
+    return f"select review_id, stars, body from {table} where jev_p is not null"
+
+
 def main(n: int = 100, seed: int = 42) -> int:
     from jevdbx.databricks import Sql
 
     with open(ROOT / "eval/production_flips.csv", newline="") as f:
         planted = {int(r["id"]) for r in csv.DictReader(f)}
     sql = Sql()
-    res = sql.run(f"select review_id, stars, body from {TABLE}")
+    res = sql.run(flagged_query(TABLE))
     if res.state != "SUCCEEDED":
         print(f"could not read {TABLE}: {res.error}", file=sys.stderr)
         return 1
