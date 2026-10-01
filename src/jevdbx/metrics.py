@@ -52,7 +52,7 @@ def reliability(probs, labels, bins: int = 10):
 
 
 def agreement(flags: dict[str, set], positives: set) -> dict[str, int]:
-    out = {"all": 0, "none": 0} | {f"only_{j}": 0 for j in flags}
+    out = {"all": 0, "some": 0, "none": 0} | {f"only_{j}": 0 for j in flags}
     for x in positives:
         who = [j for j, f in flags.items() if x in f]
         if len(who) == len(flags):
@@ -61,4 +61,6 @@ def agreement(flags: dict[str, set], positives: set) -> dict[str, int]:
             out["none"] += 1
         elif len(who) == 1:
             out[f"only_{who[0]}"] += 1
+        else:
+            out["some"] += 1
     return out

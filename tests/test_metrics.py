@@ -29,4 +29,12 @@ def test_brier_and_reliability():
 
 def test_agreement_on_positives():
     a = metrics.agreement({"jev": {1, 2}, "llm": {2, 3}}, positives={1, 2, 3, 4})
-    assert a == {"all": 1, "none": 1, "only_jev": 1, "only_llm": 1}
+    assert a == {"all": 1, "some": 0, "none": 1, "only_jev": 1, "only_llm": 1}
+
+
+def test_agreement_with_three_judges():
+    a = metrics.agreement(
+        {"a": {1, 2, 3}, "b": {2, 3}, "c": {3}}, positives={1, 2, 3, 4}
+    )
+    assert a == {"all": 1, "some": 1, "none": 1, "only_a": 1, "only_b": 0, "only_c": 0}
+    assert sum(a.values()) == len({1, 2, 3, 4})
