@@ -109,7 +109,7 @@ def test_latest_live_invocation_must_cover_every_scored_test_and_be_live():
 def test_utc_stamp_is_utc_and_to_the_second():
     # 2026-10-01T03:54:19Z
     assert evallog.utc_stamp(1_790_826_859_123_456) == "2026-10-01T03:54:19Z"
-    assert evallog.utc_stamp("1790826859123456") == "2026-10-01T03:54:19Z"  # SQL client strings
+    assert evallog.utc_stamp(str(1_790_826_859_123_456)) == "2026-10-01T03:54:19Z"  # SQL client strings
 
 
 def test_figures_sql_reads_the_ledger_for_exactly_this_invocation_and_tests():
