@@ -18,7 +18,7 @@
 - Confirm-first, every time, with a cost estimate: live Jev runs, any `ai_query` call against a real endpoint, downloads, uploads, creating schema `jev_demo.bench` or volume `jev_demo.bench.raw`, first read of `system.serving.*`. Standing OK: other queries on the 2X-Small warehouse `jev-demo-5`.
 - SIMULATED (`JEV_MODE=demo`) output is never logged or quoted as a result. Numbers in docs come from logged live runs; estimates are labelled.
 - LLM cap: **$15** total (Databricks pay-per-token, $0.070/DBU). Jev: ≈ $0.35 estimated of ≈ $3.20 TypeSafe credit.
-- Judges: `jev` (default), `databricks-gpt-oss-20b`, `databricks-meta-llama-3-3-70b-instruct`, `databricks-claude-sonnet-5-5`. Temperature 0 for every LLM.
+- Judges: `jev` (default), `databricks-gpt-oss-20b`, `databricks-meta-llama-3-3-70b-instruct`, `databricks-claude-opus-5`. Temperature 0 for every LLM.
 - Reused, never redeployed: `jev_demo.jev.noul_pack`, `jev_demo.jev.noul_pack_demo`, UC secret `jev_demo.jev.typesafe_api_key`. Never modify `~/Projects/jev-demo-5` (read only).
 - Databricks SQL: `''` is not a quote escape; write `\'` and double backslashes (`jev_sql_string`, `sql_string`).
 - Never edit keys, swap lists, family tables or baselines to make a judge win.
@@ -489,7 +489,7 @@ def test_hook_runs_records_judge_and_window():
 def test_llm_demo_is_deterministic_and_has_ai_query_shape():
     sql = deploy.llm_demo_function_sql(deploy.Target())
     assert "jev_demo.bench.llm_demo(endpoint STRING, prompt STRING)" in sql
-    assert "RETURNS STRUCT<response: STRING, errorMessage: STRING>" in sql
+    assert "RETURNS STRUCT<result: STRING, errorMessage: STRING>" in sql
     assert "sha2(concat(endpoint, prompt), 256)" in sql
     assert "SIMULATED error" in sql   # every 97th prompt errors, to exercise the error path
 
@@ -581,15 +581,15 @@ def llm_demo_function_sql(t: Target) -> str:
     """SIMULATED stand-in for ai_query(..., failOnError => false): same return shape, a
     hash-derived probability, no network. Every 97th prompt returns an error."""
     return f"""CREATE OR REPLACE FUNCTION {t.fq('llm_demo')}(endpoint STRING, prompt STRING)
-RETURNS STRUCT<response: STRING, errorMessage: STRING>
+RETURNS STRUCT<result: STRING, errorMessage: STRING>
 COMMENT 'SIMULATED stand-in for ai_query: hash values, no network. jev-demo-6.'
 RETURN (
   WITH h AS (SELECT sha2(concat(endpoint, prompt), 256) AS d)
   SELECT CASE
     WHEN pmod(conv(substr(d, 9, 8), 16, 10), 97) = 0
-      THEN named_struct('response', CAST(NULL AS STRING), 'errorMessage', 'SIMULATED error')
+      THEN named_struct('result', CAST(NULL AS STRING), 'errorMessage', 'SIMULATED error')
     ELSE named_struct(
-      'response', to_json(named_struct(
+      'result', to_json(named_struct(
           'decision', conv(substr(d, 1, 8), 16, 10) / 4294967295.0 > 0.5,
           'probability', round(conv(substr(d, 1, 8), 16, 10) / 4294967295.0, 4))),
       'errorMessage', CAST(NULL AS STRING))
@@ -712,7 +712,7 @@ vars:
   jev_llm_endpoints:
     - databricks-gpt-oss-20b
     - databricks-meta-llama-3-3-70b-instruct
-    - databricks-claude-sonnet-5-5
+    - databricks-claude-opus-5
   jev_llm_reasoning_low: [databricks-gpt-oss-20b]   # Task 3 (S2): [] if the endpoint rejects it
   jev_llm_response_format: '{"type": "json_schema", "json_schema": {"name": "judgment", "schema": {"type": "object", "properties": {"decision": {"type": "boolean"}, "probability": {"type": "number"}}, "required": ["decision", "probability"], "additionalProperties": false}, "strict": true}}'
   bench_scope: sample            # pilot | sample | full
@@ -794,7 +794,7 @@ Copy demo 05's `jaffle_shop/macros/jev_question.sql`, keep `jev_mode`, `jev_rela
 {% endmacro %}
 
 {#- One LLM call (live: ai_query; demo: the SIMULATED llm_demo). Returns the
-    STRUCT<response STRING, errorMessage STRING> expression. -#}
+    STRUCT<result STRING, errorMessage STRING> expression (S2: field `result`). -#}
 {% macro jev_llm_call(prompt_expr) %}
   {%- set endpoint = jev_judge_name() -%}
   {%- if jev_mode() == 'demo' -%}
@@ -810,7 +810,7 @@ Copy demo 05's `jaffle_shop/macros/jev_question.sql`, keep `jev_mode`, `jev_rela
 {% endmacro %}
 ```
 
-If Task 3 (S2) found different struct field names than `response` / `errorMessage`, use those names in Task 6's `parsed` CTE and in `llm_demo` (Task 4) and record it in the spec amendment.
+S2 (spec §4 amendment) found the struct fields `result` / `errorMessage`; `llm_demo` (Task 4) and Task 6's `parsed` CTE use `result`.
 
 - [ ] **Step 3: Write `bench/macros/jev_render.sql`** (pytest helpers; offline `render` target)
 
@@ -897,7 +897,7 @@ from tests.dbt_helpers import render
 FAILS_IF = "The customer's `query` is not about its labelled `intent`."
 CRITERIA = {"true": "The `query` asks about another topic", "false": "Fits `intent`"}
 ARGS = {"column_name": "query", "context": ["intent"], "fails_if": FAILS_IF, "criteria": CRITERIA}
-LLM = "databricks-claude-sonnet-5-5"
+LLM = "databricks-claude-opus-5"
 
 
 @pytest.mark.slow
@@ -1011,7 +1011,7 @@ called as (
 ),
 parsed as (
   select key, state, est, r,
-         from_json(r.response, 'decision BOOLEAN, probability DOUBLE') as j
+         from_json(r.result, 'decision BOOLEAN, probability DOUBLE') as j
   from called
 )
 select key, {{ jev_sql_string(jev_judge_name()) }}, {{ jev_sql_string(t.name) }},
@@ -1024,7 +1024,7 @@ select key, {{ jev_sql_string(jev_judge_name()) }}, {{ jev_sql_string(t.name) }}
        cast(null as array<int>),
        coalesce(r.errorMessage,
                 case when j.decision is null
-                     then concat('unparseable response: ', left(coalesce(r.response, ''), 200)) end),
+                     then concat('unparseable response: ', left(coalesce(r.result, ''), 200)) end),
        cast(null as timestamp), cast(null as timestamp),
        {{ jev_sql_string(invocation_id) }}, current_timestamp()
 from parsed
@@ -1185,7 +1185,7 @@ def test_llm_path_is_one_row_wise_ai_query_statement():
     s = _sections(render("jev_render_judge", {"model_name": "stg_fixture"}, vars={"judge": LLM}))
     ins = s["insert"]
     assert ins.count("ai_query(") == 1 and "noul_pack" not in ins
-    assert "from_json(r.response, 'decision BOOLEAN, probability DOUBLE')" in ins
+    assert "from_json(r.result, 'decision BOOLEAN, probability DOUBLE')" in ins
     assert "unparseable response" in ins and "r.errorMessage" in ins
     assert "'row'" in ins and f"'{LLM}'" in ins
     assert "count_if(false) as oversized" in s["count"]
@@ -2222,7 +2222,7 @@ from jevdbx import budget
 
 def test_prices_per_endpoint():
     assert budget.cost_usd("databricks-gpt-oss-20b", 1_000_000, 1_000_000) == pytest.approx(0.37)
-    assert budget.cost_usd("databricks-claude-sonnet-5-5", 1_000_000, 0) == pytest.approx(2.0)
+    assert budget.cost_usd("databricks-claude-opus-5", 1_000_000, 0) == pytest.approx(5.0)
 
 
 def test_projection_and_guard():
@@ -2281,12 +2281,13 @@ readable, else from the eval log's cost lines; the guard uses the larger of the 
 
 DBU_USD = 0.070
 # $ per 1M tokens (input, output), Azure Premium at DBU_USD, from the Databricks pricing pages
-# (DBU per 1M: gpt-oss-20b 1.000 / 4.286, llama-3.3-70b 7.143 / 21.429, sonnet 28.571 / 142.857).
-# Sonnet's +10% regional-processing uplift is not included: re-check before pass 1.
+# (DBU per 1M: gpt-oss-20b 1.000 / 4.286, llama-3.3-70b 7.143 / 21.429).
+# opus-5 is an ESTIMATE (S2 replaced sonnet-5-5, which ai_query rejects): verify before the pilot.
 PRICES: dict[str, tuple[float, float]] = {
     "databricks-gpt-oss-20b": (0.07, 0.30),
     "databricks-meta-llama-3-3-70b-instruct": (0.50, 1.50),
-    "databricks-claude-sonnet-5-5": (2.00, 10.00),
+    # ESTIMATE until verified before the pilot gate (Task 15 Step 5); S2: no Sonnet works with ai_query
+    "databricks-claude-opus-5": (5.00, 25.00),
 }
 CAP_USD = 15.0
 SINCE = "2026-10-01"
@@ -3143,12 +3144,12 @@ Every step here is confirm-first with the estimate shown; record each OK in the 
 - [ ] **Step 2: Keys** — `uv run python scripts/make_keys.py banking && uv run python scripts/make_keys.py abt`. Expected: 150 in-sample swaps (75/75). Commit `eval/` and `bench/seeds/` (`git add eval bench/seeds`; message `data: Banking77 swaps and sample, Abt-Buy labels and Jaccard threshold`).
 - [ ] **Step 3: Upload (ask: two parquet files to `/Volumes/jev_demo/bench/raw/`)** — `uv run python scripts/fetch_data.py --upload`; then `uv run python scripts/dbtw.py seed && uv run python scripts/dbtw.py build --exclude tag:semantic tag:baseline` (no judging).
 - [ ] **Step 4: wanderbricks labels by the user and planted ratings** — `uv run python scripts/make_keys.py wanderbricks-flips` (standing-OK query; expected ≈ 40 planted ratings over 15 comments); `uv run python scripts/make_keys.py wanderbricks-template`; the user fills `data/wanderbricks_label_me.csv`; then `wanderbricks-commit`; `uv run python scripts/dbtw.py seed`; commit `eval/wanderbricks_polarity.csv`, `eval/wanderbricks_flips.csv`, `bench/seeds/wanderbricks_flips.csv`.
-- [ ] **Step 5: Re-check prices** on the two Databricks pricing pages; if any changed, update `budget.PRICES` with a test and commit.
+- [ ] **Step 5: Re-check prices** on the Databricks pricing pages, and verify `databricks-claude-opus-5` (an estimate until now); if any changed, update `budget.PRICES` with a test and commit.
 - [ ] **Step 6: Pre-register** — `uv run python scripts/score.py --preregister`; commit `docs/eval-results.md` (`docs: pre-registration, frozen before pass 1`). From here on, prompts and sentences are frozen.
 - [ ] **Step 7: Pilot (ask: 50 rows per dataset per judge; est. ≈ $0.10 LLM, under $0.01 Jev)** — for each judge: `uv run python scripts/score.py --run --judge <judge> --scope pilot --pass 0 --mode live --append`. Expected: entries with `tokens/row … (measured)` lines for each LLM (or `estimated` cost if usage lags; wait and rerun `--usage` later).
 - [ ] **Step 8: Re-estimate pass 1** from the measured tokens/row; show the user the per-judge estimate and the running total against $15.
 - [ ] **Step 9: Pass 1 (ask with the step-8 estimate)** — `--scope sample --pass 1` for `jev`, then each LLM.
-- [ ] **Step 10: Pass 2 (ask)** — the same with `--fresh --pass 2`.
+- [ ] **Step 10: Pass 2 (ask)** — the same with `--fresh --pass 2` for `jev`, `databricks-gpt-oss-20b` and `databricks-meta-llama-3-3-70b-instruct` only (spec S2 amendment: Opus 5 gets one pass).
 - [ ] **Step 11: Jev at scale (ask: est. ≈ $0.25)** — `--judge jev --scope full --pass 3`.
 - [ ] **Step 12: Commit the log** after each logged step: `git add docs/eval-results.md && git commit -m "eval: <step> (<judge>)"` with the Co-Authored-By trailer.
 

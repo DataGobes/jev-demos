@@ -67,7 +67,7 @@ tuning per judge, models outside the three tiers in §3.
 | `jev` (default) | `jev_demo.jev.noul_pack`, packs by estimated tokens (48k budget, 256-row cap), nested layout | — |
 | `databricks-gpt-oss-20b` | `ai_query`, one row per call | small |
 | `databricks-meta-llama-3-3-70b-instruct` | `ai_query`, one row per call | mid |
-| `databricks-claude-sonnet-5-5` | `ai_query`, one row per call | frontier |
+| `databricks-claude-opus-5` (was `databricks-claude-sonnet-5-5`, see S2 amendment) | `ai_query`, one row per call | frontier |
 
 Each judge is used natively (Jev packs, `ai_query` is row-wise); the scorecard shows requests, wall
 time and cost per judge so the difference is visible.
@@ -96,6 +96,20 @@ time and cost per judge so the difference is visible.
   deterministic hash-based SQL stand-in returning the same struct. Always shows `SIMULATED`, never
   logged or quoted as a result.
 
+- *Amended 2026-10-01 (S2, live probe, 3 rows per endpoint):* `ai_query(..., failOnError => false)`
+  returns `STRUCT<result STRING, errorMessage STRING>` (field **`result`**, not `response`);
+  `result` is the JSON string `{"decision": …, "probability": …}`. gpt-oss-20b accepts
+  `reasoning_effort: low`; llama-3.3-70b answers with `temperature 0`. **No Sonnet is usable from
+  `ai_query` in this workspace**: `databricks-claude-sonnet-5-5`, its `system.ai` name and
+  `databricks-claude-sonnet-5` fail with "not supported for batch inference", and there is no
+  Sonnet 4.6 endpoint (404). The user chose **`databricks-claude-opus-5`** (batch-optimized, READY)
+  as the frontier judge, with **one pass** (pilot + pass 1, no pass 2) to stay under the $15 cap;
+  its price is verified before the pilot gate. `system.serving.endpoint_usage` and
+  `served_entities` are readable with the expected columns, but `served_entities` has **no rows** for
+  these foundation-model endpoints, so token usage per endpoint cannot be read there;
+  `system.billing.usage` had no `MODEL_SERVING` rows yet (billing lag). How LLM cost is measured is
+  decided before Task 11 (open item); until then every LLM cost is an estimate.
+
 ## 5. Platform
 
 - Workspace, CLI profile and dev warehouse as demo 05 (`jev-demo-5`, 2X-Small). No workspace host,
@@ -121,7 +135,7 @@ Every step below is confirm-first, with a cost estimate.
 | S2 spike | 3 rows per LLM endpoint: structured output, `temperature 0`, gpt-oss low reasoning effort accepted; `system.serving.endpoint_usage` readable (first read confirm-first) | ≈ $0.01 LLM |
 | P pilot | 50 rows per dataset per judge; measured tokens/row replace the estimates | ≈ $0.10 LLM |
 | 1 | pass 1: shared sample, all four judges | est. ≈ $5.50–6.30 LLM, ≈ $0.05 Jev |
-| 2 | pass 2: `--fresh` rerun of pass 1 (run-to-run noise) | same as pass 1 |
+| 2 | pass 2: `--fresh` rerun of pass 1 (run-to-run noise), Jev and the two open models only (S2 amendment: no Opus pass 2) | ≈ pass 1 minus Opus |
 | 3 | Jev at scale (§2) | est. ≈ $0.25 Jev |
 
 - **LLM cap: $15 total** (Databricks pay-per-token, Azure subscription). Before each LLM pass the
@@ -131,7 +145,8 @@ Every step below is confirm-first, with a cost estimate.
   ≈ $0.35.
 - Prices (Azure Premium, $0.070/DBU, checked 2026-10-01): gpt-oss-20b $0.07 / $0.30 per 1M
   input / output tokens; llama-3.3-70b $0.50 / $1.50; claude-sonnet-5-5 $2.00 / $10.00 (+10% with
-  regional processing). Re-checked before pass 1. All estimates in this table are labelled
+  regional processing; not usable, S2). claude-opus-5: ≈ $5 / $25 (ESTIMATE, unverified; checked
+  before the pilot gate). Re-checked before pass 1. All estimates in this table are labelled
   estimates until replaced by measured numbers.
 - If `endpoint_usage` is unavailable, LLM cost is a tokenizer estimate, labelled as such everywhere
   it appears.
