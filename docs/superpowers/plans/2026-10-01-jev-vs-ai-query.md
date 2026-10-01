@@ -2207,8 +2207,8 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 
 **Interfaces:**
 - Produces:
-  - `budget.PRICES: dict[str, tuple[float, float]]` ($ per 1M input, output tokens), `budget.CAP_USD = 15.0`, `budget.SINCE = "2026-10-01"`, `budget.DEFAULT_TOKENS_PER_ROW: dict[str, tuple[int, int]]` (by test name, assumption until the pilot), `budget.cost_usd(endpoint, input_tokens, output_tokens) -> float`, `budget.usage_sql(endpoints: list[str], since: str, until: str | None = None) -> str` (columns: `endpoint, requests, input_tokens, output_tokens`), `budget.project(endpoint, rows: int, per_row: tuple[int, int]) -> float`, `class BudgetExceeded(Exception)`, `budget.check(spent: float, projected: float, cap: float = CAP_USD) -> None`.
-  - `evallog.llm_spend(md: str) -> float` (sum of `- llm cost $X` lines), `evallog.tokens_per_row(md: str, endpoint: str, test: str) -> tuple[int, int] | None` (from the latest pilot entry line `- tokens/row <test> in A out B (measured)`), `evallog.append(path: Path, entry: str) -> None`, `evallog.has_preregistration(md: str) -> bool`.
+  - `budget.PRICES: dict[str, tuple[float, float]]` ($ per 1M input, output tokens), `budget.CAP_USD = 15.0`, `budget.SINCE = "2026-10-01"`, `budget.DEFAULT_TOKENS_PER_ROW: dict[str, tuple[int, int]]` (by test name, assumption until the pilot), `budget.cost_usd(endpoint, input_tokens, output_tokens) -> float`, `budget.usage_sql(since: str, until: str | None = None) -> str` (this user's `system.serving.endpoint_usage` per `served_entity_id` in a window; columns `served_entity_id, requests, input_tokens, output_tokens`; spec S2: `served_entities` has no rows for these endpoints, so usage is attributed by time window, one judge per window), `budget.window_cost(endpoint, rows) -> tuple[float, int, int, int] | None` (cost, requests, in, out when exactly one served entity used the window, else None), `budget.project(endpoint, rows: int, per_row: tuple[int, int]) -> float`, `class BudgetExceeded(Exception)`, `budget.check(spent: float, projected: float, cap: float = CAP_USD) -> None`.
+  - `evallog.llm_spend(md: str) -> float` (sum of `- llm cost $X` lines; a later entry with the same `- invocation <id>` — a `measured cost` entry — replaces that invocation's earlier cost), `evallog.tokens_per_row(md: str, endpoint: str, test: str) -> tuple[int, int] | None` (from the latest pilot entry line `- tokens/row <test> in A out B (measured)`), `evallog.append(path: Path, entry: str) -> None`, `evallog.has_preregistration(md: str) -> bool`.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -2233,11 +2233,19 @@ def test_projection_and_guard():
         budget.check(spent=10.0, projected=5.1)
 
 
-def test_usage_sql_reads_endpoint_usage_by_endpoint_and_window():
-    sql = budget.usage_sql(["databricks-gpt-oss-20b"], "2026-10-01", "2026-10-02T10:00:00")
-    assert "system.serving.endpoint_usage" in sql and "system.serving.served_entities" in sql
-    assert "'databricks-gpt-oss-20b'" in sql and ">= timestamp'2026-10-01'" in sql
-    assert "< timestamp'2026-10-02T10:00:00'" in sql
+def test_usage_sql_reads_my_endpoint_usage_in_a_window():
+    sql = budget.usage_sql("2026-10-01", "2026-10-02T10:00:00")
+    assert "system.serving.endpoint_usage" in sql and "served_entities" not in sql
+    assert "requester = current_user()" in sql and "group by served_entity_id" in sql
+    assert ">= timestamp'2026-10-01'" in sql and "< timestamp'2026-10-02T10:00:00'" in sql
+
+
+def test_window_cost_needs_exactly_one_served_entity():
+    rows = [["e1", "3", "600", "90"]]
+    assert budget.window_cost("databricks-gpt-oss-20b", rows) == (
+        budget.cost_usd("databricks-gpt-oss-20b", 600, 90), 3, 600, 90)
+    assert budget.window_cost("databricks-gpt-oss-20b", []) is None
+    assert budget.window_cost("databricks-gpt-oss-20b", [*rows, ["e2", "1", "5", "5"]]) is None
 ```
 
 `tests/test_evallog.py`:
@@ -2259,6 +2267,13 @@ def test_spend_and_tokens_per_row():
     assert evallog.tokens_per_row(MD, "databricks-gpt-oss-20b",
                                   "banking_query_not_about_intent") == (310, 140)
     assert evallog.tokens_per_row(MD, "databricks-gpt-oss-20b", "other") is None
+
+
+def test_measured_entry_replaces_the_estimate_of_its_invocation():
+    md = ("## a · pass 1 · x\n- invocation inv-1\n- llm cost $0.40 (estimated)\n"
+          "## b · measured cost · pass 1 · x\n- invocation inv-1\n- llm cost $0.31 (measured)\n"
+          "## c · pass 1 · y\n- invocation inv-2\n- llm cost $0.10 (estimated)\n")
+    assert evallog.llm_spend(md) == 0.41
 
 
 def test_append_and_preregistration(tmp_path):
@@ -2321,17 +2336,26 @@ def _lit(s: str) -> str:
     return "'" + s.replace("\\", "\\\\").replace("'", "\\'") + "'"
 
 
-def usage_sql(endpoints: list[str], since: str, until: str | None = None) -> str:
-    names = ", ".join(_lit(e) for e in endpoints)
-    until_sql = f" and u.request_time < timestamp{_lit(until)}" if until else ""
-    return (
-        "select e.endpoint_name as endpoint, count(*) as requests, "
-        "coalesce(sum(u.input_token_count), 0) as input_tokens, "
-        "coalesce(sum(u.output_token_count), 0) as output_tokens "
-        "from system.serving.endpoint_usage u "
-        "join system.serving.served_entities e on e.served_entity_id = u.served_entity_id "
-        f"where e.endpoint_name in ({names}) and u.request_time >= timestamp{_lit(since)}"
-        f"{until_sql} group by e.endpoint_name")
+def usage_sql(since: str, until: str | None = None) -> str:
+    """This user's foundation-model usage per served entity in [since, until). S2 (spec §4):
+    served_entities has no rows for the pay-per-token endpoints, so usage is attributed by time
+    window (the scorer runs one judge at a time), not by endpoint name."""
+    until_sql = f" and request_time < timestamp{_lit(until)}" if until else ""
+    return ("select served_entity_id, count(*) as requests, "
+            "coalesce(sum(input_token_count), 0) as input_tokens, "
+            "coalesce(sum(output_token_count), 0) as output_tokens "
+            "from system.serving.endpoint_usage "
+            f"where requester = current_user() and request_time >= timestamp{_lit(since)}"
+            f"{until_sql} group by served_entity_id")
+
+
+def window_cost(endpoint: str, rows: list) -> tuple[float, int, int, int] | None:
+    """Cost of one judge's window, or None unless exactly one served entity was used (usage not
+    landed yet — it lags ~2 h — or another model ran in the same window)."""
+    if len(rows) != 1:
+        return None
+    _, n, i, o = rows[0]
+    return cost_usd(endpoint, int(i), int(o)), int(n), int(i), int(o)
 ```
 
 (If Task 3 found different column names in `endpoint_usage`/`served_entities`, use those here and in the test.)
@@ -2348,8 +2372,24 @@ _COST = re.compile(r"^- llm cost \$([0-9.]+) \((?:measured|estimated)\)$", re.M)
 PREREG = "## Pre-registration (frozen before pass 1)"
 
 
+_INV = re.compile(r"^- invocation (\S+)$", re.M)
+
+
 def llm_spend(md: str) -> float:
-    return round(sum(float(x) for x in _COST.findall(md)), 6)
+    """Logged LLM spend. A later entry for the same invocation (a `measured cost` entry written by
+    `score.py --measure`) replaces that invocation's earlier (estimated) cost."""
+    by_inv: dict[str, float] = {}
+    loose = 0.0
+    for block in re.split(r"\n(?=## )", md):
+        costs = [float(x) for x in _COST.findall(block)]
+        if not costs:
+            continue
+        inv = _INV.search(block)
+        if inv:
+            by_inv[inv[1]] = sum(costs)
+        else:
+            loose += sum(costs)
+    return round(loose + sum(by_inv.values()), 6)
 
 
 def tokens_per_row(md: str, endpoint: str, test: str) -> tuple[int, int] | None:
@@ -2373,7 +2413,7 @@ def has_preregistration(md: str) -> bool:
     return PREREG in md
 ```
 
-- [ ] **Step 5: Run** — `uv run pytest tests/test_budget.py tests/test_evallog.py -q` → PASS (5).
+- [ ] **Step 5: Run** — `uv run pytest tests/test_budget.py tests/test_evallog.py -q` → PASS (7).
 
 - [ ] **Step 6: Commit**
 
@@ -2393,7 +2433,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 
 **Interfaces:**
 - Consumes: `jevdbx.metrics`, `jevdbx.budget`, `jevdbx.evallog`, `jevdbx.keys`, `jevdbx.databricks.Sql`, `scripts/dbtw.py` (subprocess), committed `eval/*.csv`.
-- Produces: CLI `score.py [--run --judge J --scope S --pass N --mode live|demo] [--append] [--fresh] [--preregister] [--usage]`; functions `TESTS: dict[str, TestSpec]`, `@dataclass TestSpec(name, model, id_expr, state_cols, truth)`, `truth_ids(test: str, scope: str) -> tuple[set, set]` (universe, positives), `stored_flags(sql, spec, judge, is_llm) -> tuple[set, set, set]` (flagged ids, unjudged ids, invocation ids), `run_stats(sql, invocation, is_llm) -> dict` (requests, wall_s, jev_cost), `swap_recall(flagged, scope_ids) -> dict[str, tuple[int, int]]`, `natural_ids(sql, spec) -> set` (wanderbricks states with `review_rows > 0`), `false_alarms(flagged, natural, positives) -> tuple[int, int]` (the wanderbricks control: flags on natural states the key calls clean, out of those states), `entry_md(..., extra: list[str]) -> str`, `refuse_reasons(mode, judge, invocation_ids, errors) -> list[str]`.
+- Produces: CLI `score.py [--run --judge J --scope S --pass N --mode live|demo] [--append] [--fresh] [--preregister] [--usage] [--measure [--append]]`; `unmeasured(md) -> list[tuple[str, str, str]]` (label, judge, invocation of logged LLM runs whose cost is still estimated and has no later measured-cost entry); functions `TESTS: dict[str, TestSpec]`, `@dataclass TestSpec(name, model, id_expr, state_cols, truth)`, `truth_ids(test: str, scope: str) -> tuple[set, set]` (universe, positives), `stored_flags(sql, spec, judge, is_llm) -> tuple[set, set, set]` (flagged ids, unjudged ids, invocation ids), `run_stats(sql, invocation, is_llm) -> dict` (requests, wall_s, jev_cost), `swap_recall(flagged, scope_ids) -> dict[str, tuple[int, int]]`, `natural_ids(sql, spec) -> set` (wanderbricks states with `review_rows > 0`), `false_alarms(flagged, natural, positives) -> tuple[int, int]` (the wanderbricks control: flags on natural states the key calls clean, out of those states), `entry_md(..., extra: list[str]) -> str`, `refuse_reasons(mode, judge, invocation_ids, errors) -> list[str]`.
 
 - [ ] **Step 1: Write the failing tests** (pure parts only; the workspace parts are exercised in Task 14)
 
@@ -2436,6 +2476,18 @@ def test_entry_names_pass_judge_and_cost_source():
     assert "- requests 4,615 · wall time 812.4 s" in md
 
 
+def test_unmeasured_lists_estimates_without_a_later_measurement():
+    md = ("# Eval results\n"
+          "## s1 · pilot · databricks-gpt-oss-20b\n\n- invocation inv-1\n"
+          "- llm cost $0.010 (estimated)\n"
+          "## s2 · pass 1 · jev\n\n- invocation inv-2\n"
+          "## s3 · pass 1 · databricks-gpt-oss-20b\n\n- invocation inv-3\n"
+          "- llm cost $0.400 (estimated)\n"
+          "## s4 · measured cost · pass 1 · databricks-gpt-oss-20b\n\n- invocation inv-3\n"
+          "- llm cost $0.350 (measured)\n")
+    assert score.unmeasured(md) == [("pilot", "databricks-gpt-oss-20b", "inv-1")]
+
+
 def test_swap_recall_splits_random_and_near_miss():
     swaps = [{"query_id": "a", "swap_type": "random"}, {"query_id": "b", "swap_type": "random"},
              {"query_id": "c", "swap_type": "near_miss"}]
@@ -2468,6 +2520,7 @@ scores what dbt stored. `--append` writes the entry to docs/eval-results.md (liv
 import argparse
 import csv
 import json
+import re
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -2626,11 +2679,47 @@ def dbt(*args: str) -> int:
     return subprocess.run([sys.executable, str(ROOT / "scripts" / "dbtw.py"), *args]).returncode
 
 
-def measured_spend(sql: Sql) -> float | None:
-    r = sql.run(budget.usage_sql(list(budget.PRICES), budget.SINCE))
-    if r.state != "SUCCEEDED":
-        return None
-    return sum(budget.cost_usd(e, int(i), int(o)) for e, _, i, o in r.rows)
+def unmeasured(md: str) -> list[tuple[str, str, str]]:
+    """Logged LLM runs whose cost is still an estimate and has no later measured-cost entry."""
+    blocks = re.split(r"\n(?=## )", md)
+    measured = set()
+    for block in blocks:
+        inv = re.search(r"^- invocation (\S+)$", block, re.M)
+        if inv and " · measured cost · " in block.splitlines()[0]:
+            measured.add(inv[1])
+    out = []
+    for block in blocks:
+        m = re.match(r"## \S+ · (pilot|pass \d+) · (\S+)$", block.splitlines()[0])
+        inv = re.search(r"^- invocation (\S+)$", block, re.M)
+        if m and inv and "(estimated)" in block and inv[1] not in measured:
+            out.append((m[1], m[2], inv[1]))
+    return out
+
+
+def measure(append: bool) -> int:
+    """Attribute endpoint usage to logged runs whose cost is still estimated (usage lags ~2 h):
+    window = the run's hook_runs window ± 5 s; exactly one served entity must have been used."""
+    sql = Sql()
+    for label, judge, inv in unmeasured(LOG.read_text()):
+        w = sql.run("select min(started_at) - interval 5 seconds, max(finished_at) + interval 5 "
+                    "seconds from jev_demo.bench.hook_runs where invocation_id = "
+                    f"'{inv.replace(chr(39), '')}'")
+        start, end = w.rows[0]
+        r = sql.run(budget.usage_sql(str(start), str(end)))
+        m = budget.window_cost(judge, r.rows) if r.state == "SUCCEEDED" else None
+        if m is None:
+            print(f"{label} · {judge} · {inv}: usage not attributable yet; try again later")
+            continue
+        cost, n, i, o = m
+        lines = [f"## {datetime.now(UTC).strftime('%Y-%m-%dT%H:%M:%SZ')} · measured cost · "
+                 f"{label} · {judge}", "", f"- invocation {inv}",
+                 f"- requests {n:,} · tokens in {i:,} out {o:,}", f"- llm cost ${cost:.3f} (measured)"]
+        if label == "pilot":
+            lines += [f"- tokens/row {t} in {i // n} out {o // n} (measured)" for t in TESTS]
+        print("\n".join(lines))
+        if append:
+            evallog.append(LOG, "\n".join(lines) + "\n")
+    return 0
 
 
 def run(a) -> int:
@@ -2641,16 +2730,14 @@ def run(a) -> int:
         return 1
     md = LOG.read_text()
     if is_llm:
-        logged, measured = evallog.llm_spend(md), measured_spend(sql)
-        spent = max(logged, measured or 0.0)
+        spent = evallog.llm_spend(md)  # logged runs; measured entries replace estimates
         projected = 0.0
         for test, spec in TESTS.items():
             n = len(universe(sql, spec))
             per_row = (evallog.tokens_per_row(md, a.judge, test)
                        or budget.DEFAULT_TOKENS_PER_ROW[test])
             projected += budget.project(a.judge, n, per_row)
-        print(f"budget: spent ${spent:.2f} (log ${logged:.2f}, usage "
-              f"{'n/a' if measured is None else f'${measured:.2f}'}) + projected ${projected:.2f}"
+        print(f"budget: spent ${spent:.2f} (logged) + projected ${projected:.2f}"
               f" of ${budget.CAP_USD:.2f}")
         budget.check(spent, projected)
     if a.fresh:
@@ -2681,12 +2768,13 @@ def run(a) -> int:
     print("\n".join(rows))
     cost, source, tpr = 0.0, "estimated", {}
     if is_llm:
-        r = sql.run(budget.usage_sql([a.judge], t0, t1))
-        if r.state == "SUCCEEDED" and r.rows and int(r.rows[0][1]) > 0:
-            _, n_req, i, o = r.rows[0]
-            cost, source = budget.cost_usd(a.judge, int(i), int(o)), "measured"
+        r = sql.run(budget.usage_sql(t0, t1))
+        m = budget.window_cost(a.judge, r.rows) if r.state == "SUCCEEDED" else None
+        if m is not None:
+            cost, n_req, i, o = m
+            source = "measured"
             if a.scope == "pilot":
-                tpr = {t: (int(i) // int(n_req), int(o) // int(n_req)) for t in TESTS}
+                tpr = {t: (i // n_req, o // n_req) for t in TESTS}
         else:
             cost = sum(budget.project(a.judge, len(universe(sql, s)),
                                       budget.DEFAULT_TOKENS_PER_ROW[t]) for t, s in TESTS.items())
@@ -2755,12 +2843,18 @@ def main(argv=None) -> int:
     ap.add_argument("--fresh", action="store_true")
     ap.add_argument("--preregister", action="store_true")
     ap.add_argument("--usage", action="store_true")
+    ap.add_argument("--measure", action="store_true")
     a = ap.parse_args(argv)
     if a.preregister:
         return preregister()
     if a.usage:
-        print(f"measured LLM spend since {budget.SINCE}: {measured_spend(Sql())}")
+        r = Sql().run(budget.usage_sql(budget.SINCE))
+        print(f"endpoint usage since {budget.SINCE} by served entity (no names: spec S2):")
+        for row in r.rows:
+            print("  ", row)
         return 0
+    if a.measure:
+        return measure(a.append)
     if a.run:
         if a.mode is None:
             ap.error("--run needs --mode live|demo")
@@ -2787,7 +2881,7 @@ SIMULATED runs are never written here. LLM cost lines say `measured` (from
 `system.serving.endpoint_usage`) or `estimated` (token assumptions); Jev cost comes from the ledger.
 ```
 
-- [ ] **Step 4: Run** — `uv run pytest tests/test_score.py -q && uv run ruff check` → PASS (6).
+- [ ] **Step 4: Run** — `uv run pytest tests/test_score.py -q && uv run ruff check` → PASS (7).
 
 - [ ] **Step 5: Commit**
 
@@ -2917,7 +3011,7 @@ Add to `main()` before `if a.run:`:
 
 and the flag `ap.add_argument("--compare", action="store_true")`.
 
-- [ ] **Step 4: Run** — `uv run pytest tests/test_score.py -q && uv run ruff check` → PASS (8).
+- [ ] **Step 4: Run** — `uv run pytest tests/test_score.py -q && uv run ruff check` → PASS (9).
 
 - [ ] **Step 5: Commit**
 
@@ -3146,7 +3240,7 @@ Every step here is confirm-first with the estimate shown; record each OK in the 
 - [ ] **Step 4: wanderbricks labels by the user and planted ratings** — `uv run python scripts/make_keys.py wanderbricks-flips` (standing-OK query; expected ≈ 40 planted ratings over 15 comments); `uv run python scripts/make_keys.py wanderbricks-template`; the user fills `data/wanderbricks_label_me.csv`; then `wanderbricks-commit`; `uv run python scripts/dbtw.py seed`; commit `eval/wanderbricks_polarity.csv`, `eval/wanderbricks_flips.csv`, `bench/seeds/wanderbricks_flips.csv`.
 - [ ] **Step 5: Re-check prices** on the Databricks pricing pages, and verify `databricks-claude-opus-5` (an estimate until now); if any changed, update `budget.PRICES` with a test and commit.
 - [ ] **Step 6: Pre-register** — `uv run python scripts/score.py --preregister`; commit `docs/eval-results.md` (`docs: pre-registration, frozen before pass 1`). From here on, prompts and sentences are frozen.
-- [ ] **Step 7: Pilot (ask: 50 rows per dataset per judge; est. ≈ $0.10 LLM, under $0.01 Jev)** — for each judge: `uv run python scripts/score.py --run --judge <judge> --scope pilot --pass 0 --mode live --append`. Expected: entries with `tokens/row … (measured)` lines for each LLM (or `estimated` cost if usage lags; wait and rerun `--usage` later).
+- [ ] **Step 7: Pilot (ask: 50 rows per dataset per judge; est. ≈ $0.10 LLM, under $0.01 Jev)** — for each judge: `uv run python scripts/score.py --run --judge <judge> --scope pilot --pass 0 --mode live --append`. Expected: entries with `tokens/row … (measured)` lines for each LLM, or `estimated` cost when usage has not landed (it lags ~2 h): then later `uv run python scripts/score.py --measure --append` writes `measured cost` entries that replace the estimates (and carry the pilot's tokens/row).
 - [ ] **Step 8: Re-estimate pass 1** from the measured tokens/row; show the user the per-judge estimate and the running total against $15.
 - [ ] **Step 9: Pass 1 (ask with the step-8 estimate)** — `--scope sample --pass 1` for `jev`, then each LLM.
 - [ ] **Step 10: Pass 2 (ask)** — the same with `--fresh --pass 2` for `jev`, `databricks-gpt-oss-20b` and `databricks-meta-llama-3-3-70b-instruct` only (spec S2 amendment: Opus 5 gets one pass).
