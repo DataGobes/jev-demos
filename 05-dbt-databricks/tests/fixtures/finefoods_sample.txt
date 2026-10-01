@@ -1,0 +1,108 @@
+product/productId: B000000000
+review/userId: A0000000000000
+review/profileName: user0
+review/helpfulness: 0/1
+review/score: 5.0
+review/time: 1303862400
+review/summary: Good Quality Dog Food
+review/text: The kibble arrived fresh and my terrier cleans the bowl every single day. Would buy again.
+
+product/productId: B000000001
+review/userId: A0000000000001
+review/profileName: user1
+review/helpfulness: 1/2
+review/score: 1.0
+review/time: 1303948800
+review/summary: Not as Advertised
+review/text: The bag was half empty and the contents smelled stale. Terrible, I want a refund.
+
+product/productId: B000000002
+review/userId: A0000000000002
+review/profileName: user2
+review/helpfulness: 2/3
+review/score: 4.0
+review/time: 1304035200
+review/summary: Tasty little snack
+review/text: Crunchy and not too salty. The box could be bigger for the price but I love them.
+
+product/productId: B000000003
+review/userId: A0000000000003
+review/profileName: user3
+review/helpfulness: 0/1
+review/score: 2.0
+review/time: 1304121600
+review/summary: Disappointed
+review/text: Expected more flavor. The tea tastes like hot water and the tin was dented on arrival.
+
+product/productId: B000000004
+review/userId: A0000000000004
+review/profileName: user4
+review/helpfulness: 1/2
+review/score: 3.0
+review/time: 1304208000
+review/summary: It's okay
+review/text: Average granola. Nothing special, nothing wrong. I might try another brand next time.
+
+product/productId: B000000005
+review/userId: A0000000000005
+review/profileName: user5
+review/helpfulness: 2/3
+review/score: 5.0
+review/time: 1304294400
+review/summary: Café au lait perfection
+review/text: Crème brûlée syrup that tastes like a Parisian café. Delicious in coffee, amazing on pancakes.
+
+product/productId: B000000006
+review/userId: A0000000000006
+review/profileName: user6
+review/helpfulness: 0/1
+review/score: 1.0
+review/time: 1304380800
+review/summary: Awful
+review/text: Disgusting aftertaste. I threw the rest away, the worst purchase this year.
+
+product/productId: B000000007
+review/userId: A0000000000007
+review/profileName: user7
+review/helpfulness: 1/2
+review/score: 5.0
+review/time: 1304467200
+review/summary: Best pasta ever
+review/text: Cooks in eight minutes and holds its bite. Perfect with a simple tomato sauce.
+
+product/productId: B000000008
+review/userId: A0000000000008
+review/profileName: user8
+review/helpfulness: 2/3
+review/score: 2.0
+review/time: 1304553600
+review/summary: Too sweet
+review/text: Way too sugary for me. The cookies were soggy when they showed up.
+
+product/productId: B000000009
+review/userId: A0000000000009
+review/profileName: user9
+review/helpfulness: 0/1
+review/score: 4.0
+review/time: 1304640000
+review/summary: Nice gift
+review/text: Bought these for my aunt and she loved them. Good packaging, fast shipping.
+
+product/productId: B000000010
+review/userId: A0000000000010
+review/profileName: user10
+review/helpfulness: 1/2
+review/score: 3.0
+review/time: 1304726400
+review/summary: Mixed feelings
+review/text: The flavor is good but the texture is odd. Three stars, maybe four with a discount.
+
+product/productId: B000000011
+review/userId: A0000000000011
+review/profileName: user11
+review/helpfulness: 2/3
+review/score: 5.0
+review/time: 1304812800
+review/summary: Great oats
+review/text: Hearty and fresh, makes a wonderful breakfast. Highly recommend to anyone.
+

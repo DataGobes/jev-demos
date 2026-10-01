@@ -1,0 +1,220 @@
+{
+  "source": "~/Projects/jev-demo-4/docs/eval-results.md (gated live runs; copied by hand, numbers as printed there)",
+  "note": "demo 04 prints 'N judgments · M unique': M is the number of distinct (test, state) pairs, which is what demo 05 calls 'judgments'. f1_derived is computed from the printed 2-decimal P and R (demo 04 does not print F1). precision/recall/hard_neg are as printed.",
+  "compare_to": "live/pack=64/nested",
+  "runs": {
+    "live/pack=1": {
+      "source_heading": "## 2026-09-24T21:12:55Z · live/pack=1",
+      "logged_at": "2026-09-24T21:12:55Z",
+      "judgments": 1300,
+      "unique_states": 1057,
+      "requests": 1057,
+      "wall_s": 53.9,
+      "cost_usd": 0.017,
+      "tests": {
+        "customers_full_name_is_a_person": {
+          "defects": 25,
+          "jev": {
+            "precision": 0.96,
+            "recall": 0.96,
+            "f1_derived": 0.96,
+            "hard_neg": 1
+          },
+          "baseline": {
+            "precision": 0.71,
+            "recall": 0.6,
+            "f1_derived": 0.65,
+            "hard_neg": 6
+          }
+        },
+        "returns_comment_matches_reason_code": {
+          "defects": 12,
+          "jev": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1_derived": 1.0,
+            "hard_neg": 0
+          },
+          "baseline": {
+            "precision": 0.45,
+            "recall": 0.75,
+            "f1_derived": 0.56,
+            "hard_neg": 6
+          }
+        },
+        "reviews_body_matches_stars": {
+          "defects": 24,
+          "jev": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1_derived": 1.0,
+            "hard_neg": 0
+          },
+          "baseline": {
+            "precision": 0.39,
+            "recall": 0.92,
+            "f1_derived": 0.55,
+            "hard_neg": 8
+          }
+        },
+        "tickets_body_has_no_pii": {
+          "defects": 14,
+          "jev": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1_derived": 1.0,
+            "hard_neg": 0
+          },
+          "baseline": {
+            "precision": 0.48,
+            "recall": 0.86,
+            "f1_derived": 0.62,
+            "hard_neg": 13
+          }
+        }
+      }
+    },
+    "live/pack=32/nested": {
+      "source_heading": "## 2026-09-26T15:15:25Z · live/pack=32/nested",
+      "logged_at": "2026-09-26T15:15:25Z",
+      "judgments": 1300,
+      "unique_states": 1057,
+      "requests": 35,
+      "wall_s": 2.0,
+      "cost_usd": 0.006,
+      "tests": {
+        "customers_full_name_is_a_person": {
+          "defects": 25,
+          "jev": {
+            "precision": 0.96,
+            "recall": 0.92,
+            "f1_derived": 0.94,
+            "hard_neg": 1
+          },
+          "baseline": {
+            "precision": 0.71,
+            "recall": 0.6,
+            "f1_derived": 0.65,
+            "hard_neg": 6
+          }
+        },
+        "returns_comment_matches_reason_code": {
+          "defects": 12,
+          "jev": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1_derived": 1.0,
+            "hard_neg": 0
+          },
+          "baseline": {
+            "precision": 0.45,
+            "recall": 0.75,
+            "f1_derived": 0.56,
+            "hard_neg": 6
+          }
+        },
+        "reviews_body_matches_stars": {
+          "defects": 24,
+          "jev": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1_derived": 1.0,
+            "hard_neg": 0
+          },
+          "baseline": {
+            "precision": 0.39,
+            "recall": 0.92,
+            "f1_derived": 0.55,
+            "hard_neg": 8
+          }
+        },
+        "tickets_body_has_no_pii": {
+          "defects": 14,
+          "jev": {
+            "precision": 0.93,
+            "recall": 1.0,
+            "f1_derived": 0.96,
+            "hard_neg": 1
+          },
+          "baseline": {
+            "precision": 0.48,
+            "recall": 0.86,
+            "f1_derived": 0.62,
+            "hard_neg": 13
+          }
+        }
+      }
+    },
+    "live/pack=64/nested": {
+      "source_heading": "## 2026-09-26T15:15:33Z · live/pack=64/nested",
+      "logged_at": "2026-09-26T15:15:33Z",
+      "judgments": 1300,
+      "unique_states": 1057,
+      "requests": 18,
+      "wall_s": 1.2,
+      "cost_usd": 0.006,
+      "tests": {
+        "customers_full_name_is_a_person": {
+          "defects": 25,
+          "jev": {
+            "precision": 0.96,
+            "recall": 0.96,
+            "f1_derived": 0.96,
+            "hard_neg": 1
+          },
+          "baseline": {
+            "precision": 0.71,
+            "recall": 0.6,
+            "f1_derived": 0.65,
+            "hard_neg": 6
+          }
+        },
+        "returns_comment_matches_reason_code": {
+          "defects": 12,
+          "jev": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1_derived": 1.0,
+            "hard_neg": 0
+          },
+          "baseline": {
+            "precision": 0.45,
+            "recall": 0.75,
+            "f1_derived": 0.56,
+            "hard_neg": 6
+          }
+        },
+        "reviews_body_matches_stars": {
+          "defects": 24,
+          "jev": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1_derived": 1.0,
+            "hard_neg": 0
+          },
+          "baseline": {
+            "precision": 0.39,
+            "recall": 0.92,
+            "f1_derived": 0.55,
+            "hard_neg": 8
+          }
+        },
+        "tickets_body_has_no_pii": {
+          "defects": 14,
+          "jev": {
+            "precision": 0.93,
+            "recall": 1.0,
+            "f1_derived": 0.96,
+            "hard_neg": 1
+          },
+          "baseline": {
+            "precision": 0.48,
+            "recall": 0.86,
+            "f1_derived": 0.62,
+            "hard_neg": 13
+          }
+        }
+      }
+    }
+  }
+}
