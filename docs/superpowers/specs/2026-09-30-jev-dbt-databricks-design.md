@@ -45,8 +45,9 @@ imported into `jev-demos` as `05-dbt-databricks/`. It is not a package.
 
 *Amended 2026-10-01:* the workspace name and region, the dev warehouse id and the catalog's storage
 path were removed from this table (the repo is public); they come from the CLI profile or are looked
-up by name. `tests/test_no_workspace_identifiers.py` scans every tracked file for them. Earlier
-commits still contain them: rewriting history is the user's decision before publishing.
+up by name. `tests/test_no_workspace_identifiers.py` scans every tracked file for them. Before
+publishing, the user had the history rewritten (`git filter-repo --replace-text`, 2026-10-01): the
+earlier versions of this table now carry the same wording, so no commit contains them.
 
 *Amended 2026-10-01: 50,000 rows (47,500 + 2,500), chosen by the user after an offline dry estimate*
 (was ~100k, split 95,000 + 5,000). §1, §2, §8, §12.2, §13 and §14 now say 50,000. The estimate is
