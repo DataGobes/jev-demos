@@ -178,7 +178,11 @@ def test_notebook_names_the_scored_tests_in_one_place_only():
 def test_readme_and_claude_md_document_results_mode():
     readme = (ROOT / "README.md").read_text()
     assert "action=results" in readme and "no Jev call" in readme
-    assert "action=results" in (ROOT / "CLAUDE.md").read_text()
+    claude = " ".join((ROOT / "CLAUDE.md").read_text().split())
+    assert "action=results" in claude
+    assert "latest logged live run" not in claude
+    assert "every live run that judged the shown rows" in claude
+    assert "failing rows from the latest" in claude
 
 
 def test_results_mode_is_described_as_every_judging_run_not_the_latest_one():

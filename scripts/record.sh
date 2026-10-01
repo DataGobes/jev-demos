@@ -178,6 +178,8 @@ beat "python scripts/score.py" \
 # docs/eval-results.md, verbatim: its numbers (planted flips, audited precision, cost, throughput)
 # are the billed runs'. Then a live rerun on the production warehouse, shown only for its 0
 # requests: everything is already judged, so its own cost line is $0 and is not the run's cost.
+# With --results there is no live rerun: the notebook job (action=results) shows the logged runs
+# that judged the rows (states, requests, cost) instead.
 if [[ $PRODUCTION == 1 ]]; then
   beat "python scripts/show.py production" \
     "50,000 real reviews, the logged run: planted flips, audited precision, cost."

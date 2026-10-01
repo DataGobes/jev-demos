@@ -43,8 +43,9 @@ dated inside it).
   CSV). `--download`, `--upload` and `--upload-part2` each need the user's yes first.
 - Bundle (dbt inside Databricks, serverless notebook job): `databricks bundle validate` is fine;
   `databricks bundle deploy` / `databricks bundle run jev_semantic_tests` are confirm-first.
-  Job parameter `action=results` runs no dbt and makes no Jev call: it shows the latest logged live
-  run (ledger numbers, the `docs/eval-results.md` entry, failing rows if they are that run's)
+  Job parameter `action=results` runs no dbt and makes no Jev call: it shows every live run that
+  judged the shown rows (ledger numbers, each run's `docs/eval-results.md` entry) and the failing
+  rows from the latest live run, if they are that run's
 - Recording: `scripts/record.sh [--cold] [--notebook] [--results] [--no-production] [--no-captions]` · smoke test, demo mode only,
   never live: `yes '' | JEV_MODE=demo TYPE_DELAY=0 scripts/record.sh`
 
