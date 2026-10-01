@@ -2077,7 +2077,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 - Create: `src/jevdbx/metrics.py`, `tests/test_metrics.py`
 
 **Interfaces:**
-- Produces: `@dataclass Scores(tp, fp, fn, tn, precision, recall, f1)`; `score(flagged: set, positives: set, universe: set) -> Scores`; `wilson(k: int, n: int, z: float = 1.96) -> tuple[float, float]`; `brier(probs: list[float], labels: list[bool]) -> float`; `reliability(probs, labels, bins=10) -> list[tuple[float, float, float, int]]` (bin low, bin high, observed rate, count); `agreement(flags: dict[str, set], positives: set) -> dict[str, int]` with keys `all`, `none`, `only_<judge>` for positives.
+- Produces: `@dataclass Scores(tp, fp, fn, tn, precision, recall, f1)`; `score(flagged: set, positives: set, universe: set) -> Scores`; `wilson(k: int, n: int, z: float = 1.96) -> tuple[float, float]`; `brier(probs: list[float], labels: list[bool]) -> float`; `reliability(probs, labels, bins=10) -> list[tuple[float, float, float, int]]` (bin low, bin high, observed rate, count); `agreement(flags: dict[str, set], positives: set) -> dict[str, int]` with keys `all`, `some` (≥2 judges, not all; ruling R23), `none`, `only_<judge>` for positives.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -2929,7 +2929,8 @@ def test_side_md_reports_calibration_thresholded_f1_agreement_and_key_errors():
     llm_line = next(x for x in md.splitlines() if x.startswith("| databricks-gpt-oss-20b |"))
     assert llm_line.endswith("| 1.00 |")             # p >= 0.8 flags exactly a, b
     assert "possible key errors (flagged by every judge, not in the key): c" in md
-    assert "agreement on positives: all 1 · none 0 · only jev 0 · only databricks-gpt-oss-20b 1" in md
+    assert ("agreement on positives: all 1 · some 0 · none 0 · only jev 0 · "
+            "only databricks-gpt-oss-20b 1") in md
 ```
 
 - [ ] **Step 2: Run to verify failure** — `uv run pytest tests/test_score.py -q` → FAIL.
@@ -2970,12 +2971,12 @@ def side_md(test: str, per_judge: dict, pos: set, uni: set) -> str:
         ids = sorted(i for i in rows if i in uni and rows[i][0] is not None)
         probs = [rows[i][0] for i in ids]
         labels = [i in pos for i in ids]
-        b = metrics.brier(probs, labels) if ids else float("nan")
+        b = f"{metrics.brier(probs, labels):.2f}" if ids else "n/a"  # undefined without data
         rel = " ".join(f"{lo:.1f}-{hi:.1f}: {rate:.2f}, {n}"
                        for lo, hi, rate, n in metrics.reliability(probs, labels, bins=5) if n)
         thr = {i for i in ids if rows[i][0] >= THRESHOLD}
         f1 = metrics.score(thr, pos, uni).f1
-        lines.append(f"| {judge} | {b:.2f} | {rel} | "
+        lines.append(f"| {judge} | {b} | {rel} | "
                      + ("(the decision rule)" if judge == "jev" else f"{f1:.2f}") + " |")
     flags = {j: _flags(j, rows) for j, rows in per_judge.items()}
     a = metrics.agreement(flags, pos)
