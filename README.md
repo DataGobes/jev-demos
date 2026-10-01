@@ -13,7 +13,7 @@ Two runs:
 
 - the **yardstick run**: demo 04's exact data, golden answer key and regex baselines, so the
   numbers compare directly with demo 04;
-- the **production run**: ~100,000 real product reviews (Amazon Fine Food Reviews) with planted
+- the **production run**: a planned sample of 50,000 real product reviews (Amazon Fine Food Reviews) with planted
   star flips, on a production-sized serverless warehouse.
 
 ## The test, as written
@@ -190,10 +190,17 @@ dbt-databricks, runs `dbt build` for the chosen `mode` (demo|live) and `selectio
 (yardstick|production) against the SQL warehouse, then shows the summary and the flagged rows.
 It authenticates with the notebook's own short-lived credential.
 
+`action=results` (default `build`) makes no Jev call and runs no dbt: it shows the latest **live**
+run of the selection that is already in the ledger (`jev_demo.jev.hook_runs`), labelled LIVE: its
+states, requests, retries and 429s, input tokens, Jev cost and span, the matching entry of
+`docs/eval-results.md` verbatim, and the failing rows when every stored row is that run's. Use it
+to show a logged result on camera without judging. `mode` is ignored; with no live run it says so.
+
 ```bash
 databricks bundle validate
 databricks bundle deploy          # creates the job
 databricks bundle run jev_semantic_tests --params mode=demo,selection=yardstick
+databricks bundle run jev_semantic_tests --params action=results,selection=yardstick   # no Jev call
 ```
 
 ### Scoring
@@ -215,22 +222,30 @@ these tests, so the request counts are not like for like; the accuracy columns a
 
 ## The production run
 
-~100,000 real product reviews with planted rating flips, judged by the same review sentence
+A planned sample of 50,000 real product reviews with planted rating flips, judged by the same review sentence
 (`reviews_body_matches_stars`, same `fails_if`, `context`, threshold and `criteria`).
 
 Dataset: Amazon Fine Food Reviews, SNAP / Stanford. J. McAuley and J. Leskovec, *From amateurs to
 connoisseurs: modeling the evolution of user expertise through online reviews*, WWW 2013.
-Kaggle lists it as CC0. `scripts/fetch_reviews.py` keeps only id, score, summary and text
-(user ids and profile names are dropped), samples 100,000 with seed 42, plants flips on ~3% of the
-non-3-star rows (1↔5, 2↔4), and splits 95,000 + 5,000. The data files are gitignored; only
-`eval/production_flips.csv` (ids and stars, no text) is committed.
+The SNAP page states no licence and asks for the citation; SNAP's Kaggle upload lists CC0. The
+data is downloaded locally and never committed. `scripts/fetch_reviews.py` keeps only id, score,
+summary and text (user ids and profile names are dropped), samples 50,000 with seed 42, plants
+flips on ~3% of the non-3-star rows (1↔5, 2↔4), and splits 47,500 + 2,500. The data files are
+gitignored; only `eval/production_flips.csv` (ids and stars, no text) is committed.
+
+The source file, measured (a fact about the data, not a Jev result): 568,454 reviews; review text
+length mean 475 / median 346 chars.
+
+**ESTIMATE, not a result** (offline estimate, 2026-10-01; no Jev call was made): 50,000 sampled
+rows → 46,511 distinct states; estimated 10.8–11.1M input tokens ≈ $0.45–0.47 (±15%), 0 rows over
+the per-row token limit. The cost of the run is the logged one, once it has been made.
 
 1. Download and sample: `uv run python scripts/fetch_reviews.py --download --out data/` (or
    `--source` for a file you already have). `<br />` tags become newlines and HTML entities are
    unescaped (markup artifacts of the source, the same for Jev and the baseline).
 2. `uv run python scripts/deploy.py --production --apply`, then
    `uv run python scripts/fetch_reviews.py --out data/ --source data/finefoods.txt.gz --upload`
-   (part 1, 95,000 rows).
+   (part 1, 47,500 rows).
 3. A larger serverless warehouse (for the recorded run, `jev-demo-5-prod`, Small), then
    `eval "$(uv run python scripts/jev_env.py --warehouse jev-demo-5-prod)"`.
 4. Judge part 1 and log it (the billed run is the scored one):
@@ -243,10 +258,10 @@ non-3-star rows (1↔5, 2↔4), and splits 95,000 + 5,000. The data files are gi
    and stars disagree) or `ok`, without seeing Jev's probability. Precision is extrapolated from
    that sample with a 95% Wilson interval; raw precision against the planted flips is reported
    too.
-6. The increment: `uv run python scripts/fetch_reviews.py --out data/ --upload-part2` (+5,000
+6. The increment: `uv run python scripts/fetch_reviews.py --out data/ --upload-part2` (+2,500
    rows), then `uv run python scripts/score.py --production --run --mode live --increment --append`.
    Only the new distinct (body, stars) states are judged, nothing else; the entry logs
-   `increment: N new distinct states judged (M rows loaded)`. N can be below 5,000: reviews repeat
+   `increment: N new distinct states judged (M rows loaded)`. N can be below 2,500: reviews repeat
    texts, and a state already judged is a cache hit.
 7. The rerun check: `uv run python scripts/score.py --production --run --rerun --mode live --append`
    builds once (nothing new to judge) and again, and requires the second build to make 0 requests.
@@ -259,7 +274,7 @@ last entry also carries the cost of the billed runs.
 Production builds pass `jev_max_concurrency: 2` (two packs in flight per statement instead of
 four). TypeSafe allows 250k tokens/s, and a handful of 48k-token packs finishing within the same
 second can exceed it. The retry path (429 and backoff) is tested offline but has never been
-exercised live, so the first 100,000-row run keeps fewer packs in flight rather than relying on
+exercised live, so the first 50,000-row run keeps fewer packs in flight rather than relying on
 it.
 
 ## Results

@@ -157,13 +157,13 @@ beat "python scripts/show.py score" \
   "Jev vs. what you'd hand-write in regex."
 beat "python scripts/score.py" \
   "And next to demo 04's logged numbers."
-# Beat 7: 100k real reviews (live mode only). First the logged production entry from
+# Beat 7: 50,000 real reviews (live mode only). First the logged production entry from
 # docs/eval-results.md, verbatim: its numbers (planted flips, audited precision, cost, throughput)
 # are the billed runs'. Then a live rerun on the production warehouse, shown only for its 0
 # requests: everything is already judged, so its own cost line is $0 and is not the run's cost.
 if [[ $PRODUCTION == 1 ]]; then
   beat "python scripts/show.py production" \
-    "100,000 real reviews, the logged run: planted flips, audited precision, cost."
+    "50,000 real reviews, the logged run: planted flips, audited precision, cost."
   export JEV_WAREHOUSE="$PROD_WAREHOUSE"
   if [[ $NOTEBOOK == 1 ]]; then
     notebook_beat production "Rerun: nothing new to judge. 0 requests."

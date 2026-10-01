@@ -1,8 +1,8 @@
 """Production dataset: Amazon Fine Food Reviews (SNAP, McAuley & Leskovec, WWW 2013).
 
 Keeps only id, score, summary and text (drops user ids and profile names; `<br />` becomes a
-newline and HTML entities are unescaped), samples 100,000 with seed 42, plants star flips across
-the pole (1<->5, 2<->4) on 3% of the non-3-star rows, writes two Parquet files (95,000 + 5,000,
+newline and HTML entities are unescaped), samples 50,000 with seed 42, plants star flips across
+the pole (1<->5, 2<->4) on 3% of the non-3-star rows, writes two Parquet files (47,500 + 2,500,
 for the incremental proof) and eval/production_flips.csv.
 
     uv run python scripts/fetch_reviews.py --source data/finefoods.txt.gz --out data/
@@ -146,18 +146,23 @@ def _upload(out: Path, names: tuple[str, ...]) -> None:
         print(f"uploaded {VOLUME}/{name}")
 
 
-def main(argv=None) -> int:
+def build_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--source", type=Path, help="finefoods.txt.gz (SNAP) or Kaggle Reviews.csv")
     ap.add_argument("--download", action="store_true",
                     help=f"fetch {URL} into --out (only after the user's go-ahead)")
     ap.add_argument("--out", type=Path, default=ROOT / "data")
-    ap.add_argument("--n", type=int, default=100_000)
-    ap.add_argument("--first", type=int, default=95_000)
+    ap.add_argument("--n", type=int, default=50_000)
+    ap.add_argument("--first", type=int, default=47_500)
     ap.add_argument("--rate", type=float, default=0.03)
     ap.add_argument("--upload", action="store_true", help=f"upload part 1 to {VOLUME}/")
     ap.add_argument("--upload-part2", action="store_true",
                     help="upload part 2 (the incremental step); needs no --source")
+    return ap
+
+
+def main(argv=None) -> int:
+    ap = build_parser()
     args = ap.parse_args(argv)
     args.out.mkdir(parents=True, exist_ok=True)
     if args.upload_part2 and not (args.source or args.download):

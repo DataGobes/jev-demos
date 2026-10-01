@@ -180,3 +180,13 @@ def test_both_sources_clean_summary_and_text(tmp_path):
     csv_path.write_text('Id,Score,Summary,Text\n7,1,"C &amp; D","three<BR/>four"\n')
     assert list(fr.parse_kaggle_csv(csv_path)) == [
         {"id": 7, "score": 1, "summary": "C & D", "text": "three\nfour"}]
+
+
+def test_planned_sample_is_50k_split_47500_plus_2500_and_flags_override():
+    args = fr.build_parser().parse_args([])
+    assert (args.n, args.first) == (50_000, 47_500)
+    assert args.n - args.first == 2_500
+    args = fr.build_parser().parse_args(["--n", "20", "--first", "15"])
+    assert (args.n, args.first) == (20, 15)
+    doc = fr.__doc__
+    assert "50,000" in doc and "47,500 + 2,500" in doc and "100,000" not in doc

@@ -1,7 +1,7 @@
 # CLAUDE.md
 
 Semantic dbt tests on Databricks: four `jev_expect` tests, written as English sentences in
-`jaffle_shop/models/staging/schema.yml` (plus one on ~100k real product reviews), judged by
+`jaffle_shop/models/staging/schema.yml` (plus one on a planned 50,000-row sample of real product reviews), judged by
 TypeSafe's Jev model through a Unity Catalog Python function (`jev_demo.jev.noul_pack`), scored
 against a hidden answer key and a regex baseline. Demo 04 (`~/Projects/jev-demo-4`, read-only)
 is the predecessor and the yardstick. Spec:
@@ -42,7 +42,9 @@ dated inside it).
 - Production data: `scripts/fetch_reviews.py` (`--source`), `scripts/audit_sample.py` (blind audit
   CSV). `--download`, `--upload` and `--upload-part2` each need the user's yes first.
 - Bundle (dbt inside Databricks, serverless notebook job): `databricks bundle validate` is fine;
-  `databricks bundle deploy` / `databricks bundle run jev_semantic_tests` are confirm-first
+  `databricks bundle deploy` / `databricks bundle run jev_semantic_tests` are confirm-first.
+  Job parameter `action=results` runs no dbt and makes no Jev call: it shows the latest logged live
+  run (ledger numbers, the `docs/eval-results.md` entry, failing rows if they are that run's)
 - Recording: `scripts/record.sh [--cold] [--notebook] [--no-production] [--no-captions]` · smoke test, demo mode only,
   never live: `yes '' | JEV_MODE=demo TYPE_DELAY=0 scripts/record.sh`
 

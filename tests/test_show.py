@@ -334,8 +334,8 @@ Jev · yardstick again
 
 ## 2026-10-02T13:00:00Z · production live/budget=48k
 
-Jev · 100,000 judgments · 100% cached · 0 requests
-- judged in invocation i1: 94,000 states · 400 requests · $0.52
+Jev · 50,000 judgments · 100% cached · 0 requests
+- judged in invocation i1: 46,500 states · 200 requests · $0.46
 
 **Gate: PASS**
 """
@@ -344,7 +344,7 @@ Jev · 100,000 judgments · 100% cached · 0 requests
 def test_last_production_block_is_verbatim_and_the_newest():
     block = show.last_production_block(LOG)
     assert block.startswith("## 2026-10-02T13:00:00Z · production live/budget=48k\n")
-    assert "- judged in invocation i1: 94,000 states · 400 requests · $0.52" in block
+    assert "- judged in invocation i1: 46,500 states · 200 requests · $0.46" in block
     assert block.rstrip().endswith("**Gate: PASS**")
     assert "first production block" not in block and "yardstick" not in block
 
@@ -369,7 +369,7 @@ def test_render_production_prints_the_block_or_says_there_is_none(tmp_path):
     out = StringIO()
     assert show.render_production(Console(file=out, width=90), log) == 0
     # verbatim: no Rich markup interpretation
-    assert "$0.52" in out.getvalue() and "flagged = [3], [bold]x[/bold]" in out.getvalue()
+    assert "$0.46" in out.getvalue() and "flagged = [3], [bold]x[/bold]" in out.getvalue()
     log.write_text("# Eval results\n")
     out = StringIO()
     assert show.render_production(Console(file=out, width=90), log) == 1

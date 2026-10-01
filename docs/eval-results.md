@@ -18,7 +18,7 @@ enabled) and the dbt wall time are not written by `score.py`; they are added to 
 Gate, yardstick run (unchanged from demo 04): live, no errors, Jev precision >= 0.85 and recall
 >= 0.85 on every test, Jev F1 above the regex baseline on every test. Gate, production run:
 recall on the loaded planted flips >= 0.85, audited precision >= 0.85, F1 above the lexicon
-baseline, 0 errors, the three once-per-row checks, a rerun with 0 requests, and +5,000 rows
+baseline, 0 errors, the three once-per-row checks, a rerun with 0 requests, and +2,500 rows
 loaded judging the new distinct (body, stars) states and nothing else (counts are distinct
 states, not rows). The production gate reads **PENDING** until the audit is labelled and
 `--rerun` has run.

@@ -18,7 +18,7 @@ inside the dbt process. Demo 05 takes the same tests to a production-like Databr
 - Two runs:
   - the **yardstick run**, on demo 04's exact data, golden key and regex baselines, so the numbers
     are directly comparable;
-  - the **production run**, on ~100k real product reviews (Amazon Fine Food Reviews) with planted
+  - the **production run**, on a planned 50,000 real product reviews (Amazon Fine Food Reviews) with planted
     star flips, on a production-sized serverless warehouse.
 
 Deliverable: a public demo repo and a repeatable terminal recording (same shape as demo 04), later
@@ -39,7 +39,7 @@ imported into `jev-demos` as `05-dbt-databricks/`. It is not a package.
 | Pack cutting | by estimated tokens (budget 48k) **and** a row cap (256), not by row count alone |
 | Model | pinned `jev-1.13.0` (var), not the `jev-latest` alias |
 | Deliverable | repo + recording, like demo 04 |
-| Production dataset | Amazon Fine Food Reviews (SNAP/Stanford; Kaggle lists CC0), ~100k sampled, planted star flips |
+| Production dataset | Amazon Fine Food Reviews (SNAP/Stanford; Kaggle upload lists CC0), 50,000 sampled (47,500 + 2,500), planted star flips |
 | Audit labels | the **user** labels ~100 flagged-but-unplanted rows, blind to `jev_p` |
 | Pins | Python 3.13, uv, `dbt-databricks==1.12.5`, which caps dbt-core below 1.12.4 (so dbt-core 1.12.3, not demo 04's 1.12.5), `databricks-sdk` as resolved. dbt Fusion is not used, as in demo 04 |
 
@@ -47,6 +47,11 @@ imported into `jev-demos` as `05-dbt-databricks/`. It is not a package.
 path were removed from this table (the repo is public); they come from the CLI profile or are looked
 up by name. `tests/test_no_workspace_identifiers.py` scans every tracked file for them. Earlier
 commits still contain them: rewriting history is the user's decision before publishing.
+
+*Amended 2026-10-01: 50,000 rows (47,500 + 2,500), chosen by the user after an offline dry estimate*
+(was ~100k, split 95,000 + 5,000). §1, §2, §8, §12.2, §13 and §14 now say 50,000. The estimate is
+not a result: 50,000 sampled rows → 46,511 distinct states, estimated 10.8–11.1M input tokens ≈
+$0.45–0.47 (±15%), 0 rows over the per-row token limit (offline, 2026-10-01).
 
 ## 3. Spike results (2026-09-30, live, in `jev_demo.spike`, throwaway)
 
@@ -89,7 +94,7 @@ jev-demo-5/
   scripts/
     make_seeds.py, pools/   copied from demo 04 (seed=42)
     deploy.py               CLI: prints or (with --apply) runs the platform DDL, confirm-first
-    fetch_reviews.py        download (after asking) + sample 100k + strip + plant flips
+    fetch_reviews.py        download (after asking) + sample 50,000 + strip + plant flips
     audit_sample.py         writes the blind audit CSV data/production_audit.csv (review + stars only)
     score.py                scorecard: yardstick (golden key) and production (flips + audit)
     record.sh, show.py      recording, demo 04 style
@@ -255,7 +260,8 @@ was cached and nothing was inserted.
 
 TypeSafe: 1,200 requests/min, 250k tokens/s, 64k tokens/request, all "adjusting dynamically".
 
-- Requests will not bind (100k review rows ≈ 600–800 packs). Tokens/s will: 8 concurrent 48k
+- Requests will not bind (50,000 review rows: 10.8–11.1M estimated tokens, so 230+ packs of up
+  to 48k). Tokens/s will: 8 concurrent 48k
   packs ≈ 380k tokens/s.
 - Layer 1: `REPARTITION(n)`, `n = var('jev_max_concurrency', 4)`, caps concurrent packs.
 - Layer 2: in-function retry with backoff on 429/529/5xx (§5.1). Each pack records attempts and
@@ -269,7 +275,7 @@ TypeSafe: 1,200 requests/min, 250k tokens/s, 64k tokens/request, all "adjusting 
   spec and README say so; the production run reports whether 429s occurred.
 - *Amended 2026-10-01:* production builds (`score.py --production`, the notebook's production
   selection, the README) pass `jev_max_concurrency: 2`: the retry path has never been exercised
-  live (§3), so the first 100k-row run keeps fewer packs in flight under the 250k tokens/s limit.
+  live (§3), so the first 50,000-row run keeps fewer packs in flight under the 250k tokens/s limit.
 
 ## 9. One evaluation per row
 
@@ -350,10 +356,11 @@ are non-null in every seed, so states are identical.
 ### 12.2 Production (Amazon Fine Food Reviews)
 
 - Source: SNAP / Stanford (McAuley & Leskovec, WWW 2013), 568,454 reviews, 1999–2012. Kaggle
-  lists it as CC0. Licence confirmed at the source before download; citation in the README.
+  lists it as CC0. The SNAP page states no licence and asks for the citation (in the README); the
+  data is downloaded locally and never committed.
 - `scripts/fetch_reviews.py`: downloads only after the user approves (filename, source, size
   stated), keeps `Id`, `Score`, `Summary`, `Text` (drops `UserId`, `ProfileName`, helpfulness,
-  time), samples 100,000 with seed 42, splits 95,000 + 5,000 (incremental proof).
+  time), samples 50,000 with seed 42, splits 47,500 + 2,500 (incremental proof).
 - Planted defects: ~3% of rows with original stars in {1, 2, 4, 5} get flipped across the pole
   (1↔5, 2↔4), seed 42. `eval/production_flips.csv` = `id, original_stars, planted_stars` (no text).
   3-star reviews are never flipped (their mismatch is ambiguous).
@@ -385,7 +392,7 @@ reframe). The golden key, pools and baselines are never edited to make Jev win.
   interval. Raw precision against planted flips only is also reported.
 - F1 above the demo 04 review lexicon baseline, ported to Spark SQL, not tuned.
 - Operational: 0 errors after retries; the three once-per-row checks pass; ledger tokens vs
-  TypeSafe bill logged; rerun makes **0** requests; +5,000 rows loaded → the new distinct
+  TypeSafe bill logged; rerun makes **0** requests; +2,500 rows loaded → the new distinct
   (body, stars) states are judged, nothing else (counts are distinct states, not rows: repeated
   texts are cache hits).
 
@@ -420,7 +427,7 @@ requests, retries, tokens, Jev cost, DBUs, wall time and the numbers.
 4. `dbt build --select +tag:semantic`: WARN counts + summary line.
 5. Failing rows with `jev_p` (`scripts/show.py`).
 6. Scorecard: Jev vs regex baseline, and vs demo 04.
-7. Production: 100k real reviews, summary (packs, tokens/s, cost); rerun → 0 requests.
+7. Production: 50,000 real reviews, summary (packs, tokens/s, cost); rerun → 0 requests.
    *(Amended 2026-10-01: the rerun is fully cached, so its cost line is $0. Beat 7 prints the last
    logged production entry of `docs/eval-results.md` verbatim (`show.py production`) for cost and
    throughput, then runs the rerun only to show 0 requests.)*
@@ -476,6 +483,15 @@ Local dbt (uv) stays for development and tests. For the demo and the production 
 - *Amended 2026-10-01:* the notebook shows the summary line and the failing rows with `jev_p`;
   the scorecard is `scripts/score.py` (the golden key and the audit labels stay out of the
   workspace). Its production selection passes `jev_max_concurrency: 2` like `score.py`.
+- *Amended 2026-10-01:* widget and job parameter `action` = `build` (default) | `results`. `results`
+  runs no dbt and makes no Jev call, and runs before the `%pip install`: it finds the latest **live**
+  invocation in `hook_runs` that covers every scored test of the selection (none → a clear message
+  and stop), shows its numbers from `hook_runs`/`requests` labelled LIVE (states judged, requests,
+  retries and 429s, input tokens, Jev cost at 0.042 per million tokens, Jev span), prints the
+  matching `docs/eval-results.md` entry (its `- invocation <id>` line) verbatim, or says it was not
+  appended, and shows the failing rows only when every stored row carries that invocation id and
+  `jev_mode = 'live'`. `docs/eval-results.md` is in the bundle's `sync.include`. The pure parts
+  live in `src/jevdbx/evallog.py`.
 - Recording: beats 4–7 may be shown from the notebook or the job run page instead of the terminal.
 - Demo mode through the notebook is covered by the standing OK; live runs stay confirm-first.
 

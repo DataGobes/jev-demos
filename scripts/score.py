@@ -65,7 +65,7 @@ PROD_TEST = "product_reviews_body_matches_stars"
 PROD_ID = "review_id"
 PROD_MODEL = "jev_demo.jaffle_shop.stg_product_reviews"
 # Production builds halve the packs in flight: TypeSafe allows 250k tokens/s and the retry path has
-# never been exercised live (spec §3, §8), so the first 100k-row run stays well under the limit.
+# never been exercised live (spec §3, §8), so the first 50,000-row run stays well under the limit.
 PROD_VARS = "{production: true, jev_max_concurrency: 2}"
 
 PRECISION_MIN = RECALL_MIN = 0.85

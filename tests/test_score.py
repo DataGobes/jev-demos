@@ -892,21 +892,21 @@ def test_append_production_report_records_loaded_flips(tmp_path):
 
 
 def test_increment_line_and_checks():
-    run = live_run(tested=100_000, missing=4_987, inserted=4_987, pack_rows=4_987)
-    inc = score.check_increment(95_000, 100_000, run)
-    assert inc.line == "increment: 4,987 new distinct states judged (5,000 rows loaded)"
+    run = live_run(tested=50_000, missing=2_487, inserted=2_487, pack_rows=2_487)
+    inc = score.check_increment(47_500, 50_000, run)
+    assert inc.line == "increment: 2,487 new distinct states judged (2,500 rows loaded)"
     with pytest.raises(score.NotCaptured, match="no new rows"):
-        score.check_increment(95_000, 95_000, run)
+        score.check_increment(47_500, 47_500, run)
     with pytest.raises(score.NotCaptured, match="only 10 rows"):
-        score.check_increment(95_000, 95_010, run)
-    bad = live_run(tested=100_000, missing=4_987, inserted=4_900, pack_rows=4_900)
+        score.check_increment(47_500, 47_510, run)
+    bad = live_run(tested=50_000, missing=2_487, inserted=2_400, pack_rows=2_400)
     with pytest.raises(score.NotCaptured, match="inserted"):
-        score.check_increment(95_000, 100_000, bad)
+        score.check_increment(47_500, 50_000, bad)
 
 
 def test_obtain_run_with_increment_counts_rows_before_and_after(dbt_calls):
     sql = SeqSql(["old", "new"])
-    counts, builds_seen = iter([["95000"], ["100000"]]), []
+    counts, builds_seen = iter([["47500"], ["50000"]]), []
     orig = sql.fixed.run
 
     def run(q, timeout_s=900):
@@ -917,7 +917,7 @@ def test_obtain_run_with_increment_counts_rows_before_and_after(dbt_calls):
 
     sql.fixed.run = run
     got, inc = obtain(sql, Args(increment=True))
-    assert got is not None and inc.rows_loaded == 5_000 and inc.new_states == 1057
+    assert got is not None and inc.rows_loaded == 2_500 and inc.new_states == 1057
     assert builds_seen == [0, 1]  # counted once before the build and once after it
 
 
@@ -960,13 +960,13 @@ def test_production_append_records_where_cached_judgments_came_from(tmp_path):
     m = score.production_metrics(**prod_inputs())
     run = live_run(tested=100, missing=0, inserted=0, packs=0, pack_rows=0, invocation_id="i3")
     sources = [score.Source("i1", 95, 3, 30_000, 12.5), score.Source("i2", 5, 1, 1_000, 1.0)]
-    inc = score.Increment(95_000, 100_000, 5)
+    inc = score.Increment(47_500, 50_000, 5)
     score.append_production_report(path, m, run, "w", 0, increment=inc, sources=sources)
     text = path.read_text()
     assert "cached 100% (100 of 100 states from earlier invocations; 0 judged in this run)" in text
     assert "- judged in invocation i1: 95 states · 3 requests · 30,000 tokens · $0.001260" in text
     assert "12.5 s Jev" in text and "- judged in invocation i2: 5 states" in text
-    assert "increment: 5 new distinct states judged (5,000 rows loaded)" in text
+    assert "increment: 5 new distinct states judged (2,500 rows loaded)" in text
 
 
 # -- F4: a yardstick entry never comes from cached judgments -----------------------------------

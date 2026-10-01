@@ -170,3 +170,9 @@ def test_build_mode_keeps_its_simulated_and_live_captions_and_scored_test_names(
 
 def test_notebook_names_the_scored_tests_in_one_place_only():
     assert "customers_full_name_is_a_person" not in _notebook()  # jevdbx.evallog owns the list
+
+
+def test_readme_and_claude_md_document_results_mode():
+    readme = (ROOT / "README.md").read_text()
+    assert "action=results" in readme and "no Jev call" in readme
+    assert "action=results" in (ROOT / "CLAUDE.md").read_text()
