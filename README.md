@@ -13,8 +13,8 @@ Two runs:
 
 - the **yardstick run**: demo 04's exact data, golden answer key and regex baselines, so the
   numbers compare directly with demo 04;
-- the **production run**: a planned sample of 50,000 real product reviews (Amazon Fine Food Reviews) with planted
-  star flips, on a production-sized serverless warehouse.
+- the **production run**: a seeded sample of 50,000 real product reviews (Amazon Fine Food Reviews) with planted
+  star flips, on the same 2X-Small serverless warehouse.
 
 ## The test, as written
 
@@ -125,13 +125,14 @@ judgments with demo 04's unique count.
    ```
 
    Create the TypeSafe key as a Unity Catalog secret **yourself**, from your own shell. The key
-   never appears in a command line (where `ps` could show it), a file or your shell history: `read
-   -s` takes it without echo, `jq` builds the request body from the environment, and the CLI reads
-   that body from standard input. Nothing in this repo reads or stores it.
+   never appears in a command line or a process environment (where `ps` could show it), a file or
+   your shell history: `read -s` takes it without echo into an unexported shell variable, the
+   `printf` builtin pipes it to `jq`, which builds the request body from standard input, and the
+   CLI reads that body from standard input. Nothing in this repo reads or stores it.
 
    ```bash
-   read -rs TS_KEY && export TS_KEY
-   jq -n '{name: "typesafe_api_key", catalog_name: "jev_demo", schema_name: "jev", value: env.TS_KEY}' \
+   read -rs TS_KEY
+   printf '%s' "$TS_KEY" | jq -Rs '{name: "typesafe_api_key", catalog_name: "jev_demo", schema_name: "jev", value: .}' \
      | databricks secrets-uc create-secret --json @/dev/stdin -p jev-demo-5 > /dev/null
    unset TS_KEY
    ```
@@ -218,12 +219,13 @@ uv run python scripts/score.py --run --fresh --mode live --append    # live: bil
 ```
 
 The comparison with demo 04 uses its `live/pack=64/nested` run (64 rows per request). Demo 05
-cuts packs by estimated tokens instead (budget 48k, cap 256 rows), about 120–256 rows per pack on
-these tests, so the request counts are not like for like; the accuracy columns are.
+cuts packs by estimated tokens instead (budget 48k, cap 256 rows): the logged yardstick runs sent
+1,057 states in 6 requests (≈176 rows per request on average), so the request counts are not like
+for like; the accuracy columns are.
 
 ## The production run
 
-A planned sample of 50,000 real product reviews with planted rating flips, judged by the same review sentence
+A seeded sample of 50,000 real product reviews with planted rating flips, judged by the same review sentence
 (`reviews_body_matches_stars`, same `fails_if`, `context`, threshold and `criteria`).
 
 Dataset: Amazon Fine Food Reviews, SNAP / Stanford. J. McAuley and J. Leskovec, *From amateurs to
@@ -300,9 +302,49 @@ it.
 
 ## Results
 
-No numbers here yet: the live runs have not been made. Scored live runs are appended to
-[`docs/eval-results.md`](docs/eval-results.md), next to demo 04's logged numbers for the same four
-tests. Only numbers from logged live runs appear in this repo; SIMULATED output is never quoted.
+Every number below is from a logged live run in [`docs/eval-results.md`](docs/eval-results.md)
+(2026-10-01, `jev-1.13.0`, warehouse `jev-demo-5`, 2X-Small); SIMULATED output is never quoted.
+
+**Yardstick: four fresh live runs, all gate PASS.** Each judged the same 1,057 states in 6
+requests (146,994 tokens, $0.006, 0 retries); demo 04 needed 18 requests for them at 64 rows per
+request.
+
+| test | defects | Jev P | Jev R | regex P | regex R | demo 04 Jev P/R (pack=64) |
+|---|---|---|---|---|---|---|
+| customers_full_name_is_a_person | 25 | 0.96 | 0.92–0.96 | 0.71 | 0.60 | 0.96 / 0.96 |
+| returns_comment_matches_reason_code | 12 | 1.00 | 0.92–1.00 | 0.45 | 0.75 | 1.00 / 1.00 |
+| reviews_body_matches_stars | 24 | 1.00 | 1.00 | 0.39 | 0.92 | 1.00 / 1.00 |
+| tickets_body_has_no_pii | 14 | 0.93 | 1.00 | 0.48 | 0.86 | 0.93 / 1.00 |
+
+The recall ranges are run-to-run noise, one row each: customer 379 and return 144 sit on their
+thresholds (p 0.69–0.75 vs 0.7, 0.79–0.83 vs 0.8) and flipped in the first run only; runs 2–4 match
+demo 04 exactly. Across the four runs the mean SD of p is 0.0042; precision never moved.
+
+**Production: 50,000 reviews (47,500 + 2,500), 1,386 planted flips. Gate FAIL on raw recall.**
+
+| | |
+|---|---|
+| part 1 (47,500 rows) | 44,292 distinct states · 277 requests · 10.4M tokens · 72.5 s Jev · $0.437 · 0 retries |
+| part 2 (+2,500 rows) | 2,219 new states judged, nothing else · 14 requests · $0.022 |
+| rerun | 46,511 states, 100% cached · 0 requests · $0.000 |
+| Jev recall on planted flips | **0.84** (gate ≥ 0.85: FAIL) |
+| Jev precision | raw 0.87 · audited **0.94** (95% Wilson 0.93–0.95, n=100) |
+| regex baseline | recall 0.73 · raw precision 0.24 · F1 0.36 (Jev raw F1 0.85) |
+
+The raw gate fails and stays logged as a FAIL. Two checks put it in context:
+
+- *Audited precision.* Raw precision counts every flagged review that was not planted as wrong. A
+  blind audit of 100 of them, labelled independently by two LLM labellers (Claude Opus, Claude
+  Sonnet; disagreements resolved against Jev; agreement 81%, κ 0.60), found that many of them are
+  real mismatches already in the source data (text that contradicts its own stars): audited
+  precision 0.94.
+- *The key itself.* A blind audit of 100 planted flips found 98 really read as mismatched (agreement
+  99%, κ 0.80). Corrected for that, recall over all loaded flips is 0.86 (a point estimate; recall
+  on the audited-real flips is 0.90, 95% Wilson 0.82–0.94). So recall is about 0.84–0.86, at the
+  gate's edge either way.
+
+Part 1 averaged ≈160 rows per request (44,292 states in 277). The four production steps, the
+audit protocol and every entry are in [`docs/eval-results.md`](docs/eval-results.md).
 
 ## Production notes
 
@@ -343,7 +385,7 @@ locally, and `--cold` is ignored with a notice). `--results` implies `--notebook
 `action=results` run instead: the logged live run is shown without judging on camera. Captions, a title card and an end card are built
 in.
 
-Record right after a scored run (`score.py --run --append`, live), and without `--cold`: the
+Record right after a scored run (`score.py --run --fresh --mode live --append`), and without `--cold`: the
 accuracy numbers on screen (flagged rows, scorecard) are then the logged run's, and beat 4 shows a
 fully cached rerun. Beat 7 prints the last logged production entry of `docs/eval-results.md`
 verbatim (`scripts/show.py production`: planted flips, audited precision, cost and throughput of

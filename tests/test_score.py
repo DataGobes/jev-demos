@@ -179,6 +179,18 @@ def test_run_derived_numbers():
     assert cached.cached_pct == 100.0 and cached.est_ratio is None and cached.once_per_row_ok
 
 
+def test_pack_size_note_is_measured_from_the_run_not_estimated():
+    # the logged yardstick run: 1,057 states in 6 requests
+    note = score.pack_size_note(score.Run(packs=6, pack_rows=1057, inserted=1057))
+    assert "176" in note
+    # a 95%-cached increment: rows sent, not all judgments, are the numerator (2,219 in 14)
+    note = score.pack_size_note(score.Run(packs=14, pack_rows=2219, inserted=2219))  # 158.5
+    assert ("158" in note or "159" in note) and "3,3" not in note
+    for run in (None, score.Run(packs=0, pack_rows=0)):  # no run captured / a fully cached rerun
+        note = score.pack_size_note(run)
+        assert note and not any(c in "123456789" for c in note)  # no number to measure
+
+
 def test_run_line_matches_the_dbt_summary_layout():
     line = score.run_line(run_line_example())
     assert line == (

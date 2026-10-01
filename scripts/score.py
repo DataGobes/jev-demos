@@ -245,6 +245,18 @@ class Run:
         )
 
 
+def pack_size_note(run: Run | None) -> str:
+    """The rows-per-request clause of the demo 04 comparison note, e.g. "≈176 rows per request in
+    this run". Only a measured number may appear here (Ruling R23): never the budget-derived range.
+    `run.pack_rows` is the rows sent in this run's packs; `run.judgments` also counts cached states,
+    so it is not the numerator. The clause follows "cap 256 rows), " in the note."""
+    if run is None:
+        return "rows per request not measured (use --run)"
+    if run.packs == 0:
+        return "no requests in this run (every state cached)"
+    return f"≈{run.pack_rows / run.packs:.0f} rows per request on average in this run"
+
+
 def run_line(run: Run) -> str:
     """The dbt `Jev · N judgments · ...` summary line, rebuilt from the ledger tables."""
     label = "SIMULATED" if run.simulated else "LIVE"
@@ -1084,8 +1096,8 @@ def print_report(console: Console, results: GateResults, run: Run | None, ref: d
     budget = f"{int(run.budget / 1000)}k" if run is not None and run.budget else "48k"
     console.print(
         f"note: demo 04's reference is {key} (64 rows per request); demo 05 cuts packs by "
-        f"estimated tokens (budget {budget}, cap 256 rows), ~120–256 rows per pack on these "
-        "tests, so request counts are not like for like.")
+        f"estimated tokens (budget {budget}, cap 256 rows), {pack_size_note(run)}, so request "
+        "counts are not like for like.")
 
     if run is None:
         console.print("summary: not captured (use --run)")

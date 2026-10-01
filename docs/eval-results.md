@@ -44,8 +44,9 @@ How to read them:
 - `live/pack=1` sent one request per state (the recording pack in demo 04); `pack=32` and
   `pack=64` used the `nested` layout.
 - The comparison uses `live/pack=64/nested` (64 rows per request). Demo 05 cuts packs by estimated
-  tokens (budget 48k, cap 256 rows), about 120–256 rows per pack on these tests, so request counts
-  are not like for like; the accuracy columns are.
+  tokens (budget 48k, cap 256 rows): ≈176 rows per request on average in the logged yardstick
+  runs below (1,057 states in 6 requests), so request counts are not like for like; the accuracy
+  columns are.
 
 ### live/pack=1 (logged 2026-09-24T21:12:55Z)
 
