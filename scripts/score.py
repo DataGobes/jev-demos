@@ -297,6 +297,57 @@ def run(a) -> int:
     return rc
 
 
+THRESHOLD = 0.8  # every jev_expect in schema.yml (a test keeps them equal)
+
+
+def judged_rows(sql: Sql, spec: TestSpec) -> dict[str, dict[str, tuple]]:
+    ids = ", ".join(f"m.`{c}`" for c in spec.id_cols)
+    r = sql.run(
+        f"select {ids}, j.judge, j.p, j.decision from jev_demo.bench.{spec.model} m "
+        # unqualified state columns resolve to m: judgments has no column with those names
+        f"join {JUDGMENTS} j on j.state = {state_expr(spec.state_cols)} "
+        f"and j.test_name = '{spec.name}' and j.mode = 'live' "
+        f"and (j.p is not null or j.decision is not null)")
+    out: dict[str, dict[str, tuple]] = {}
+    for row in r.rows:
+        rid = row_id(spec.name, row[: len(spec.id_cols)])
+        judge, p, d = row[len(spec.id_cols):]
+        out.setdefault(judge, {})[rid] = (None if p is None else float(p),
+                                          None if d is None else d in ("true", True))
+    return out
+
+
+def _flags(judge: str, rows: dict[str, tuple]) -> set[str]:
+    if judge == "jev":
+        return {i for i, (p, _) in rows.items() if p is not None and p >= THRESHOLD}
+    return {i for i, (_, d) in rows.items() if d}
+
+
+def side_md(test: str, per_judge: dict, pos: set, uni: set) -> str:
+    lines = [f"### {test}", "",
+             "| judge | Brier | reliability (bin: observed, n) | thresholded F1 |",
+             "|---|---|---|---|"]
+    for judge, rows in per_judge.items():
+        ids = sorted(i for i in rows if i in uni and rows[i][0] is not None)
+        probs = [rows[i][0] for i in ids]
+        labels = [i in pos for i in ids]
+        b = f"{metrics.brier(probs, labels):.2f}" if ids else "n/a"  # undefined without data
+        rel = " ".join(f"{lo:.1f}-{hi:.1f}: {rate:.2f}, {n}"
+                       for lo, hi, rate, n in metrics.reliability(probs, labels, bins=5) if n)
+        thr = {i for i in ids if rows[i][0] >= THRESHOLD}
+        f1 = metrics.score(thr, pos, uni).f1
+        lines.append(f"| {judge} | {b} | {rel} | "
+                     + ("(the decision rule)" if judge == "jev" else f"{f1:.2f}") + " |")
+    flags = {j: _flags(j, rows) for j, rows in per_judge.items()}
+    a = metrics.agreement(flags, pos)
+    lines += ["", "agreement on positives: " + " · ".join(
+        f"{k.replace('only_', 'only ')} {v}" for k, v in a.items())]
+    every = set.intersection(*flags.values()) - pos if flags else set()
+    lines.append("possible key errors (flagged by every judge, not in the key): "
+                 + (", ".join(sorted(every)[:50]) or "none"))
+    return "\n".join(lines) + "\n"
+
+
 def preregister() -> int:
     md = LOG.read_text()
     if evallog.has_preregistration(md):
@@ -341,6 +392,7 @@ def main(argv=None) -> int:
     ap.add_argument("--preregister", action="store_true")
     ap.add_argument("--usage", action="store_true")
     ap.add_argument("--measure", action="store_true")
+    ap.add_argument("--compare", action="store_true")
     a = ap.parse_args(argv)
     if a.preregister:
         return preregister()
@@ -352,6 +404,23 @@ def main(argv=None) -> int:
         return 0
     if a.measure:
         return measure(a.append)
+    if a.compare:
+        sql = Sql()
+        parts = []
+        for test, spec in TESTS.items():
+            per = judged_rows(sql, spec)
+            missing = [j for j in JUDGES if j not in per]
+            if missing:
+                print(f"{test}: no live judgments yet for {missing}; nothing compared")
+                return 1
+            uni = universe(sql, spec)
+            parts.append(side_md(test, per, positives(sql, spec) & uni, uni))
+        text = "\n".join(parts)
+        print(text)
+        if a.append:
+            evallog.append(LOG, f"## {datetime.now(UTC).strftime('%Y-%m-%dT%H:%M:%SZ')} · side "
+                                f"analyses · {a.scope}\n\n{text}")
+        return 0
     if a.run:
         if a.mode is None:
             ap.error("--run needs --mode live|demo")

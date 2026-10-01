@@ -59,3 +59,29 @@ def test_swap_recall_splits_random_and_near_miss():
 def test_false_alarms_count_flags_on_clean_natural_states_only():
     assert score.false_alarms({"a", "b", "x"}, natural={"a", "b", "c", "d"},
                               positives={"b"}) == (1, 3)
+
+
+def test_thresholds_in_schema_match_the_scorer():
+    import yaml
+    doc = yaml.safe_load((ROOT / "bench" / "models" / "staging" / "schema.yml").read_text())
+    found = [t["jev_expect"]["arguments"]["threshold"] for m in doc["models"]
+             for c in m.get("columns", []) for t in c.get("data_tests", [])
+             if isinstance(t, dict) and "jev_expect" in t]
+    assert found == [score.THRESHOLD] * 3
+
+
+def test_side_md_reports_calibration_thresholded_f1_agreement_and_key_errors():
+    uni = {"a", "b", "c", "d"}
+    pos = {"a", "b"}
+    per_judge = {
+        "jev": {"a": (0.95, None), "b": (0.4, None), "c": (0.9, None), "d": (0.1, None)},
+        "databricks-gpt-oss-20b": {"a": (0.9, True), "b": (0.9, True), "c": (0.6, True),
+                                   "d": (0.2, False)},
+    }
+    md = score.side_md("t", per_judge, pos, uni)
+    assert "| jev | 0.30 |" in md                   # Brier = (0.0025+0.36+0.81+0.01)/4
+    llm_line = next(x for x in md.splitlines() if x.startswith("| databricks-gpt-oss-20b |"))
+    assert llm_line.endswith("| 1.00 |")             # p >= 0.8 flags exactly a, b
+    assert "possible key errors (flagged by every judge, not in the key): c" in md
+    assert ("agreement on positives: all 1 · some 0 · none 0 · only jev 0 · "
+            "only databricks-gpt-oss-20b 1") in md
