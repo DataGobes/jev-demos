@@ -106,7 +106,8 @@ beat() {
 notebook_beat() {
   local selection="$1" cap="$2" run
   if [[ $RESULTS == 1 ]]; then
-    # results mode reads the ledger with spark.sql: no warehouse lookup, no dbt, no Jev call
+    # results mode reads the ledger on the job's SQL warehouse (default: the dev warehouse, so no
+    # warehouse parameter): no dbt, no Jev call
     run="databricks bundle run jev_semantic_tests --params action=results,selection=$selection"
   else
     run="databricks bundle run jev_semantic_tests --params mode=$MODE,selection=$selection"
@@ -181,8 +182,10 @@ beat "python scripts/score.py" \
 # With --results there is no live rerun: the notebook job (action=results) shows the logged runs
 # that judged the rows (states, requests, cost) instead.
 if [[ $PRODUCTION == 1 ]]; then
+  # The numbers are the last logged production entry's (docs/eval-results.md); the entry shows the
+  # raw gate FAIL, so the caption names it. Update both together if a new production run is logged.
   beat "python scripts/show.py production" \
-    "50,000 real reviews, the logged run: planted flips, audited precision, cost."
+    "50,000 real reviews: recall 0.84, just under the 0.85 gate; audited precision 0.94."
   export JEV_WAREHOUSE="$PROD_WAREHOUSE"
   if [[ $RESULTS == 1 ]]; then
     # --results: the logged runs (states, requests, cost), not a rerun
