@@ -39,25 +39,31 @@ if action == "results":
         dbutils.notebook.exit(message)
     invocation = latest[0]["invocation_id"]
     judged_at = evallog.utc_stamp(latest[0]["recorded_micros"])
-    displayHTML(
-        f"<p><b>LIVE</b> · Results of the live run judged at {judged_at} (invocation "
-        f"{invocation}), logged in docs/eval-results.md. No Jev calls are made now.</p>")
 
-    figures = evallog.figures_from_row(
-        tuple(spark.sql(evallog.figures_sql(invocation, tests)).collect()[0]))
-    displayHTML("<pre>" + html.escape("\n".join(evallog.figure_lines(invocation, figures)))
-                + "</pre>")
+    # The rows on screen were judged by every live run that made a successful judgment on record,
+    # not only the latest invocation (a rerun judges nothing and costs $0).
+    judges = evallog.judging_from_rows(
+        tuple(r) for r in spark.sql(evallog.judging_invocations_sql(tests)).collect())
+    if not judges:
+        message = (f"No successful live judgments on record for the {selection} selection, "
+                   "so there are no results to show.")
+        displayHTML(f"<p><b>{html.escape(message)}</b></p>")
+        dbutils.notebook.exit(message)
+    displayHTML(f"<p><b>{html.escape(evallog.judging_caption(judges))}</b></p>")
+    displayHTML("<pre>" + html.escape("\n".join([*evallog.judging_lines(judges),
+                                                  "", evallog.COST_NOTE])) + "</pre>")
 
     log = results_root / "docs" / "eval-results.md"
-    entry = evallog.entry_for(log.read_text(encoding="utf-8") if log.is_file() else "", invocation)
-    if entry is None:
-        displayHTML("<p><b>Logged entry:</b> not found in eval-results.md — this run was not "
-                    "appended.</p>")
-    else:
-        displayHTML("<p><b>Logged entry (docs/eval-results.md, verbatim)</b></p>"
-                    f'<pre style="white-space: pre-wrap">{html.escape(entry)}</pre>')
+    log_text = log.read_text(encoding="utf-8") if log.is_file() else ""
+    displayHTML("<p><b>Logged entries (docs/eval-results.md, verbatim)</b></p>")
+    for run_id, entry in evallog.entries_for_runs(log_text, judges):
+        if entry is None:
+            displayHTML(f"<p>invocation {run_id}: {evallog.NOT_APPENDED}.</p>")
+        else:
+            displayHTML(f'<pre style="white-space: pre-wrap">{html.escape(entry)}</pre>')
 
-    displayHTML("<p><b>Failing rows, with Jev's probability (LIVE)</b></p>")
+    displayHTML(f"<p><b>Failing rows, with Jev's probability (LIVE)</b>: stored by the latest live "
+                f"run, invocation {invocation}, judged at {judged_at}.</p>")
     for t in tests:
         try:
             total, matching = spark.sql(evallog.stored_failures_sql(t, invocation)).collect()[0]

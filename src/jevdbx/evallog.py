@@ -80,69 +80,101 @@ def utc_stamp(micros: int) -> str:
     return datetime.fromtimestamp(int(micros) // 1_000_000, UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def figures_sql(invocation: str, tests: list[str]) -> str:
-    """One row of ledger figures for exactly this invocation and these tests. Columns: tested,
-    missing, unjudged, requests, tokens, retries, throttled (429s), span_s, model."""
-    inv, names = sql_string(invocation), _in_list(tests)
+def judging_invocations_sql(tests: list[str]) -> str:
+    """The live invocations that made the successful judgments on record for `tests` (their latest
+    question; judgments of an older wording do not count), oldest first. Columns: invocation_id,
+    states (distinct judged states), requests, tokens, retries, throttled (429s), span_s,
+    recorded_micros (when the invocation's hook rows were written). Same scope as score.py."""
+    names = _in_list(tests)
     return (
-        "select h.tested, h.missing, j.unjudged, r.requests, r.tokens, r.retries, r.throttled, "
-        "r.span_s, r.model "
-        "from (select coalesce(sum(tested), 0) as tested, coalesce(sum(missing), 0) as missing "
-        f"from {LEDGER}.hook_runs where invocation_id = {inv} and test_name in ({names})) h "
-        f"cross join (select count_if(p is null) as unjudged from {LEDGER}.judgments "
-        f"where invocation_id = {inv} and test_name in ({names})) j "
-        "cross join (select count(*) as requests, coalesce(sum(pack_tokens), 0) as tokens, "
+        "with latest as (select test_name, max_by(question, judged_at) as q "
+        f"from {LEDGER}.judgments where mode = 'live' and test_name in ({names}) "
+        "group by test_name), "
+        "src as (select j.invocation_id, count(distinct j.key) as states, "
+        "min(j.judged_at) as first_at "
+        f"from {LEDGER}.judgments j "
+        "join latest l on j.test_name = l.test_name and j.question = l.q "
+        "where j.p is not null and j.mode = 'live' group by j.invocation_id), "
+        "req as (select invocation_id, count(*) as requests, "
+        "coalesce(sum(pack_tokens), 0) as tokens, "
         "coalesce(sum(greatest(attempts - 1, 0)), 0) as retries, "
         "coalesce(sum(greatest(size(filter(retry_statuses, s -> s = 429)), 0)), 0) as throttled, "
         "coalesce((unix_micros(max(finished_at)) - unix_micros(min(started_at))) / 1e6, 0) "
-        "as span_s, max(answered_model) as model "
-        f"from {LEDGER}.requests where invocation_id = {inv} and test_name in ({names})) r"
+        f"as span from {LEDGER}.requests where mode = 'live' and test_name in ({names}) "
+        "group by invocation_id), "
+        "hook as (select invocation_id, unix_micros(max(recorded_at)) as recorded_micros "
+        f"from {LEDGER}.hook_runs where mode = 'live' and test_name in ({names}) "
+        "group by invocation_id) "
+        "select s.invocation_id, s.states, coalesce(r.requests, 0), coalesce(r.tokens, 0), "
+        "coalesce(r.retries, 0), coalesce(r.throttled, 0), coalesce(r.span, 0), "
+        "h.recorded_micros "
+        "from src s left join req r on r.invocation_id = s.invocation_id "
+        "left join hook h on h.invocation_id = s.invocation_id order by s.first_at"
     )
 
 
 @dataclass(frozen=True)
-class Figures:
-    tested: int
-    missing: int
-    unjudged: int
+class Judging:
+    """One live invocation that judged rows now on record (or, for the total, all of them)."""
+
+    invocation_id: str
+    states: int
     requests: int
     tokens: int
     retries: int
     throttled: int
     span_s: float
-    model: str
-
-    @property
-    def judgments(self) -> int:
-        """Distinct (test, state) pairs with a successful judgment, as in the dbt summary line."""
-        return self.tested - self.unjudged
-
-    @property
-    def cached_pct(self) -> float:
-        return (self.tested - self.missing) * 100 / self.tested if self.tested else 0.0
+    recorded_at: str
 
     @property
     def cost_usd(self) -> float:
         return cost_usd(self.tokens)
 
 
-def figures_from_row(row) -> Figures:
-    tested, missing, unjudged, requests, tokens, retries, throttled, span_s, model = row
-    return Figures(int(tested), int(missing), int(unjudged), int(requests), int(tokens),
-                   int(retries), int(throttled), float(span_s), model or "")
+def judging_from_rows(rows) -> list[Judging]:
+    out = []
+    for inv, states, requests, tokens, retries, throttled, span_s, micros in rows:
+        out.append(Judging(str(inv), int(states), int(requests), int(tokens), int(retries),
+                           int(throttled), float(span_s),
+                           utc_stamp(micros) if micros not in (None, "") else "unknown"))
+    return out
 
 
-def figure_lines(invocation: str, f: Figures) -> list[str]:
-    """The invocation's numbers, labelled LIVE (this mode only shows live runs)."""
-    return [
-        f"LIVE · invocation {invocation} · {f.model}",
-        f"states judged  {f.judgments:,} ({f.cached_pct:.0f}% cached)",
-        f"requests       {f.requests:,}",
-        f"retries        {f.retries:,} ({f.throttled:,}× 429)",
-        f"input tokens   {f.tokens:,}",
-        f"Jev cost       ${f.cost_usd:.3f} (tokens × {PRICE_PER_MTOK_USD} / 1e6)",
-        f"Jev span       {f.span_s:.1f} s",
-    ]
+def judging_total(runs: list[Judging]) -> Judging:
+    return Judging("total", sum(r.states for r in runs), sum(r.requests for r in runs),
+                   sum(r.tokens for r in runs), sum(r.retries for r in runs),
+                   sum(r.throttled for r in runs), sum(r.span_s for r in runs), "")
+
+
+def judging_caption(runs: list[Judging]) -> str:
+    rows = judging_total(runs).states
+    return (f"These {rows:,} rows were judged in {len(runs)} live run(s) (listed below), logged "
+            "in docs/eval-results.md; no Jev calls are made now.")
+
+
+def _judging_row(r: Judging, span: bool = True) -> str:
+    return (f"{r.invocation_id:<36}  {r.recorded_at:<20}  {r.states:>7,}  {r.requests:>8,}  "
+            f"{r.tokens:>13,}  {'$' + format(r.cost_usd, '.3f'):>9}  "
+            f"{f'{r.retries:,} ({r.throttled:,}× 429)':<14}  "
+            f"{(format(r.span_s, '.1f') + ' s') if span else '':>8}").rstrip()
+
+
+def judging_lines(runs: list[Judging]) -> list[str]:
+    """A fixed-width table, one line per judging invocation and a total (the span is not summed:
+    runs happened at different times). Labelled LIVE: this mode only shows live runs."""
+    head = (f"{'LIVE · invocation':<36}  {'recorded (UTC)':<20}  {'states':>7}  {'requests':>8}  "
+            f"{'input tokens':>13}  {'Jev cost':>9}  {'retries':<14}  {'Jev span':>8}").rstrip()
+    return [head, *(_judging_row(r) for r in runs),
+            _judging_row(judging_total(runs), span=False)]
+
+
+COST_NOTE = f"Jev cost = input tokens × {PRICE_PER_MTOK_USD} / 1e6 (output tokens are free)"
+NOT_APPENDED = "not found in eval-results.md — this run was not appended"
+
+
+def entries_for_runs(md: str, runs: list[Judging]) -> list[tuple[str, str | None]]:
+    """(invocation, its logged eval-results entry or None) for each judging invocation."""
+    return [(r.invocation_id, entry_for(md, r.invocation_id)) for r in runs]
 
 
 def stored_failures_sql(test: str, invocation: str) -> str:

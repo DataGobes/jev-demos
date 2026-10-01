@@ -134,20 +134,23 @@ def test_results_mode_runs_before_and_instead_of_dbt_and_never_calls_jev():
 def test_results_mode_queries_with_spark_sql_from_the_ledger_helpers():
     _, cell = _results_cell()
     assert "spark.sql(" in cell
-    for fn in ("latest_live_invocation_sql(", "figures_sql(", "entry_for(", "figure_lines("):
+    for fn in ("latest_live_invocation_sql(", "judging_invocations_sql(", "judging_from_rows(",
+               "judging_lines(", "judging_caption(", "entries_for_runs("):
         assert fn in cell
     assert "sys.path.insert(0," in cell and "from jevdbx import evallog" in cell
 
 
-def test_results_mode_caption_and_logged_entry_wording():
+def test_results_mode_shows_every_run_that_judged_the_rows_not_only_the_latest():
     _, cell = _results_cell()
     cell = re.sub(r'"\s*\n\s*f?"', "", cell)  # adjacent string literals read as one
-    assert ('Results of the live run judged at {judged_at} (invocation {invocation}), '
-            'logged in docs/eval-results.md. No Jev calls are made now.') in cell
-    assert "LIVE" in cell
-    assert "not found in eval-results.md — this run was not appended" in cell
-    assert "eval-results.md" in cell and "html.escape" in cell  # the entry is shown verbatim
-    assert "no live run" in cell.lower()  # clear message when nothing qualifies
+    assert "evallog.judging_caption(judges)" in cell
+    assert "evallog.COST_NOTE" in cell
+    assert "evallog.NOT_APPENDED" in cell  # a judging run missing from the log is said so
+    assert "html.escape" in cell  # each logged entry is shown verbatim
+    assert "LIVE" in cell and "no live run" in cell.lower()
+    # the failing rows are checked against the latest invocation, not the judging runs
+    assert cell.index("judging_invocations_sql(") < cell.index("stored_failures_sql(")
+    assert "latest live run" in cell and "docs/eval-results.md" in cell
 
 
 def test_results_mode_checks_stored_failures_before_showing_them():

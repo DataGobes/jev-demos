@@ -113,38 +113,86 @@ def test_utc_stamp_is_utc_and_to_the_second():
     assert evallog.utc_stamp(str(1_790_826_859_123_456)) == "2026-10-01T03:54:19Z"
 
 
-def test_figures_sql_reads_the_ledger_for_exactly_this_invocation_and_tests():
-    sql = " ".join(evallog.figures_sql(INV, ["a", "b"]).split())
+def test_judging_invocations_sql_is_live_successful_latest_question_per_invocation():
+    tests = evallog.scored_tests("yardstick")
+    sql = " ".join(evallog.judging_invocations_sql(tests).split())
     for table in ("jev_demo.jev.hook_runs", "jev_demo.jev.requests", "jev_demo.jev.judgments"):
         assert table in sql
-    assert sql.count(f"invocation_id = '{INV}'") == 3
-    assert sql.count("test_name in ('a', 'b')") == 3
-    assert "pack_tokens" in sql and "429" in sql and "unix_micros" in sql
+    assert "max_by(question, judged_at)" in sql  # judgments of an older wording do not count
+    assert "j.p is not null" in sql and "j.mode = 'live'" in sql and "mode = 'live'" in sql
+    assert "group by j.invocation_id" in sql
+    assert "count(distinct j.key)" in sql
+    assert "429" in sql and "pack_tokens" in sql and "unix_micros" in sql
+    assert "order by s.first_at" in sql
+    for t in tests:
+        assert f"'{t}'" in sql
 
 
 def test_sql_literals_escape_quotes_the_databricks_way():
-    sql = evallog.figures_sql("x'y", ["a"])
-    assert "'x\\'y'" in sql
+    assert "'x\\'y'" in evallog.stored_failures_sql("t", "x'y")
 
 
-def test_figures_from_row_and_lines_label_live_and_price_the_tokens():
-    # tested, missing, unjudged, requests, tokens, retries, throttled, span_s, model
-    f = evallog.figures_from_row([1057, 1057, 0, 6, 146994, 0, 0, 8.7, "jev-1.13.0"])
-    assert f.judgments == 1057 and f.cached_pct == 0
-    assert f.cost_usd == pytest.approx(146994 * PRICE_PER_MTOK_USD / 1e6)
-    lines = evallog.figure_lines(INV, f)
+# columns: invocation_id, states, requests, tokens, retries, throttled, span_s, recorded_micros
+ROW_A = [FIRST, "1057", "6", "146994", "0", "0", "8.7", str(1_790_826_859_123_456)]
+ROW_B = [SECOND, "100", "2", "10000", "1", "1", "1.5", str(1_790_827_859_000_000)]
+
+
+def test_judging_from_rows_casts_and_prices_the_tokens():
+    js = evallog.judging_from_rows([ROW_A, ROW_B])
+    assert [j.invocation_id for j in js] == [FIRST, SECOND]
+    a = js[0]
+    assert (a.states, a.requests, a.tokens, a.retries, a.throttled) == (1057, 6, 146994, 0, 0)
+    assert a.span_s == 8.7 and a.recorded_at == "2026-10-01T03:54:19Z"
+    assert a.cost_usd == pytest.approx(146994 * PRICE_PER_MTOK_USD / 1e6)
+
+
+def test_judging_total_sums_requests_tokens_cost_and_states():
+    js = evallog.judging_from_rows([ROW_A, ROW_B])
+    t = evallog.judging_total(js)
+    assert (t.states, t.requests, t.tokens, t.retries, t.throttled) == (1157, 8, 156994, 1, 1)
+    assert t.cost_usd == pytest.approx(156994 * PRICE_PER_MTOK_USD / 1e6)
+    assert evallog.judging_total([]).requests == 0
+
+
+def test_judging_caption_counts_rows_and_runs():
+    js = evallog.judging_from_rows([ROW_A, ROW_B])
+    assert evallog.judging_caption(js) == (
+        "These 1,157 rows were judged in 2 live run(s) (listed below), logged in "
+        "docs/eval-results.md; no Jev calls are made now.")
+    one = evallog.judging_caption(evallog.judging_from_rows([ROW_A]))
+    assert "These 1,057 rows were judged in 1 live run(s)" in one
+
+
+def test_judging_lines_list_each_run_then_a_total_labelled_live():
+    js = evallog.judging_from_rows([ROW_A, ROW_B])
+    lines = evallog.judging_lines(js)
     text = "\n".join(lines)
-    assert lines[0].startswith("LIVE") and INV in lines[0] and "jev-1.13.0" in lines[0]
-    for needle in ("1,057", "requests       6", "retries        0", "0× 429", "146,994", "$0.006",
-                   "8.7 s"):
-        assert needle in text
+    assert "LIVE" in lines[0]
+    ra = next(ln for ln in lines if FIRST in ln)
+    for needle in ("2026-10-01T03:54:19Z", "1,057", "146,994", "$0.006", "8.7 s"):
+        assert needle in ra, needle
+    rb = next(ln for ln in lines if SECOND in ln)
+    assert "1 (1× 429)" in rb and "$0.000" in rb
+    total = lines[-1]
+    assert total.lstrip().startswith("total")
+    for needle in ("1,157", "156,994", "$0.007", "8 "):
+        assert needle in total, needle
     assert "SIMULATED" not in text
 
 
-def test_cached_share_is_shown_when_judgments_came_from_earlier_runs():
-    f = evallog.figures_from_row([1000, 200, 0, 1, 10, 0, 0, 1.0, "m"])
-    assert f.cached_pct == 80
-    assert "80% cached" in "\n".join(evallog.figure_lines(INV, f))
+def test_cost_note_states_the_price():
+    assert evallog.COST_NOTE.startswith("Jev cost = input tokens × 0.042 / 1e6")
+
+
+def test_entries_for_runs_prints_each_logged_entry_and_says_not_appended_for_the_rest():
+    js = evallog.judging_from_rows([ROW_A, ROW_B])
+    got = evallog.entries_for_runs(MD, js)
+    assert [inv for inv, _ in got] == [FIRST, SECOND]
+    assert got[0][1].startswith("## 2026-10-01T03:54:19Z") and "Gate: PASS" in got[0][1]
+    assert got[1][1].startswith("## 2026-10-01T04:10:59Z")
+    none = evallog.entries_for_runs("# log\n", js)
+    assert [e for _, e in none] == [None, None]
+    assert evallog.NOT_APPENDED == "not found in eval-results.md — this run was not appended"
 
 
 def test_stored_failures_are_checked_against_the_chosen_invocation_and_live_mode():

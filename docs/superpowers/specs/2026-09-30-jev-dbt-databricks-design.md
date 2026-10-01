@@ -486,11 +486,16 @@ Local dbt (uv) stays for development and tests. For the demo and the production 
 - *Amended 2026-10-01:* widget and job parameter `action` = `build` (default) | `results`. `results`
   runs no dbt and makes no Jev call, and runs before the `%pip install`: it finds the latest **live**
   invocation in `hook_runs` that covers every scored test of the selection (none → a clear message
-  and stop), shows its numbers from `hook_runs`/`requests` labelled LIVE (states judged, requests,
-  retries and 429s, input tokens, Jev cost at 0.042 per million tokens, Jev span), prints the
-  matching `docs/eval-results.md` entry (its `- invocation <id>` line) verbatim, or says it was not
-  appended, and shows the failing rows only when every stored row carries that invocation id and
-  `jev_mode = 'live'`. `docs/eval-results.md` is in the bundle's `sync.include`. The pure parts
+  and stop). That invocation is the one whose stored failing rows are shown, and only when every
+  stored row carries its id and `jev_mode = 'live'`. *Amended 2026-10-01 (Ruling R25):* the numbers
+  shown are those of the runs that actually judged the rows (a rerun judges nothing and costs $0):
+  the distinct live invocations of the successful judgments (`p is not null`, latest question) of
+  the selected tests, each with its recorded time, states judged, requests, retries and 429s,
+  input tokens, Jev cost at 0.042 per million tokens and Jev span, plus a total row, under the
+  caption "These N rows were judged in K live run(s) (listed below), logged in
+  docs/eval-results.md; no Jev calls are made now." Each judging invocation's
+  `docs/eval-results.md` entry (its `- invocation <id>` line) is printed verbatim, or reported as
+  not appended. `docs/eval-results.md` is in the bundle's `sync.include`. The pure parts
   live in `src/jevdbx/evallog.py`.
 - Recording: beats 4–7 may be shown from the notebook or the job run page instead of the terminal.
 - Demo mode through the notebook is covered by the standing OK; live runs stay confirm-first.
