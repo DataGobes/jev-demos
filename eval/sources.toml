@@ -17,5 +17,5 @@ licence = "Creative Commons (variant not named on the source page); credit dbs.u
 citation = "Abt-Buy (DeepMatcher Textual split, Mudgal et al., SIGMOD 2018) from the Leipzig benchmark datasets for entity resolution (Rahm group); Köpcke, Thor, Rahm, VLDB 2010"
 pairs_total = 9575     # from page
 matches_total = 1028   # from page
-pairs_test = 1915      # derived: DeepMatcher page, 9,575 pairs / 1,028 matches split 3:1:1; exact count recorded at download (Task 15 Step 1)
-matches_test = 206     # derived: DeepMatcher page, 9,575 pairs / 1,028 matches split 3:1:1; exact count recorded at download (Task 15 Step 1)
+pairs_test = 1916      # counted at download 2026-10-01 (Task 15 Step 1); S1 had derived 1,915
+matches_test = 206     # counted at download 2026-10-01 (Task 15 Step 1)

@@ -26,7 +26,7 @@ tuning per judge, models outside the three tiers in §3.
 | dbt model | `stg_banking_queries` (query, intent) | `stg_product_pairs` (left, right: two product records per row) | `stg_wanderbricks_reviews` (comment, rating, review_rows): natural states + seeded planted ratings |
 | `jev_expect` sentence | The customer's `query` is not about its labelled `intent` | `left` and `right` describe the same product | The review `comment` clearly contradicts its `rating` |
 | Ground truth | planted intent swaps, seeded | the dataset's own match labels | the user labels the 15 comments' polarity; a fixed rule derives contradiction per (comment, rating) state, natural or planted |
-| Benchmark sample | 2,000 test-split queries, 150 swaps: 75 random, 75 near-miss (same intent family, e.g. `card_arrival` → `card_delivery_estimate`); reported separately | the full test split (≈1,900 pairs, ≈200 matches; exact counts from the spike) | every natural state (205, the control) + the planted states (≈40) |
+| Benchmark sample | 2,000 test-split queries, 150 swaps: 75 random, 75 near-miss (same intent family, e.g. `card_arrival` → `card_delivery_estimate`); reported separately | the full test split (1,916 pairs, 206 matches; counted at download) | every natural state (205, the control) + the planted states (≈40) |
 | Jev at scale | all 13,083 queries (swaps at the same rates) | all labelled pairs | same as sample |
 | Baseline | keyword overlap between query and intent name | token-Jaccard ≥ threshold (threshold fixed on the train split) | none (the rule is exact) |
 
@@ -55,7 +55,7 @@ tuning per judge, models outside the three tiers in §3.
   downloaded). Banking77's pages give 10,003 + 3,080 = 13,083, matching this spec; licence CC BY 4.0.
   The entity-matching dataset is **Abt-Buy** (DeepMatcher Textual split; all five files reachable;
   no fallback needed): 9,575 labelled pairs, 1,028 matches, split 3:1:1. Its test-split counts are
-  derived from that split (≈1,915 pairs, ≈206 matches); the exact counts come from the confirm-first
+  derived from that split (≈1,915 pairs, ≈206 matches; counted at download 2026-10-01: 1,916 / 206); the exact counts come from the confirm-first
   download in Task 15. The source (Leipzig benchmark page) states only "Creative Commons" with no
   named variant, so only pair ids and labels are committed, never record text. URLs and values are
   in `eval/sources.toml`.
