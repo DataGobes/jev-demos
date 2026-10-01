@@ -17,3 +17,5 @@ jaffle_shop/dbt_packages/
 jaffle_shop/.user.yml
 logs/
 data/
+
+node_modules/
