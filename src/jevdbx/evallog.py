@@ -77,7 +77,7 @@ def latest_live_invocation_sql(tests: list[str]) -> str:
 
 def utc_stamp(micros: int) -> str:
     """An epoch-microseconds timestamp as UTC, to the second: 2026-10-01T03:54:19Z."""
-    return datetime.fromtimestamp(micros // 1_000_000, UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return datetime.fromtimestamp(int(micros) // 1_000_000, UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def figures_sql(invocation: str, tests: list[str]) -> str:
