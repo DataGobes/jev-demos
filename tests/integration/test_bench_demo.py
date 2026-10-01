@@ -36,14 +36,31 @@ def test_simulated_build_judges_every_state_once(judge):
     assert int(j) == int(n)
     rerun = dbt("build", "--vars", vars_, "--select", "+stg_wanderbricks_reviews",
                 "wanderbricks_comment_contradicts_rating")
+    assert rerun.returncode == 0, rerun.stdout[-3000:]
     assert " 0 judged now" in rerun.stdout
 
 
-def test_simulated_llm_errors_are_stored_not_flagged():
+def test_simulated_llm_error_rows_are_stored_and_unjudged():
+    """llm_demo errors on ~1 in 97 prompts: those rows are stored with an error and no verdict,
+    and come back from the test as unjudged (jev_p and jev_decision null), never flagged."""
     sql = Sql()
-    r = sql.run(f"select count_if(error is not null), count_if(error is not null and "
-                f"(p is not null or decision is not null)) from jev_demo.bench.judgments "
-                f"where judge = '{LLM}' and mode = 'demo'")
-    errors, leaked = (int(x) for x in r.rows[0])
+    where = f"judge = '{LLM}' and mode = 'demo'"
+    sql.run(f"delete from jev_demo.bench.judgments where {where}")
+    vars_ = json.dumps({"judge": LLM, "bench_scope": "sample"})
+    out = dbt("build", "--vars", vars_, "--select", "+stg_wanderbricks_reviews",
+              "wanderbricks_comment_contradicts_rating")
+    assert out.returncode == 0, out.stdout[-3000:]
+    r = sql.run("select count(*), count_if(error is not null), "
+                "count_if(error is not null and (p is not null or decision is not null)), "
+                f"count_if(error is null and decision is null) "
+                f"from jev_demo.bench.judgments where {where}")
+    total, errors, leaked, verdictless = (int(x) for x in r.rows[0])
+    assert total >= 205, total
+    assert errors > 0, f"no error rows stored among {total} judgments"
     assert leaked == 0
-    assert errors >= 0   # ~1 in 97 prompts errors in llm_demo; 50 rows may hold none
+    assert verdictless == 0
+    unjudged = sql.run(
+        "select count(*) from jev_demo.bench_dbt_test__audit."
+        "wanderbricks_comment_contradicts_rating "
+        f"where jev_judge = '{LLM}' and jev_p is null and jev_decision is null").scalar()
+    assert int(unjudged) == errors, (unjudged, errors)
