@@ -51,6 +51,14 @@ tuning per judge, models outside the three tiers in §3.
 - No LLM audit. Rows that all four judges flag but the key calls clean are listed as "possible key
   errors" for the user to label by hand if they choose; raw scores never change because of them.
 - Licences and exact sizes are verified in Spike S1 before any download is requested.
+- *Amended 2026-10-01 (S1):* sources checked by HEAD and documentation pages only (no data
+  downloaded). Banking77's pages give 10,003 + 3,080 = 13,083, matching this spec; licence CC BY 4.0.
+  The entity-matching dataset is **Abt-Buy** (DeepMatcher Textual split; all five files reachable;
+  no fallback needed): 9,575 labelled pairs, 1,028 matches, split 3:1:1. Its test-split counts are
+  derived from that split (≈1,915 pairs, ≈206 matches); the exact counts come from the confirm-first
+  download in Task 15. The source (Leipzig benchmark page) states only "Creative Commons" with no
+  named variant, so only pair ids and labels are committed, never record text. URLs and values are
+  in `eval/sources.toml`.
 
 ## 3. Judges
 
