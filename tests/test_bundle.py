@@ -20,6 +20,7 @@ def test_bundle_defines_serverless_notebook_job():
     assert "job_cluster_key" not in task and "job_clusters" not in job
     params = {p["name"]: p["default"] for p in job["parameters"]}
     assert params["mode"] == "demo" and params["selection"] == "yardstick"
+    assert params["action"] == "build"  # `results` only shows a logged live run
 
 
 def test_bundle_syncs_what_the_notebook_needs_and_no_host_or_warehouse_id():
@@ -28,6 +29,7 @@ def test_bundle_syncs_what_the_notebook_needs_and_no_host_or_warehouse_id():
     sync = b["sync"]["include"]
     for needed in ("jaffle_shop/**", "notebooks/**", "src/**"):
         assert needed in sync
+    assert "docs/eval-results.md" in sync  # results mode prints the logged entry
     assert not re.search(r"https://\S*databricks", text)
     assert not re.search(r"\b[0-9a-f]{16}\b", text)  # warehouse ids
 
@@ -95,3 +97,76 @@ def test_notebook_production_vars_equal_the_scorers():
     score = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(score)
     assert f'"{score.PROD_VARS}"' in _notebook()
+
+
+# ---- action=results: show the logged live run, run no dbt, call no Jev ------------------------
+
+
+def _cells() -> list[str]:
+    return _notebook().split("# COMMAND ----------")
+
+
+def _results_cell() -> tuple[int, str]:
+    hits = [(i, c) for i, c in enumerate(_cells()) if 'action == "results"' in c]
+    assert len(hits) == 1, "exactly one cell handles action == results"
+    return hits[0]
+
+
+def test_notebook_has_an_action_widget_defaulting_to_build():
+    src = _notebook()
+    assert 'dbutils.widgets.dropdown("action", "build", ["build", "results"])' in src
+
+
+def test_results_mode_runs_before_and_instead_of_dbt_and_never_calls_jev():
+    cells = _cells()
+    i, cell = _results_cell()
+    assert "dbutils.notebook.exit(" in cell  # nothing below this cell runs in results mode
+    ahead = "\n".join(cells[: i + 1])
+    for banned in ("subprocess", "dbt_cli", "%pip", "dbt_env", "noul_pack(", "noul_pack_demo(",
+                   "apiToken", "authenticate()", "WorkspaceClient"):
+        assert banned not in ahead, banned
+    # every dbt-running cell comes after the exit
+    later = "\n".join(cells[i + 1:])
+    assert "subprocess.run" in later and "%pip install" in later
+    assert "noul_pack(" not in _notebook()  # the notebook itself never calls the Jev function
+
+
+def test_results_mode_queries_with_spark_sql_from_the_ledger_helpers():
+    _, cell = _results_cell()
+    assert "spark.sql(" in cell
+    for fn in ("latest_live_invocation_sql(", "figures_sql(", "entry_for(", "figure_lines("):
+        assert fn in cell
+    assert "sys.path.insert(0," in cell and "from jevdbx import evallog" in cell
+
+
+def test_results_mode_caption_and_logged_entry_wording():
+    _, cell = _results_cell()
+    cell = re.sub(r'"\s*\n\s*f?"', "", cell)  # adjacent string literals read as one
+    assert ('Results of the live run judged at {judged_at} (invocation {invocation}), '
+            'logged in docs/eval-results.md. No Jev calls are made now.') in cell
+    assert "LIVE" in cell
+    assert "not found in eval-results.md — this run was not appended" in cell
+    assert "eval-results.md" in cell and "html.escape" in cell  # the entry is shown verbatim
+    assert "no live run" in cell.lower()  # clear message when nothing qualifies
+
+
+def test_results_mode_checks_stored_failures_before_showing_them():
+    _, cell = _results_cell()
+    check = cell.index("stored_failures_sql(")
+    status = cell.index("failure_rows_status(")
+    shown = cell.index("order by jev_p desc")
+    assert check < status < shown
+    assert 'status == "show"' in cell
+    assert "stored failures come from a different run" in cell
+    assert "rebuild or pick that run" in cell
+
+
+def test_build_mode_keeps_its_simulated_and_live_captions_and_scored_test_names():
+    src = _notebook()
+    assert "SIMULATED (demo)" in src and "Mode: LIVE" in src
+    last = _cells()[-1]
+    assert "scored_tests(selection)" in last and "jev_p" in last
+
+
+def test_notebook_names_the_scored_tests_in_one_place_only():
+    assert "customers_full_name_is_a_person" not in _notebook()  # jevdbx.evallog owns the list

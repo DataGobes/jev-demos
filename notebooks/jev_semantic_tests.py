@@ -3,16 +3,87 @@
 # MAGIC # Jev semantic dbt tests, run inside Databricks
 # MAGIC `dbt build` on a serverless notebook; queries run on the SQL warehouse; Jev is the UC
 # MAGIC function `jev_demo.jev.noul_pack`, whose key never leaves Unity Catalog.
+# MAGIC
+# MAGIC `action=build` (default) installs dbt and builds. `action=results` runs no dbt and makes no
+# MAGIC Jev call: it shows the latest logged **live** run of the selection (`mode` is ignored).
+
+# COMMAND ----------
+
+dbutils.widgets.dropdown("action", "build", ["build", "results"])
+dbutils.widgets.dropdown("mode", "demo", ["demo", "live"])
+dbutils.widgets.dropdown("selection", "yardstick", ["yardstick", "production"])
+dbutils.widgets.text("warehouse", "jev-demo-5")
+
+# COMMAND ----------
+
+# action=results: show the logged live run and stop here. Nothing below runs (no pip install, no
+# dbt, no Jev call, no token): only spark.sql on the ledger tables and the synced eval log.
+action = dbutils.widgets.get("action")
+if action == "results":
+    import html
+    import os
+    import sys
+    from pathlib import Path
+
+    results_root = Path(os.getcwd()).parent
+    sys.path.insert(0, str(results_root / "src"))
+    from jevdbx import evallog
+
+    selection = dbutils.widgets.get("selection")
+    tests = evallog.scored_tests(selection)
+    latest = spark.sql(evallog.latest_live_invocation_sql(tests)).collect()
+    if not latest:
+        message = (f"No live run found for the {selection} selection: no invocation in "
+                   "jev_demo.jev.hook_runs covers all of its scored tests in live mode.")
+        displayHTML(f"<p><b>{html.escape(message)}</b></p>")
+        dbutils.notebook.exit(message)
+    invocation = latest[0]["invocation_id"]
+    judged_at = evallog.utc_stamp(latest[0]["recorded_micros"])
+    displayHTML(
+        f"<p><b>LIVE</b> · Results of the live run judged at {judged_at} (invocation "
+        f"{invocation}), logged in docs/eval-results.md. No Jev calls are made now.</p>")
+
+    figures = evallog.figures_from_row(
+        tuple(spark.sql(evallog.figures_sql(invocation, tests)).collect()[0]))
+    displayHTML("<pre>" + html.escape("\n".join(evallog.figure_lines(invocation, figures)))
+                + "</pre>")
+
+    log = results_root / "docs" / "eval-results.md"
+    entry = evallog.entry_for(log.read_text(encoding="utf-8") if log.is_file() else "", invocation)
+    if entry is None:
+        displayHTML("<p><b>Logged entry:</b> not found in eval-results.md — this run was not "
+                    "appended.</p>")
+    else:
+        displayHTML("<p><b>Logged entry (docs/eval-results.md, verbatim)</b></p>"
+                    f'<pre style="white-space: pre-wrap">{html.escape(entry)}</pre>')
+
+    displayHTML("<p><b>Failing rows, with Jev's probability (LIVE)</b></p>")
+    for t in tests:
+        try:
+            total, matching = spark.sql(evallog.stored_failures_sql(t, invocation)).collect()[0]
+            status = evallog.failure_rows_status(int(total), int(matching))
+            detail = f"{matching} of {total} stored rows are this run's"
+        except Exception as e:  # noqa: BLE001 -- older stored failures have no provenance columns
+            status = "unreadable"
+            detail = f"the stored failures could not be read ({type(e).__name__})"
+        if status == "show":
+            displayHTML(f"<p>{t}</p>")
+            display(spark.sql(f"select * from {evallog.AUDIT}.{t} "
+                              "order by jev_p desc nulls last limit 20"))
+        elif status == "empty":
+            displayHTML(f"<p>{t}: no failing rows stored.</p>")
+        else:
+            displayHTML(f"<p><b>Warning, {t}:</b> stored failures come from a different run "
+                        f"({detail}); rebuild or pick that run.</p>")
+    dbutils.notebook.exit(f"results of live invocation {invocation}")
+
+# The install cell below comes after the results branch on purpose: results mode installs nothing.
+# The Python restart that follows an install clears state; widgets persist and every cell below
+# sets itself up.
 
 # COMMAND ----------
 
 # MAGIC %pip install -q "dbt-core==1.12.3" "dbt-databricks==1.12.5"
-
-# COMMAND ----------
-
-dbutils.widgets.dropdown("mode", "demo", ["demo", "live"])
-dbutils.widgets.dropdown("selection", "yardstick", ["yardstick", "production"])
-dbutils.widgets.text("warehouse", "jev-demo-5")
 
 # COMMAND ----------
 
@@ -40,6 +111,7 @@ assert project.is_dir(), (
     "(expected the bundle root to be the notebook folder's parent)")
 # dbt's target/ and logs/ go to a scratch directory, never into the synced workspace files.
 scratch = tempfile.mkdtemp(prefix="jev-dbt-")
+sys.path.insert(0, str(bundle_root / "src"))  # jevdbx.evallog, for the scored test names
 pythonpath = os.pathsep.join(
     p for p in (str(bundle_root / "src"), os.environ.get("PYTHONPATH", "")) if p)
 
@@ -112,9 +184,8 @@ displayHTML("<pre>" + "\n".join(summary) + "</pre>")
 caption = ("Mode: SIMULATED (demo) — probabilities are not Jev judgments" if mode == "demo"
            else "Mode: LIVE")
 displayHTML(f"<p><b>{caption}</b></p>")
-tests = (["product_reviews_body_matches_stars"] if selection == "production"
-         else ["customers_full_name_is_a_person", "returns_comment_matches_reason_code",
-               "reviews_body_matches_stars", "tickets_body_has_no_pii"])
-for t in tests:
+from jevdbx.evallog import scored_tests  # noqa: E402
+
+for t in scored_tests(selection):
     display(spark.sql(f"select * from jev_demo.jaffle_shop_dbt_test__audit.{t} "
                       "order by jev_p desc nulls last limit 20"))

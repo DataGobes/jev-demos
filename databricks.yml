@@ -5,7 +5,8 @@ bundle:
   name: jev-demo-5
 
 sync:
-  include: ["jaffle_shop/**", "notebooks/**", "src/**", "pyproject.toml"]
+  include: ["jaffle_shop/**", "notebooks/**", "src/**", "pyproject.toml",
+            "docs/eval-results.md"]
   exclude: ["jaffle_shop/target/**", "jaffle_shop/logs/**", "data/**", ".venv/**"]
 
 targets:
@@ -20,6 +21,8 @@ resources:
     jev_semantic_tests:
       name: jev-semantic-tests
       parameters:
+        # build (default): dbt build. results: no dbt, no Jev call; shows the latest logged live run
+        - {name: action, default: build}
         - {name: mode, default: demo}
         - {name: selection, default: yardstick}
         - {name: warehouse, default: jev-demo-5}
