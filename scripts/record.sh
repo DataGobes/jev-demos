@@ -2,12 +2,15 @@
 # Typewriter runner for the screen recording. A keypress advances each beat.
 # Captions, a title card and an end card are built in, so the video only needs trimming.
 #
-# Usage: scripts/record.sh [--cold] [--notebook] [--no-production] [--no-captions]
+# Usage: scripts/record.sh [--cold] [--notebook] [--results] [--no-production] [--no-captions]
 #   --cold           forget this mode's judgments for the four tests before beat 4, so the
 #                    semantic build is a real cold run (a live cold run re-bills ~1,000 states)
 #   --notebook       beats 4 and 7 print how to run the bundle job instead of running dbt locally
 #                    (beat 1 still runs dbt locally; this script never deploys or runs the bundle;
 #                    --cold is ignored)
+#   --results        like --notebook, but the job runs with action=results: it shows the latest
+#                    logged live run (numbers, the docs/eval-results.md entry, failing rows) and
+#                    runs no dbt and makes no Jev call, so nothing is judged on camera
 #   --no-production  skip beat 7 (live mode only; it is always skipped in demo mode)
 #   --no-captions    no title card, captions or end card
 #
@@ -20,12 +23,14 @@ cd "$ROOT"
 source "$ROOT/.venv/bin/activate"
 COLD=0
 NOTEBOOK=0
+RESULTS=0
 PRODUCTION=1
 CAPTIONS=1
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --cold) COLD=1; shift ;;
     --notebook) NOTEBOOK=1; shift ;;
+    --results) NOTEBOOK=1; RESULTS=1; shift ;;
     --no-production) PRODUCTION=0; shift ;;
     --no-captions) CAPTIONS=0; shift ;;
     *) echo "unknown arg $1" >&2; exit 2 ;;
@@ -98,16 +103,26 @@ beat() {
 # A dbt beat that runs inside Databricks (--notebook): show the command, do not run or deploy it.
 notebook_beat() {
   local selection="$1" cap="$2" run
-  run="databricks bundle run jev_semantic_tests --params mode=$MODE,selection=$selection"
-  # the job's warehouse parameter defaults to the dev warehouse
-  [[ $selection == production ]] && run="$run,warehouse=$PROD_WAREHOUSE"
+  if [[ $RESULTS == 1 ]]; then
+    # results mode reads the ledger with spark.sql: no warehouse lookup, no dbt, no Jev call
+    run="databricks bundle run jev_semantic_tests --params action=results,selection=$selection"
+  else
+    run="databricks bundle run jev_semantic_tests --params mode=$MODE,selection=$selection"
+    # the job's warehouse parameter defaults to the dev warehouse
+    [[ $selection == production ]] && run="$run,warehouse=$PROD_WAREHOUSE"
+  fi
   read -rsn1
   clear 2>/dev/null || true
   type_cmd "$run"
-  printf '\n  dbt runs inside Databricks, as the serverless notebook job jev_semantic_tests.\n'
+  printf '\n  Runs inside Databricks, as the serverless notebook job jev_semantic_tests.\n'
   printf '  Once per workspace: databricks bundle deploy   (creates the job; not done here)\n'
-  printf '  Open the run page: the Summary and the failing-rows cells carry %s output.\n' \
-    "$([[ $MODE == live ]] && echo LIVE || echo SIMULATED)"
+  if [[ $RESULTS == 1 ]]; then
+    printf '  Open the run page: the logged LIVE run, its docs/eval-results.md entry, the failing rows.\n'
+    printf '  No dbt runs and no Jev call is made.\n'
+  else
+    printf '  Open the run page: the Summary and the failing-rows cells carry %s output.\n' \
+      "$([[ $MODE == live ]] && echo LIVE || echo SIMULATED)"
+  fi
   caption "$cap"
 }
 card() {

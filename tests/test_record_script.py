@@ -33,11 +33,11 @@ def test_record_script_has_no_workspace_details():
     assert not re.search(r"\b[0-9a-f]{16}\b", text)
 
 
-def _notebook_beat(selection: str) -> str:
+def _notebook_beat(selection: str, results: int = 0) -> str:
     """Run record.sh's notebook_beat function alone (stubs for typing, captions and clear)."""
     script = (
         "type_cmd() { echo \"CMD: $1\"; }\ncaption() { :; }\nclear() { :; }\n"
-        "MODE=live; PROD_WAREHOUSE=prod-wh\n"
+        f"MODE=live; PROD_WAREHOUSE=prod-wh; RESULTS={results}\n"
         + subprocess.run(["sed", "-n", "/^notebook_beat()/,/^}/p", str(SCRIPT)],
                          capture_output=True, text=True, check=True).stdout
         + f"\nnotebook_beat {selection} cap <<< x\n"
@@ -67,3 +67,13 @@ def test_beat7_shows_the_logged_production_entry_then_the_rerun():
     assert logged < rerun
     assert "0 requests" in beat7[rerun:]
     assert "logged" in beat7[logged:rerun]
+
+
+def test_results_flag_makes_the_notebook_beats_show_the_logged_run_without_judging():
+    assert "--results" in SCRIPT.read_text()
+    cmd = next(ln for ln in _notebook_beat("yardstick", 1).splitlines() if ln.startswith("CMD:"))
+    assert "action=results" in cmd and "selection=yardstick" in cmd and "mode=" not in cmd
+    prod = next(ln for ln in _notebook_beat("production", 1).splitlines() if ln.startswith("CMD:"))
+    assert "action=results" in prod and "warehouse=" not in prod  # results need no warehouse
+    plain = next(ln for ln in _notebook_beat("yardstick").splitlines() if ln.startswith("CMD:"))
+    assert "action=results" not in plain and "mode=live" in plain

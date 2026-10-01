@@ -313,12 +313,13 @@ tests. Only numbers from logged live runs appear in this repo; SIMULATED output 
 
 ## Recording
 
-`scripts/record.sh [--cold] [--notebook] [--no-production] [--no-captions]` types out each beat and
+`scripts/record.sh [--cold] [--notebook] [--results] [--no-production] [--no-captions]` types out each beat and
 waits for a keypress: the standard build on Databricks, the `jev_expect` blocks, the Jev function (`DESCRIBE FUNCTION
 EXTENDED`), the semantic build with its summary line, the flagged rows, the scorecard, and the
 production run with its rerun. With `--notebook`, beats 4 and 7 print how to run the bundle
 job instead of running dbt locally (nothing is deployed by the script; beat 1 still runs dbt
-locally, and `--cold` is ignored with a notice). Captions, a title card and an end card are built
+locally, and `--cold` is ignored with a notice). `--results` implies `--notebook` and prints the
+`action=results` run instead: the logged live run is shown without judging on camera. Captions, a title card and an end card are built
 in.
 
 Record right after a scored run (`score.py --run --append`, live), and without `--cold`: the

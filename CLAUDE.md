@@ -45,7 +45,7 @@ dated inside it).
   `databricks bundle deploy` / `databricks bundle run jev_semantic_tests` are confirm-first.
   Job parameter `action=results` runs no dbt and makes no Jev call: it shows the latest logged live
   run (ledger numbers, the `docs/eval-results.md` entry, failing rows if they are that run's)
-- Recording: `scripts/record.sh [--cold] [--notebook] [--no-production] [--no-captions]` · smoke test, demo mode only,
+- Recording: `scripts/record.sh [--cold] [--notebook] [--results] [--no-production] [--no-captions]` · smoke test, demo mode only,
   never live: `yes '' | JEV_MODE=demo TYPE_DELAY=0 scripts/record.sh`
 
 ## Rules
