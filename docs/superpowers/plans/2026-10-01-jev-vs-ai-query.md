@@ -1240,6 +1240,8 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
   - `tokens(text: str) -> set[str]`, `jaccard(a: str, b: str) -> float`, `fit_jaccard_threshold(pairs: list[tuple[str, str, int]]) -> float`
   - `comment_hash(text: str) -> str` (sha256 of the UTF-8 text), `state_id(comment: str, rating: float) -> str` (sha256 of `comment + "|" + f"{rating:.1f}"`)
   - `contradiction(polarity: str, rating: float) -> bool` (negative & rating ≥ 4.0, or positive & rating ≤ 2.0)
+  - `rating_band(ratings: Iterable[float]) -> str` (`low` if all ≤ 2.4, `high` if all ≥ 4.0, else `mid`)
+  - `@dataclass Flip(comment_sha256: str, rating: float, band: str)`; `plan_flips(states: list[tuple[str, float]], seed: int, n_polar: int, n_mid: int) -> list[Flip]` (spec §2 amendment 2026-10-01: seeded planted ratings, opposite band for low/high comments, one low + one high for mid comments, never a natural state)
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -1267,7 +1269,8 @@ def test_sample_is_deterministic():
 def test_plan_swaps_counts_types_and_targets():
     rows = [(f"q{i}", INTENTS[i % len(INTENTS)]) for i in range(400)]
     sample = {f"q{i}" for i in range(200)}
-    swaps = keys.plan_swaps(rows, sample, seed=42, n_random=10, n_near=10, full_rate=0.05)
+    # seed 7: expected out-of-sample count ~8.6 (sd ~2.9); seed 42 draws 5 by chance
+    swaps = keys.plan_swaps(rows, sample, seed=7, n_random=10, n_near=10, full_rate=0.05)
     in_s = [s for s in swaps if s.in_sample]
     assert sum(s.swap_type == "random" for s in in_s) == 10
     assert sum(s.swap_type == "near_miss" for s in in_s) == 10
@@ -1277,11 +1280,12 @@ def test_plan_swaps_counts_types_and_targets():
         assert same == (s.swap_type == "near_miss")
     out = [s for s in swaps if not s.in_sample]
     assert 6 <= len(out) <= 14   # ~5% of 200, split between types
-    assert swaps == keys.plan_swaps(rows, sample, 42, 10, 10, 0.05)
+    assert swaps == keys.plan_swaps(rows, sample, 7, 10, 10, 0.05)
 
 
 def test_near_miss_only_from_families_with_siblings():
-    rows = [("q1", "exchange_rate"), ("q2", "card_arrival")]
+    # q3 (outside the sample) gives card_arrival a sibling; exchange_rate has none
+    rows = [("q1", "exchange_rate"), ("q2", "card_arrival"), ("q3", "card_linking")]
     swaps = keys.plan_swaps(rows, {"q1", "q2"}, seed=1, n_random=0, n_near=1, full_rate=0)
     assert [s.query_id for s in swaps] == ["q2"]
 
@@ -1298,6 +1302,27 @@ def test_wanderbricks_rule_and_ids():
     assert not keys.contradiction("negative", 3.9) and not keys.contradiction("neutral", 1.0)
     assert keys.state_id("Nice", 4.0) == keys.state_id("Nice", 4.04)
     assert len(keys.comment_hash("Nice")) == 64
+
+
+def test_rating_band():
+    assert keys.rating_band([1.0, 2.4]) == "low"
+    assert keys.rating_band([4.0, 5.0]) == "high"
+    assert keys.rating_band([2.5, 3.9]) == "mid" and keys.rating_band([2.0, 4.5]) == "mid"
+
+
+def test_plan_flips_are_seeded_opposite_band_and_never_natural():
+    states = [("h_low", 1.0), ("h_low", 2.4), ("h_high", 4.0), ("h_high", 5.0),
+              ("h_mid", 3.0), ("h_mid", 3.5)]
+    flips = keys.plan_flips(states, seed=42, n_polar=3, n_mid=2)
+    assert flips == keys.plan_flips(states, seed=42, n_polar=3, n_mid=2)
+    by: dict[str, list] = {}
+    for f in flips:
+        by.setdefault(f.comment_sha256, []).append(f)
+    assert len(by["h_low"]) == 3 and all(f.band == "low" and f.rating >= 4.0 for f in by["h_low"])
+    assert len(by["h_high"]) == 3 and all(f.rating <= 2.0 for f in by["h_high"])
+    mid = sorted(f.rating for f in by["h_mid"])
+    assert len(mid) == 2 and mid[0] <= 2.0 and mid[1] >= 4.0
+    assert not any((f.comment_sha256, f.rating) in set(states) for f in flips)
 ```
 
 - [ ] **Step 2: Run to verify failure** — `uv run pytest tests/test_keys.py -q` → FAIL.
@@ -1414,15 +1439,64 @@ def state_id(comment: str, rating: float) -> str:
 def contradiction(polarity: str, rating: float) -> bool:
     r = round(rating, 1)
     return (polarity == "negative" and r >= 4.0) or (polarity == "positive" and r <= 2.0)
+
+
+RATING_GRID = [round(1.0 + 0.1 * i, 1) for i in range(41)]  # 1.0 .. 5.0
+
+
+def rating_band(ratings: Iterable[float]) -> str:
+    """A comment's natural rating band: low (all <= 2.4), high (all >= 4.0), else mid."""
+    rs = [round(r, 1) for r in ratings]
+    if max(rs) <= 2.4:
+        return "low"
+    if min(rs) >= 4.0:
+        return "high"
+    return "mid"
+
+
+@dataclass(frozen=True)
+class Flip:
+    comment_sha256: str
+    rating: float
+    band: str  # the comment's natural band
+
+
+def plan_flips(states: list[tuple[str, float]], seed: int, n_polar: int,
+               n_mid: int) -> list[Flip]:
+    """Seeded planted ratings (states = natural (comment_sha256, rating) pairs). A low-band
+    comment gets n_polar ratings from 4.0-5.0, a high-band one n_polar from 1.0-2.0; a mid-band
+    comment gets n_mid alternating from 1.0-2.0 and 4.0-5.0. Never a natural state. Whether a
+    planted state is a contradiction is decided later by the polarity labels and the rule."""
+    rng = random.Random(seed)
+    by_comment: dict[str, set[float]] = {}
+    for h, r in states:
+        by_comment.setdefault(h, set()).add(round(r, 1))
+    low = [r for r in RATING_GRID if r <= 2.0]
+    high = [r for r in RATING_GRID if r >= 4.0]
+    out: list[Flip] = []
+    for h in sorted(by_comment):
+        natural = by_comment[h]
+        band = rating_band(natural)
+        if band == "mid":
+            picks: list[float] = []
+            for i in range(n_mid):
+                pool = [r for r in (low if i % 2 == 0 else high)
+                        if r not in natural and r not in picks]
+                picks.append(rng.choice(pool))
+        else:
+            picks = rng.sample([r for r in (high if band == "low" else low) if r not in natural],
+                               n_polar)
+        out += [Flip(h, r, band) for r in sorted(picks)]
+    return out
 ```
 
-- [ ] **Step 4: Run the tests** — `uv run pytest tests/test_keys.py -q` → PASS (6). If `test_plan_swaps_counts_types_and_targets`' out-of-sample bound fails by randomness, widen nothing: change the seed in the test only if the count is outside [6, 14] for a reason you can name; otherwise fix the code.
+- [ ] **Step 4: Run the tests** — `uv run pytest tests/test_keys.py -q` → PASS (8). If `test_plan_swaps_counts_types_and_targets`' out-of-sample bound fails by randomness, widen nothing: change the seed in the test only if the count is outside [6, 14] for a reason you can name; otherwise fix the code.
 
 - [ ] **Step 5: Commit**
 
 ```bash
 git add src/jevdbx/keys.py tests/test_keys.py
-git commit -m "feat(keys): intent families, seeded random and near-miss swaps, Jaccard, wanderbricks rule
+git commit -m "feat(keys): intent families, seeded swaps, Jaccard, wanderbricks rule and planted ratings
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
@@ -1436,8 +1510,8 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 
 **Interfaces:**
 - Consumes: `eval/sources.toml` (Task 2), `jevdbx.keys` (Task 7), `jevdbx.databricks.Sql`.
-- Produces (local, gitignored `data/`): `data/banking77.parquet` (`query_id, split, query, intent`), `data/abt_buy_pairs.parquet` (`pair_id, split, left_record, right_record`); volume files `/Volumes/jev_demo/bench/raw/banking77.parquet`, `/Volumes/jev_demo/bench/raw/abt_buy_pairs.parquet`. Committed: `eval/banking77_swaps.csv`, `eval/banking77_sample.csv`, `eval/intent_families.csv`, `eval/abt_buy_pairs.csv` (`pair_id, split, label`), `eval/abt_buy_jaccard.txt` (threshold), `eval/wanderbricks_polarity.csv` (`comment_sha256, polarity`); dbt seeds `bench/seeds/banking77_relabel.csv` (`query_id, labelled_intent`), `bench/seeds/banking77_sample.csv` (`query_id`), `bench/seeds/baseline_params.csv` (`name, value`).
-- Functions: `fetch_data.banking_rows(csv_text: str, split: str) -> list[dict]`, `fetch_data.record_text(row: dict) -> str`, `fetch_data.abt_pairs(table_a: str, table_b: str, pairs_csv: str, split: str) -> list[dict]`; `make_keys.main(argv)`.
+- Produces (local, gitignored `data/`): `data/banking77.parquet` (`query_id, split, query, intent`), `data/abt_buy_pairs.parquet` (`pair_id, split, left_record, right_record`); volume files `/Volumes/jev_demo/bench/raw/banking77.parquet`, `/Volumes/jev_demo/bench/raw/abt_buy_pairs.parquet`. Committed: `eval/banking77_swaps.csv`, `eval/banking77_sample.csv`, `eval/intent_families.csv`, `eval/abt_buy_pairs.csv` (`pair_id, split, label`), `eval/abt_buy_jaccard.txt` (threshold), `eval/wanderbricks_polarity.csv` (`comment_sha256, polarity`), `eval/wanderbricks_flips.csv` (`comment_sha256, rating, band`); dbt seeds `bench/seeds/banking77_relabel.csv` (`query_id, labelled_intent`), `bench/seeds/banking77_sample.csv` (`query_id`), `bench/seeds/baseline_params.csv` (`name, value`), `bench/seeds/wanderbricks_flips.csv` (`comment_sha256, rating`).
+- Functions: `fetch_data.banking_rows(csv_text: str, split: str) -> list[dict]`, `fetch_data.record_text(row: dict) -> str`, `fetch_data.abt_pairs(table_a: str, table_b: str, pairs_csv: str, split: str) -> list[dict]`; `make_keys.write_wanderbricks_flips(states, out_eval, out_seeds, seed)` (states = natural (comment, rating) rows; writes hashes, never text); `make_keys.main(argv)`.
 
 - [ ] **Step 1: Write fixtures**
 
@@ -1533,6 +1607,16 @@ def test_relabel_seed_contains_only_swapped_rows(tmp_path):
     assert set(relabel[0]) == {"query_id", "labelled_intent"}   # no ground truth in the seed
     sample = list(csv.DictReader((tmp_path / "seeds" / "banking77_sample.csv").open()))
     assert len(sample) == 30
+
+
+def test_flips_are_written_as_hashes_never_text(tmp_path):
+    states = [("Awful stay", "1.0"), ("Awful stay", "2.0"), ("Perfect", "4.5"), ("Okay", "3.0")]
+    mk.write_wanderbricks_flips(states, out_eval=tmp_path / "eval", out_seeds=tmp_path / "seeds")
+    seed_file = tmp_path / "seeds" / "wanderbricks_flips.csv"
+    rows = list(csv.DictReader(seed_file.open()))
+    assert set(rows[0]) == {"comment_sha256", "rating"} and len(rows) == 3 + 3 + 2
+    text = seed_file.read_text() + (tmp_path / "eval" / "wanderbricks_flips.csv").read_text()
+    assert "Awful" not in text and "Perfect" not in text and "Okay" not in text
 ```
 
 - [ ] **Step 3: Run to verify failure** — `uv run pytest tests/test_fetch_data.py tests/test_make_keys.py -q` → FAIL.
@@ -1655,6 +1739,7 @@ if __name__ == "__main__":
     uv run python scripts/make_keys.py abt              # pair labels, Jaccard threshold
     uv run python scripts/make_keys.py wanderbricks-template   # data/wanderbricks_label_me.csv
     uv run python scripts/make_keys.py wanderbricks-commit     # eval/wanderbricks_polarity.csv
+    uv run python scripts/make_keys.py wanderbricks-flips      # planted ratings (eval/ + seed)
 """
 
 import csv
@@ -1666,6 +1751,7 @@ from jevdbx import keys
 ROOT = Path(__file__).resolve().parents[1]
 DATA, EVAL, SEEDS = ROOT / "data", ROOT / "eval", ROOT / "bench" / "seeds"
 SEED, SAMPLE_N, N_RANDOM, N_NEAR, FULL_RATE = 42, 2000, 75, 75, 0.075
+N_FLIPS_POLAR, N_FLIPS_MID = 3, 2
 
 
 def _write(path: Path, fields: list[str], rows: list[dict]) -> None:
@@ -1733,11 +1819,30 @@ def wanderbricks_commit() -> None:
             for r in rows])
 
 
+def write_wanderbricks_flips(states, out_eval=EVAL, out_seeds=SEEDS, seed=SEED) -> None:
+    """states: natural (comment, rating) rows. Only comment hashes are written."""
+    flips = keys.plan_flips([(keys.comment_hash(c), float(r)) for c, r in states], seed,
+                            N_FLIPS_POLAR, N_FLIPS_MID)
+    _write(out_eval / "wanderbricks_flips.csv", ["comment_sha256", "rating", "band"],
+           [f.__dict__ for f in flips])
+    _write(out_seeds / "wanderbricks_flips.csv", ["comment_sha256", "rating"],
+           [{"comment_sha256": f.comment_sha256, "rating": f.rating} for f in flips])
+    print(f"wanderbricks: {len(flips)} planted ratings over {len({c for c, _ in states})} comments")
+
+
+def wanderbricks_flips() -> None:
+    from jevdbx.databricks import Sql
+    r = Sql().run("select distinct comment, round(rating, 1) from samples.wanderbricks.reviews "
+                  "where comment is not null and rating is not null")
+    write_wanderbricks_flips(r.rows)
+
+
 def main(argv=None) -> None:
     cmd = (argv or sys.argv[1:] or [""])[0]
     {"banking": lambda: write_banking_keys(_banking_rows()), "abt": write_abt_keys,
      "wanderbricks-template": wanderbricks_template,
-     "wanderbricks-commit": wanderbricks_commit}.get(
+     "wanderbricks-commit": wanderbricks_commit,
+     "wanderbricks-flips": wanderbricks_flips}.get(
         cmd, lambda: sys.exit(f"unknown command {cmd!r}"))()
 
 
@@ -1745,7 +1850,7 @@ if __name__ == "__main__":
     main()
 ```
 
-- [ ] **Step 6: Run the tests** — `uv run pytest tests/test_fetch_data.py tests/test_make_keys.py -q && uv run ruff check` → PASS (4).
+- [ ] **Step 6: Run the tests** — `uv run pytest tests/test_fetch_data.py tests/test_make_keys.py -q && uv run ruff check` → PASS (5).
 
 - [ ] **Step 7: Commit**
 
@@ -1762,11 +1867,12 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 
 **Files:**
 - Create: `bench/models/staging/stg_banking_queries.sql`, `stg_product_pairs.sql`, `stg_wanderbricks_reviews.sql`, `bench/tests/baseline/baseline_banking_keyword.sql`, `bench/tests/baseline/baseline_pairs_jaccard.sql`, `tests/test_models.py`
-- Modify: `bench/models/staging/schema.yml` (replace the fixture), delete `bench/models/staging/stg_fixture.sql` and update `tests/test_jev_judge_sql.py` to render `stg_wanderbricks_reviews` instead of `stg_fixture` (its test name becomes `wanderbricks_comment_contradicts_rating`)
+- Create (header-only until Task 15 writes the real keys, so the project parses offline): `bench/seeds/banking77_relabel.csv` (`query_id,labelled_intent`), `bench/seeds/banking77_sample.csv` (`query_id`), `bench/seeds/baseline_params.csv` (`name,value`), `bench/seeds/wanderbricks_flips.csv` (`comment_sha256,rating`)
+- Modify: `bench/dbt_project.yml` (seed column types, below), `bench/models/staging/schema.yml` (replace the fixture), delete `bench/models/staging/stg_fixture.sql` and update `tests/test_jev_judge_sql.py` to render `stg_wanderbricks_reviews` instead of `stg_fixture` and to compile `wanderbricks_comment_contradicts_rating` instead of `fixture_body_is_odd` (threshold 0.8 unchanged)
 
 **Interfaces:**
 - Consumes: seeds from Task 8; volume files; var `bench_scope`.
-- Produces: models `stg_banking_queries(query_id, split, query, intent)`, `stg_product_pairs(pair_id, split, left_record, right_record)`, `stg_wanderbricks_reviews(comment, rating, review_rows)`; tests `banking_query_not_about_intent` (column `query`, context `[intent]`), `pairs_describe_same_product` (column `left_record`, context `[right_record]`), `wanderbricks_comment_contradicts_rating` (column `comment`, context `[rating]`); baselines `baseline_banking_keyword`, `baseline_pairs_jaccard` (tag `baseline`, `store_failures: true`).
+- Produces: models `stg_banking_queries(query_id, split, query, intent)`, `stg_product_pairs(pair_id, split, left_record, right_record)`, `stg_wanderbricks_reviews(comment, rating, review_rows)` (natural states with `review_rows > 0`, planted states with `review_rows = 0`); tests `banking_query_not_about_intent` (column `query`, context `[intent]`), `pairs_describe_same_product` (column `left_record`, context `[right_record]`), `wanderbricks_comment_contradicts_rating` (column `comment`, context `[rating]`); baselines `baseline_banking_keyword`, `baseline_pairs_jaccard` (tag `baseline`, `store_failures: true`).
 
 - [ ] **Step 1: Write the models**
 
@@ -1807,14 +1913,35 @@ where pair_id in (select pair_id from read_files('/Volumes/jev_demo/bench/raw/ab
 `stg_wanderbricks_reviews.sql`:
 
 ```sql
-{#- Databricks' own sample data: one row per distinct (comment, rating) state -#}
-select comment, round(rating, 1) as rating, count(*) as review_rows
-from samples.wanderbricks.reviews
-where comment is not null and rating is not null
-group by comment, round(rating, 1)
+{#- Databricks' own sample data: one row per distinct (comment, rating) state, plus the seeded
+    planted ratings (review_rows = 0) keyed by comment hash. The natural data holds no
+    contradictions (query 2026-10-01): its states are the control. -#}
+with natural as (
+  select comment, cast(round(rating, 1) as double) as rating, count(*) as review_rows
+  from samples.wanderbricks.reviews
+  where comment is not null and rating is not null
+  group by comment, round(rating, 1)
+),
+planted as (
+  select c.comment, cast(f.rating as double) as rating, cast(0 as bigint) as review_rows
+  from (select distinct comment from natural) c
+  join {{ ref('wanderbricks_flips') }} f on f.comment_sha256 = sha2(c.comment, 256)
+)
+select * from (select * from natural union all select * from planted)
 {% if var('bench_scope') == 'pilot' %}
 order by comment, rating limit 50
 {% endif %}
+```
+
+Append to `bench/dbt_project.yml` (fixed types, so the header-only seeds load and the keys never get inferred types):
+
+```yaml
+seeds:
+  bench:
+    banking77_relabel: {+column_types: {query_id: string, labelled_intent: string}}
+    banking77_sample: {+column_types: {query_id: string}}
+    baseline_params: {+column_types: {name: string, value: string}}
+    wanderbricks_flips: {+column_types: {comment_sha256: string, rating: double}}
 ```
 
 - [ ] **Step 2: Write `bench/models/staging/schema.yml`**
@@ -2153,11 +2280,13 @@ def test_append_and_preregistration(tmp_path):
 readable, else from the eval log's cost lines; the guard uses the larger of the two."""
 
 DBU_USD = 0.070
-# DBU per 1M tokens (input, output) from the Databricks pricing pages, times DBU_USD
+# $ per 1M tokens (input, output), Azure Premium at DBU_USD, from the Databricks pricing pages
+# (DBU per 1M: gpt-oss-20b 1.000 / 4.286, llama-3.3-70b 7.143 / 21.429, sonnet 28.571 / 142.857).
+# Sonnet's +10% regional-processing uplift is not included: re-check before pass 1.
 PRICES: dict[str, tuple[float, float]] = {
-    "databricks-gpt-oss-20b": (1.000 * DBU_USD, 4.286 * DBU_USD),
-    "databricks-meta-llama-3-3-70b-instruct": (7.143 * DBU_USD, 21.429 * DBU_USD),
-    "databricks-claude-sonnet-5-5": (28.571 * DBU_USD, 142.857 * DBU_USD),
+    "databricks-gpt-oss-20b": (0.07, 0.30),
+    "databricks-meta-llama-3-3-70b-instruct": (0.50, 1.50),
+    "databricks-claude-sonnet-5-5": (2.00, 10.00),
 }
 CAP_USD = 15.0
 SINCE = "2026-10-01"
@@ -2263,7 +2392,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 
 **Interfaces:**
 - Consumes: `jevdbx.metrics`, `jevdbx.budget`, `jevdbx.evallog`, `jevdbx.keys`, `jevdbx.databricks.Sql`, `scripts/dbtw.py` (subprocess), committed `eval/*.csv`.
-- Produces: CLI `score.py [--run --judge J --scope S --pass N --mode live|demo] [--append] [--fresh] [--preregister] [--usage]`; functions `TESTS: dict[str, TestSpec]`, `@dataclass TestSpec(name, model, id_expr, state_cols, truth)`, `truth_ids(test: str, scope: str) -> tuple[set, set]` (universe, positives), `stored_flags(sql, spec, judge, is_llm) -> tuple[set, set, set]` (flagged ids, unjudged ids, invocation ids), `run_stats(sql, invocation, is_llm) -> dict` (requests, wall_s, jev_cost), `swap_recall(flagged, scope_ids) -> dict[str, tuple[int, int]]`, `entry_md(..., extra: list[str]) -> str`, `refuse_reasons(mode, judge, invocation_ids, errors) -> list[str]`.
+- Produces: CLI `score.py [--run --judge J --scope S --pass N --mode live|demo] [--append] [--fresh] [--preregister] [--usage]`; functions `TESTS: dict[str, TestSpec]`, `@dataclass TestSpec(name, model, id_expr, state_cols, truth)`, `truth_ids(test: str, scope: str) -> tuple[set, set]` (universe, positives), `stored_flags(sql, spec, judge, is_llm) -> tuple[set, set, set]` (flagged ids, unjudged ids, invocation ids), `run_stats(sql, invocation, is_llm) -> dict` (requests, wall_s, jev_cost), `swap_recall(flagged, scope_ids) -> dict[str, tuple[int, int]]`, `natural_ids(sql, spec) -> set` (wanderbricks states with `review_rows > 0`), `false_alarms(flagged, natural, positives) -> tuple[int, int]` (the wanderbricks control: flags on natural states the key calls clean, out of those states), `entry_md(..., extra: list[str]) -> str`, `refuse_reasons(mode, judge, invocation_ids, errors) -> list[str]`.
 
 - [ ] **Step 1: Write the failing tests** (pure parts only; the workspace parts are exercised in Task 14)
 
@@ -2311,6 +2440,11 @@ def test_swap_recall_splits_random_and_near_miss():
              {"query_id": "c", "swap_type": "near_miss"}]
     assert score.swap_recall({"a", "c", "z"}, {"a", "b", "c"}, swaps) == {
         "random": (1, 2), "near_miss": (1, 1)}
+
+
+def test_false_alarms_count_flags_on_clean_natural_states_only():
+    assert score.false_alarms({"a", "b", "x"}, natural={"a", "b", "c", "d"},
+                              positives={"b"}) == (1, 3)
 ```
 
 - [ ] **Step 2: Run to verify failure** — `uv run pytest tests/test_score.py -q` → FAIL.
@@ -2461,6 +2595,17 @@ def swap_recall(flagged: set, scope_ids: set, swaps: list[dict]) -> dict[str, tu
     return out
 
 
+def natural_ids(sql: Sql, spec: TestSpec) -> set[str]:
+    r = sql.run(f"select comment, rating from jev_demo.bench.{spec.model} where review_rows > 0")
+    return {keys.state_id(c, float(x)) for c, x in r.rows}
+
+
+def false_alarms(flagged: set, natural: set, positives: set) -> tuple[int, int]:
+    """Wanderbricks control (spec §2 amendment): flags on natural states the key calls clean."""
+    clean = natural - positives
+    return (len(flagged & clean), len(clean))
+
+
 def run_stats(sql: Sql, invocation: str, is_llm: bool) -> dict:
     """Requests, wall time (the hook windows) and, for Jev, the ledger cost of one invocation."""
     inv = invocation.replace("'", "")
@@ -2524,6 +2669,11 @@ def run(a) -> int:
                 lo, hi = metrics.wilson(k, n)
                 extra_lines.append(f"- banking recall on {kind} swaps {k}/{n} "
                                    f"({k / n if n else 0:.2f}, 95% {lo:.2f}–{hi:.2f})")
+        if test == "wanderbricks_comment_contradicts_rating":
+            k, n = false_alarms(flagged, natural_ids(sql, spec), pos)
+            lo, hi = metrics.wilson(k, n)
+            extra_lines.append(f"- wanderbricks false alarms on natural states {k}/{n} "
+                               f"({k / n if n else 0:.2f}, 95% {lo:.2f}–{hi:.2f})")
         if spec.baseline and a.judge == "jev":
             rows.append(_row(spec.baseline, metrics.score(baseline_flags(sql, spec), pos, uni),
                              len(uni), len(pos), 0))
@@ -2582,7 +2732,9 @@ def preregister() -> int:
         "families in eval/intent_families.csv",
         "- Abt-Buy: sample = test split; Jaccard threshold "
         + (EVAL / "abt_buy_jaccard.txt").read_text().strip() + " fit on train",
-        "- wanderbricks: every distinct (comment, rating); rule in jevdbx.keys.contradiction",
+        "- wanderbricks: every natural (comment, rating) state (the control: false-alarm rate) "
+        "+ planted ratings in eval/wanderbricks_flips.csv (seed 42); rule in "
+        "jevdbx.keys.contradiction",
         "- headline 1: per dataset, F1 of Jev vs each LLM (decision level), Wilson 95% for P and R",
         "- headline 2: per dataset, cost per 1,000 rows and wall time per judge",
         "- headline 3: Banking77 recall on random vs near-miss swaps, per judge",
@@ -2634,7 +2786,7 @@ SIMULATED runs are never written here. LLM cost lines say `measured` (from
 `system.serving.endpoint_usage`) or `estimated` (token assumptions); Jev cost comes from the ledger.
 ```
 
-- [ ] **Step 4: Run** — `uv run pytest tests/test_score.py -q && uv run ruff check` → PASS (5).
+- [ ] **Step 4: Run** — `uv run pytest tests/test_score.py -q && uv run ruff check` → PASS (6).
 
 - [ ] **Step 5: Commit**
 
@@ -2764,7 +2916,7 @@ Add to `main()` before `if a.run:`:
 
 and the flag `ap.add_argument("--compare", action="store_true")`.
 
-- [ ] **Step 4: Run** — `uv run pytest tests/test_score.py -q && uv run ruff check` → PASS (7).
+- [ ] **Step 4: Run** — `uv run pytest tests/test_score.py -q && uv run ruff check` → PASS (8).
 
 - [ ] **Step 5: Commit**
 
@@ -2990,7 +3142,7 @@ Every step here is confirm-first with the estimate shown; record each OK in the 
 - [ ] **Step 1: Download (ask: names, sources, sizes from `eval/sources.toml`)** — `uv run python scripts/fetch_data.py --download`. Expected: `banking77: 13083 rows · abt_buy: N pairs (M matches)`; N and M equal S1's numbers.
 - [ ] **Step 2: Keys** — `uv run python scripts/make_keys.py banking && uv run python scripts/make_keys.py abt`. Expected: 150 in-sample swaps (75/75). Commit `eval/` and `bench/seeds/` (`git add eval bench/seeds`; message `data: Banking77 swaps and sample, Abt-Buy labels and Jaccard threshold`).
 - [ ] **Step 3: Upload (ask: two parquet files to `/Volumes/jev_demo/bench/raw/`)** — `uv run python scripts/fetch_data.py --upload`; then `uv run python scripts/dbtw.py seed && uv run python scripts/dbtw.py build --exclude tag:semantic tag:baseline` (no judging).
-- [ ] **Step 4: wanderbricks labels by the user** — `uv run python scripts/make_keys.py wanderbricks-template`; the user fills `data/wanderbricks_label_me.csv`; then `wanderbricks-commit`; commit `eval/wanderbricks_polarity.csv`.
+- [ ] **Step 4: wanderbricks labels by the user and planted ratings** — `uv run python scripts/make_keys.py wanderbricks-flips` (standing-OK query; expected ≈ 40 planted ratings over 15 comments); `uv run python scripts/make_keys.py wanderbricks-template`; the user fills `data/wanderbricks_label_me.csv`; then `wanderbricks-commit`; `uv run python scripts/dbtw.py seed`; commit `eval/wanderbricks_polarity.csv`, `eval/wanderbricks_flips.csv`, `bench/seeds/wanderbricks_flips.csv`.
 - [ ] **Step 5: Re-check prices** on the two Databricks pricing pages; if any changed, update `budget.PRICES` with a test and commit.
 - [ ] **Step 6: Pre-register** — `uv run python scripts/score.py --preregister`; commit `docs/eval-results.md` (`docs: pre-registration, frozen before pass 1`). From here on, prompts and sentences are frozen.
 - [ ] **Step 7: Pilot (ask: 50 rows per dataset per judge; est. ≈ $0.10 LLM, under $0.01 Jev)** — for each judge: `uv run python scripts/score.py --run --judge <judge> --scope pilot --pass 0 --mode live --append`. Expected: entries with `tokens/row … (measured)` lines for each LLM (or `estimated` cost if usage lags; wait and rerun `--usage` later).

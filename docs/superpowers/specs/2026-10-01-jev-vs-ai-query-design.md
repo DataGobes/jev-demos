@@ -22,11 +22,11 @@ tuning per judge, models outside the three tiers in §3.
 
 | | Ticket triage | Duplicates (data quality) | Databricks sample data |
 |---|---|---|---|
-| Source | Banking77 (PolyAI), CC BY 4.0, 13,083 queries, 77 intents | Abt-Buy entity-matching benchmark (fallback: Amazon-Google) | `samples.wanderbricks.reviews` (99,793 rows, 15 distinct comments) |
-| dbt model | `stg_banking_queries` (query, intent) | `stg_product_pairs` (left, right: two product records per row) | `stg_wanderbricks_reviews` (comment, rating) |
+| Source | Banking77 (PolyAI), CC BY 4.0, 13,083 queries, 77 intents | Abt-Buy entity-matching benchmark (fallback: Amazon-Google) | `samples.wanderbricks.reviews` (99,793 rows, 15 distinct comments, 205 distinct (comment, rating) states) |
+| dbt model | `stg_banking_queries` (query, intent) | `stg_product_pairs` (left, right: two product records per row) | `stg_wanderbricks_reviews` (comment, rating, review_rows): natural states + seeded planted ratings |
 | `jev_expect` sentence | The customer's `query` is not about its labelled `intent` | `left` and `right` describe the same product | The review `comment` clearly contradicts its `rating` |
-| Ground truth | planted intent swaps, seeded | the dataset's own match labels | the user labels the 15 comments' polarity; a fixed rule derives contradiction per (comment, rating) state |
-| Benchmark sample | 2,000 test-split queries, 150 swaps: 75 random, 75 near-miss (same intent family, e.g. `card_arrival` → `card_delivery_estimate`); reported separately | the full test split (≈1,900 pairs, ≈200 matches; exact counts from the spike) | every distinct (comment, rating) state (≤615) |
+| Ground truth | planted intent swaps, seeded | the dataset's own match labels | the user labels the 15 comments' polarity; a fixed rule derives contradiction per (comment, rating) state, natural or planted |
+| Benchmark sample | 2,000 test-split queries, 150 swaps: 75 random, 75 near-miss (same intent family, e.g. `card_arrival` → `card_delivery_estimate`); reported separately | the full test split (≈1,900 pairs, ≈200 matches; exact counts from the spike) | every natural state (205, the control) + the planted states (≈40) |
 | Jev at scale | all 13,083 queries (swaps at the same rates) | all labelled pairs | same as sample |
 | Baseline | keyword overlap between query and intent name | token-Jaccard ≥ threshold (threshold fixed on the train split) | none (the rule is exact) |
 
@@ -35,6 +35,19 @@ tuning per judge, models outside the three tiers in §3.
 - wanderbricks contradiction rule (fixed before any run): negative comment and rating ≥ 4.0, or
   positive comment and rating ≤ 2.0, is a contradiction; neutral/mixed comments and 2.0 < rating
   < 4.0 are not.
+- *Amended 2026-10-01 (wanderbricks, user decision "flips + control"):* a query on 2026-10-01
+  showed the natural data has **no contradictions**: the 5 negative comments are always rated
+  1.0–2.4, the 5 lukewarm 2.5–3.9, the 5 glowing 4.0–5.0 (99,793 rows = 205 distinct states). The
+  test therefore gets seeded planted ratings on top of the natural states, which stay in as
+  negatives: per comment, by its natural rating band (seed 42), a low-band comment gets 3 ratings
+  from 4.0–5.0, a high-band comment 3 from 1.0–2.0, a mid-band comment 2 (one from 1.0–2.0, one from
+  4.0–5.0: hard negatives if labelled neutral); never a natural state. Planted states carry
+  `review_rows = 0`, are keyed by comment hash (no text committed: `eval/wanderbricks_flips.csv`,
+  seed `bench/seeds/wanderbricks_flips.csv`) and are fixed before any run. Ground truth is still
+  the 15 polarity labels + the rule, applied to every state. Scored two ways: F1 over all states
+  (headline 1) and, as a control, the false-alarm rate on the natural states (flags on natural
+  states the rule calls clean, Wilson 95%). Facts about the source data (counts and rating bands
+  from a query) may be quoted as data facts; they are not judge results.
 - No LLM audit. Rows that all four judges flag but the key calls clean are listed as "possible key
   errors" for the user to label by hand if they choose; raw scores never change because of them.
 - Licences and exact sizes are verified in Spike S1 before any download is requested.
@@ -87,7 +100,7 @@ time and cost per judge so the difference is visible.
 - Data: Banking77 and Abt-Buy are downloaded locally and uploaded to the volume (each step
   confirm-first), never committed. Committed: the swap list (query id, original and swapped intent;
   CC BY 4.0 with attribution), the near-miss family table, Abt-Buy pair ids and labels, the 15
-  wanderbricks polarity labels keyed by a hash of the comment (not its text).
+  wanderbricks polarity labels and the planted ratings, keyed by a hash of the comment (not its text).
 - dbt runs locally through `scripts/dbtw.py` (short-lived CLI-profile token, never a PAT).
 
 ## 6. Runs and budgets
@@ -120,6 +133,7 @@ Every step below is confirm-first, with a cost estimate.
 - Before pass 1, `docs/eval-results.md` records: the frozen prompts and test wording, the swap seed
   and family table, the sample definitions, and the headline comparisons:
   1. per dataset, F1 of Jev vs each LLM (decision level), with Wilson 95% intervals for P and R;
+     for wanderbricks also the false-alarm rate on the natural states (the control);
   2. per dataset, cost per 1,000 rows and wall time per judge;
   3. Banking77 recall on random vs near-miss swaps, per judge.
 - Fairness: changing a prompt or sentence after pass 1 means rerunning all judges and logging
