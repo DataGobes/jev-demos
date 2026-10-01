@@ -34,13 +34,22 @@ dated inside it).
   `docs/eval-results.md`: `uv run python scripts/score.py --run --fresh --mode live --append`
   (`--append` needs `--run`; `--run` needs an explicit `--mode`; a yardstick append refuses any
   cached state) · production, four logged steps (each live one confirm-first):
-  (a) part 1: `score.py --production --run --fresh --mode live --append`, (b) the user labels the
-  audit, (c) after `--upload-part2`: `score.py --production --run --mode live --increment --append`,
+  (a) part 1: `score.py --production --run --fresh --mode live --append`, (b) the audits are
+  labelled (R26), (c) after `--upload-part2`: `score.py --production --run --mode live --increment --append`,
   (d) `score.py --production --run --rerun --mode live --append`
 - Stored failures carry `jev_mode` and `jev_invocation_id`; score.py/show.py refuse rows that are
   not the scored invocation's.
 - Production data: `scripts/fetch_reviews.py` (`--source`), `scripts/audit_sample.py` (blind audit
-  CSV). `--download`, `--upload` and `--upload-part2` each need the user's yes first.
+  CSVs). `--download`, `--upload` and `--upload-part2` each need the user's yes first.
+- Audits (Ruling R26, spec §13): `uv run python scripts/audit_sample.py --flips 100 --labeller-copies data/audit/`
+  writes the precision audit (flagged-but-unplanted) and the key audit (random planted flips among
+  the loaded rows) plus one shuffled `id, stars, body` copy per labeller. Two independent fresh LLM
+  labellers (Opus, Sonnet) label each copy blind (rubric: `real` = sentiment clearly contradicts the
+  stars, `ok` = anything else); `scripts/audit_merge.py --precision A B --flip A B` merges them.
+  Tie rule, against Jev: precision audit disagreement is `ok`, key audit disagreement is `real`.
+  Claude writes the files and the merge, never a label, and never reads the labeller copies' text.
+  `score.py --production` reports the key-noise corrected numbers next to the raw ones; the raw
+  recall gate and the logged raw FAIL stay.
 - Bundle (dbt inside Databricks, serverless notebook job): `databricks bundle validate` is fine;
   `databricks bundle deploy` / `databricks bundle run jev_semantic_tests` are confirm-first.
   Job parameter `action=results` runs no dbt and makes no Jev call: it shows every live run that
@@ -88,4 +97,5 @@ dated inside it).
   (`fetch_reviews.py --download`), `databricks bundle deploy` / `bundle run` (creates a job),
   reading `system.billing`, dropping schemas (`jev_demo.spike`).
 - The user creates the UC secret (README: `read -s` + `jq` + `--json @/dev/stdin`, so the key is
-  never in argv) and labels the audit sample. Claude does neither and never runs that command.
+  never in argv). Claude never runs that command. The audits are labelled by the LLM labellers of
+  Ruling R26 (fresh subagents), not by the session that built the files.

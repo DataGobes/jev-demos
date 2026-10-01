@@ -387,7 +387,8 @@ reframe). The golden key, pools and baselines are never edited to make Jev win.
 
 - Recall on planted flips ≥ 0.85.
 - Audited precision ≥ 0.85: flagged rows = planted TPs + audited sample of flagged-but-unplanted
-  rows (the user labels ~100, blind to `jev_p`, via `scripts/audit_sample.py`); precision
+  rows (~100 labelled blind to `jev_p`, via `scripts/audit_sample.py`; see the 2026-10-01 amendment
+  for who labels); precision
   extrapolates the sample's "real mismatch" share to all unplanted flags, with a 95% Wilson
   interval. Raw precision against planted flips only is also reported.
 - F1 above the demo 04 review lexicon baseline, ported to Spark SQL, not tuned.
@@ -412,6 +413,31 @@ the PASS/FAIL entry. Recall counts only the planted flips loaded in `stg_product
 when judgments were cached, the invocations they came from with their states, requests, tokens,
 cost and Jev span. A yardstick `--append` requires 0% cached (in practice `--fresh`) and refuses
 otherwise. `--run` requires an explicit `--mode`.
+
+*Amended 2026-10-01 (Ruling R26, decided before any labelling):* the first live production run
+(47,500 rows, gate FAIL on raw recall 0.836, logged) showed the planted key is noisy: mild 4→2 flips
+and flips that cancel a pre-existing real mismatch are not defects. The audit is therefore two
+blind audits, labelled by two independent fresh LLM subagents (Claude Opus and Claude Sonnet) that
+see only `id, stars, body` (shuffled; never `jev_p`, never whether Jev flagged the row), using the
+test's own definition as the rubric: `real` = the overall sentiment clearly contradicts the star
+rating, `ok` = anything else (mixed, mild, sarcasm that matches a low rating).
+
+1. Precision audit: 100 random flagged-but-unplanted rows (seed 42). Disagreement → `ok`.
+2. Key audit: 100 random planted flips among the loaded rows (seed 42), drawn from all planted
+   flips whether or not Jev flagged them, shown with the planted stars. Disagreement → `real`.
+
+Both tie rules are conservative against Jev. Raw agreement and Cohen's kappa are reported for
+both. The scorecard adds, labelled "key-noise corrected (LLM-labelled audit)": key precision (share
+of audited flips that are `real`, 95% Wilson), recall against the audited-real flips (95% Wilson)
+and an extrapolated recall over all loaded flips (the flagged and the unflagged flips are each
+scaled from their audited real share). The corrected recall gate is a separate line, "recall
+(key-noise corrected) ≥ 0.85: PASS/FAIL" (PENDING until the key audit is labelled); the raw recall
+gate, its threshold and the logged raw FAIL are unchanged. `--append` records the numbers and the
+sentence "Audit labels by two independent LLM labellers (Claude Opus, Claude Sonnet), blind to
+Jev's output; disagreements resolved against Jev." The committed files hold ids and labels only
+(`eval/production_audit_labels.csv`, `eval/production_flip_audit_labels.csv`,
+`eval/production_audit_agreement.json`); `scripts/audit_sample.py --labeller-copies` writes the
+labellers' files and `scripts/audit_merge.py` merges their results.
 
 Every scored live run is appended to `docs/eval-results.md` with date, warehouse, budget,
 requests, retries, tokens, Jev cost, DBUs, wall time and the numbers.

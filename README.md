@@ -254,11 +254,30 @@ the per-row token limit. The cost of the run is the logged one, once it has been
    `--vars '{production: true, jev_max_concurrency: 2}' --select +tag:production tag:production_baseline`.
    Recall counts only the planted flips that are loaded (`planted flips loaded: X of Y`). The gate
    reads PENDING: the audit and the rerun are still missing.
-5. Audit: `uv run python scripts/audit_sample.py` writes ~100 flagged-but-unplanted reviews
-   (text and stars only, no score) to `data/production_audit.csv`. You label each `real` (text
-   and stars disagree) or `ok`, without seeing Jev's probability. Precision is extrapolated from
-   that sample with a 95% Wilson interval; raw precision against the planted flips is reported
-   too.
+5. Audits (Ruling R26, decided before any labelling): `uv run python scripts/audit_sample.py --flips 100
+   --labeller-copies data/audit/` writes two blind files (text and stars only, never `jev_p`, never
+   whether Jev flagged a row; `data/` is gitignored):
+   - the **precision audit**, `data/production_audit.csv`: 100 random flagged-but-unplanted
+     reviews. Precision is extrapolated from that sample with a 95% Wilson interval; raw
+     precision against the planted flips is reported too.
+   - the **key audit**, `data/production_flip_audit.csv`: 100 random planted flips among the loaded
+     rows, whether or not Jev flagged them, shown with the planted stars. It tests the answer key
+     itself: a mild 4 to 2 flip, or a flip that cancels a mismatch the review already had, is not a
+     defect, so raw recall understates what Jev finds.
+
+   Each audit is labelled by two independent fresh LLM labellers (one Claude Opus, one Claude
+   Sonnet) from a shuffled `id, stars, body` copy each (`--labeller-copies`), with this rubric (the
+   test's own definition): `real` = the review's overall sentiment clearly contradicts its star
+   rating (a glowing text with 1 to 2 stars, or an angry text with 4 to 5 stars); `ok` = anything
+   else, including mixed, mild, or sarcasm that matches a low rating. `uv run python
+   scripts/audit_merge.py --precision A B --flip A B` merges each pair. Tie rule, conservative
+   against Jev: a precision-audit disagreement becomes `ok`, a key-audit disagreement becomes
+   `real`. It commits only `id,label` files plus `eval/production_audit_agreement.json` (raw
+   agreement and Cohen's kappa per audit). `score.py` then reports the key precision (share of
+   audited flips that are `real`), the recall against the audited-real flips and an extrapolated
+   recall corrected for key noise, labelled "key-noise corrected (LLM-labelled audit)", next to
+   the raw numbers. The raw recall and its gate line stay as they are, so the raw FAIL stays
+   logged; the corrected recall is a separate line, `recall (key-noise corrected) >= 0.85`.
 6. The increment: `uv run python scripts/fetch_reviews.py --out data/ --upload-part2` (+2,500
    rows), then `uv run python scripts/score.py --production --run --mode live --increment --append`.
    Only the new distinct (body, stars) states are judged, nothing else; the entry logs
@@ -266,7 +285,7 @@ the per-row token limit. The cost of the run is the logged one, once it has been
    texts, and a state already judged is a cache hit.
 7. The rerun check: `uv run python scripts/score.py --production --run --rerun --mode live --append`
    builds once (nothing new to judge) and again, and requires the second build to make 0 requests.
-   With the audit labelled, this entry reads PASS or FAIL.
+   With the audits labelled, this entry reads PASS or FAIL.
 
 Every entry records the dbt invocation, the cached share and, when judgments were cached, the
 invocations they came from, each with its states, requests, tokens, cost and Jev span, so the
