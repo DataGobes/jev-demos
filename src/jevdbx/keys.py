@@ -54,19 +54,37 @@ def plan_swaps(rows: list[tuple[str, str]], sample: set[str], seed: int, n_rando
     in_s = [r for r in rows if r[0] in sample]
     rng.shuffle(in_s)
     near_pool = [r for r in in_s if r[1] in has_sibling]
+    if len(near_pool) < n_near:
+        msg = f"Not enough in-sample near-miss eligible rows: {len(near_pool)} < {n_near}"
+        raise ValueError(msg)
     near = near_pool[:n_near]
     taken = {q for q, _ in near}
-    rand = [r for r in in_s if r[0] not in taken][:n_random]
+    rand_pool = [r for r in in_s if r[0] not in taken]
+    if len(rand_pool) < n_random:
+        raise ValueError(f"Not enough in-sample random rows: {len(rand_pool)} < {n_random}")
+    rand = rand_pool[:n_random]
     for qid, intent in near:
         swaps.append(_swap(rng, qid, intent, "near_miss", fam, all_intents, True))
     for qid, intent in rand:
         swaps.append(_swap(rng, qid, intent, "random", fam, all_intents, True))
-    for qid, intent in [r for r in rows if r[0] not in sample]:
-        u = rng.random()
-        if u < full_rate / 2 and intent in has_sibling:
-            swaps.append(_swap(rng, qid, intent, "near_miss", fam, all_intents, False))
-        elif full_rate / 2 <= u < full_rate:
-            swaps.append(_swap(rng, qid, intent, "random", fam, all_intents, False))
+    out = [r for r in rows if r[0] not in sample]
+    k = round(full_rate / 2 * len(out))
+    out_near_eligible = [r for r in out if r[1] in has_sibling]
+    rng.shuffle(out_near_eligible)
+    if len(out_near_eligible) < k:
+        msg = f"Not enough out-of-sample near-miss eligible rows: {len(out_near_eligible)} < {k}"
+        raise ValueError(msg)
+    out_near = out_near_eligible[:k]
+    out_near_ids = {q for q, _ in out_near}
+    out_rand_pool = [r for r in out if r[0] not in out_near_ids]
+    rng.shuffle(out_rand_pool)
+    if len(out_rand_pool) < k:
+        raise ValueError(f"Not enough out-of-sample random rows: {len(out_rand_pool)} < {k}")
+    out_rand = out_rand_pool[:k]
+    for qid, intent in out_near:
+        swaps.append(_swap(rng, qid, intent, "near_miss", fam, all_intents, False))
+    for qid, intent in out_rand:
+        swaps.append(_swap(rng, qid, intent, "random", fam, all_intents, False))
     return sorted((s for s in swaps if s), key=lambda s: s.query_id)
 
 

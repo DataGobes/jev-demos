@@ -21,8 +21,7 @@ def test_sample_is_deterministic():
 def test_plan_swaps_counts_types_and_targets():
     rows = [(f"q{i}", INTENTS[i % len(INTENTS)]) for i in range(400)]
     sample = {f"q{i}" for i in range(200)}
-    # seed 7: expected out-of-sample count ~8.6 (sd ~2.9); seed 42 draws 5 by chance
-    swaps = keys.plan_swaps(rows, sample, seed=7, n_random=10, n_near=10, full_rate=0.05)
+    swaps = keys.plan_swaps(rows, sample, seed=42, n_random=10, n_near=10, full_rate=0.05)
     in_s = [s for s in swaps if s.in_sample]
     assert sum(s.swap_type == "random" for s in in_s) == 10
     assert sum(s.swap_type == "near_miss" for s in in_s) == 10
@@ -31,8 +30,10 @@ def test_plan_swaps_counts_types_and_targets():
         same = keys.intent_family(s.labelled_intent) == keys.intent_family(s.original_intent)
         assert same == (s.swap_type == "near_miss")
     out = [s for s in swaps if not s.in_sample]
-    assert 6 <= len(out) <= 14   # ~5% of 200, split between types
-    assert swaps == keys.plan_swaps(rows, sample, 7, 10, 10, 0.05)
+    near_count = sum(1 for s in out if s.swap_type == "near_miss")
+    rand_count = sum(1 for s in out if s.swap_type == "random")
+    assert near_count == 5 and rand_count == 5
+    assert swaps == keys.plan_swaps(rows, sample, 42, 10, 10, 0.05)
 
 
 def test_near_miss_only_from_families_with_siblings():
@@ -40,6 +41,16 @@ def test_near_miss_only_from_families_with_siblings():
     rows = [("q1", "exchange_rate"), ("q2", "card_arrival"), ("q3", "card_linking")]
     swaps = keys.plan_swaps(rows, {"q1", "q2"}, seed=1, n_random=0, n_near=1, full_rate=0)
     assert [s.query_id for s in swaps] == ["q2"]
+
+
+def test_plan_swaps_raises_on_insufficient_quota():
+    rows = [(f"q{i}", INTENTS[i % len(INTENTS)]) for i in range(20)]
+    sample = {f"q{i}" for i in range(10)}
+    try:
+        keys.plan_swaps(rows, sample, seed=1, n_random=20, n_near=0, full_rate=0.0)
+        raise AssertionError("Should raise ValueError")
+    except ValueError:
+        pass
 
 
 def test_jaccard_and_threshold():
