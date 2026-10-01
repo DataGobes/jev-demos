@@ -17,6 +17,19 @@
   {{ return({"line1": line1, "line2": line2, "ok": ok}) }}
 {% endmacro %}
 
+{#- Pure formatting for an LLM judge's run: {"line1", "line2", "ok"}; once-per-row = inserted == missing
+    and no duplicate keys (spec §4: the checks apply to every judge). -#}
+{% macro jev_llm_summary_lines(s) %}
+  {%- set label = 'SIMULATED' if s.mode == 'demo' else 'LIVE' -%}
+  {%- set cached = ((s.tested - s.missing) * 100 / s.tested) if s.tested else 0 -%}
+  {%- set ok = (s.inserted == s.missing) and (s.dups == 0) -%}
+  {%- set line1 = "LLM · {} · {:,} judgments · {:.0f}% cached · {:,} calls · {:,} errors · {:.1f} s · {}".format(
+        s.judge, s.tested - s.errors, cached, s.missing, s.errors, s.span, label) -%}
+  {%- set line2 = "LLM · once-per-row {} · {}: {:,} inserted = {:,} missing · {:,} duplicate keys".format(
+        'OK' if ok else 'VIOLATED', label, s.inserted, s.missing, s.dups) -%}
+  {{ return({"line1": line1, "line2": line2, "ok": ok}) }}
+{% endmacro %}
+
 {% macro jev_summary() %}
   {%- if not execute or flags.WHICH not in ['run', 'build'] -%}{{ return('') }}{%- endif -%}
   {%- set inv = jev_sql_string(invocation_id) -%}
@@ -25,6 +38,8 @@
       from " ~ jev_relation('hook_runs') ~ " where invocation_id = " ~ inv) -%}
   {%- set hooks = h.columns[0].values()[0] | int -%}
   {%- if hooks == 0 -%}{{ return('') }}{%- endif -%}
+  {%- set dups = run_query("select count(*) from (select key from " ~ jev_relation('judgments')
+        ~ " where p is not null or decision is not null group by key having count(*) > 1)").columns[0].values()[0] | int -%}
   {%- if jev_is_llm() -%}
     {%- set w = run_query("select coalesce(sum(tested), 0), coalesce(sum(missing), 0),
           coalesce(sum(inserted), 0),
@@ -36,15 +51,15 @@
     {%- set missing = w.columns[1].values()[0] | int -%}
     {%- set inserted = w.columns[2].values()[0] | int -%}
     {%- set errors = e.columns[0].values()[0] | int -%}
-    {%- set cached = ((tested - missing) * 100 / tested) if tested else 0 -%}
-    {%- set label = 'SIMULATED' if jev_mode() == 'demo' else 'LIVE' -%}
-    {%- do log("LLM · {} · {:,} judgments · {:.0f}% cached · {:,} calls · {:,} errors · {:.1f} s · {}".format(
-          jev_judge_name(), tested - errors, cached, missing, errors, w.columns[3].values()[0] | float,
-          label), info=True) -%}
-    {%- do log("LLM · once-per-row {} · {}: {:,} inserted = {:,} missing".format(
-          'OK' if inserted == missing else 'VIOLATED', label, inserted, missing), info=True) -%}
-    {%- if inserted != missing -%}
-      {{ exceptions.raise_compiler_error("jev: once-per-row VIOLATED for " ~ jev_judge_name()) }}
+    {%- set out = jev_llm_summary_lines({
+          "judge": jev_judge_name(), "mode": jev_mode(), "tested": tested, "missing": missing,
+          "inserted": inserted, "errors": errors, "span": w.columns[3].values()[0] | float,
+          "dups": dups}) -%}
+    {%- do log(out.line1, info=True) -%}
+    {%- do log(out.line2, info=True) -%}
+    {%- if not out.ok -%}
+      {{ exceptions.raise_compiler_error("jev: once-per-row VIOLATED for " ~ jev_judge_name()
+          ~ ": " ~ out.line2) }}
     {%- endif -%}
     {{ return('') }}
   {%- endif -%}
@@ -57,8 +72,6 @@
       from " ~ jev_relation('requests') ~ " where invocation_id = " ~ inv) -%}
   {%- set u = run_query("select count_if(p is null) from " ~ jev_relation('judgments')
         ~ " where invocation_id = " ~ inv).columns[0].values()[0] | int -%}
-  {%- set dups = run_query("select count(*) from (select key from " ~ jev_relation('judgments')
-        ~ " where p is not null or decision is not null group by key having count(*) > 1)").columns[0].values()[0] | int -%}
   {%- set out = jev_summary_lines({
         "tested": h.columns[1].values()[0] | int,
         "missing": h.columns[2].values()[0] | int,

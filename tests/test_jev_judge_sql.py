@@ -2,7 +2,7 @@ import re
 
 import pytest
 
-from tests.dbt_helpers import dbt, render
+from tests.dbt_helpers import BENCH, dbt, render
 
 LLM = "databricks-meta-llama-3-3-70b-instruct"
 
@@ -46,3 +46,20 @@ def test_expect_compiles_with_judge_specific_flag_rule():
     llm = dbt("compile", "--select", "fixture_body_is_odd", "--vars", f"{{judge: {LLM}}}")
     assert llm.returncode == 0, llm.stdout
     assert "judged.p >= 0.8" in jev.stdout and "judged.decision = true" in llm.stdout
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize("dups, verdict", [(0, "OK"), (2, "VIOLATED")])
+def test_llm_summary_counts_duplicate_keys_in_once_per_row(dups, verdict):
+    out = render("jev_render_llm_summary", {"inserted": 5, "missing": 5, "dups": dups},
+                 vars={"judge": LLM})
+    line = f"LLM · once-per-row {verdict} · LIVE: 5 inserted = 5 missing · {dups} duplicate keys"
+    assert line in out
+    assert f"ok={dups == 0}" in out
+
+
+def test_summary_reads_duplicate_keys_before_the_judge_branch():
+    text = (BENCH / "macros" / "jev_summary.sql").read_text()
+    dup = text.index("having count(*) > 1")
+    assert text.index("set hooks") < text.index("hooks == 0") < dup < text.index("if jev_is_llm()")
+    assert "where p is not null or decision is not null group by key" in text

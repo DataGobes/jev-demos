@@ -29,3 +29,10 @@
   {%- endfor -%}
   {{ print('-- BEGIN\n' ~ (parts | join('\n')) ~ '\n-- END') }}
 {% endmacro %}
+
+{% macro jev_render_llm_summary(inserted, missing, dups) %}
+  {%- set out = jev_llm_summary_lines({
+        "judge": jev_judge_name(), "mode": jev_mode(), "tested": missing, "missing": missing,
+        "inserted": inserted, "errors": 0, "span": 1.5, "dups": dups}) -%}
+  {{ print('-- BEGIN\n' ~ out.line2 ~ '\nok=' ~ out.ok ~ '\n-- END') }}
+{% endmacro %}
