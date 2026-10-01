@@ -205,3 +205,20 @@ states can be compared across the four runs.
   (customers R 0.96, returns R 1.00). Customer 174 is missed in every run (a stable miss, not noise).
 - So recall on these tests moves by one row (≈0.04 on customers, ≈0.08 on returns) between
   identical runs; precision did not move. A single run's recall is reliable to about one row.
+
+## 2026-10-01T04:59:43Z · production live/budget=48k
+
+Jev · 44,292 judgments · 0% cached · 277 requests · 0 retries (0× 429) · 72.5 s Jev · $0.437 · LIVE jev-1.13.0 budget=48k
+
+- invocation d2b515b8-a97d-4af4-b7cf-6a3a0fdc4002
+- warehouse jev-demo-5 · budget 48,000 tokens · 277 requests · 0 retries (0× 429) · 10,408,755 tokens · Jev cost $0.437168 · est/actual tokens 1.28
+- once-per-row OK: 44,292 inserted = 44,292 missing · packs sum 44,292 (+0 too long) · 0 duplicate keys · 0 errors
+- cached 0% (0 of 44,292 states from earlier invocations; 44,292 judged in this run)
+
+- planted flips loaded: 1,303 of 1,386
+- Jev: recall 0.84 on 1,303 planted flips · raw precision 0.87 · audited precision pending
+- regex baseline (same data): recall 0.73 · raw precision 0.24 · F1 0.36 (Jev raw F1 0.85)
+- flagged 1,254 = 1,089 planted + 165 unplanted
+- rerun requests not run
+
+**Gate: FAIL** — recall on planted flips 0.84 < 0.85; audited precision: audit pending; rerun not checked (use --rerun)
