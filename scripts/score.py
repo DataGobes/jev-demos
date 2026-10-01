@@ -12,7 +12,8 @@ The production run, in four logged steps (each `--append` is a billed live run, 
 
     # (a) part 1 loaded: judge it from scratch (gate PENDING until the audit and the rerun)
     uv run python scripts/score.py --production --run --fresh --mode live --append
-    # (b) the user labels data/production_audit.csv (scripts/audit_sample.py)
+    # (b) the audits are labelled blind by two LLM labellers (scripts/audit_sample.py writes the
+    #     files, scripts/audit_merge.py merges them into eval/production_*audit_labels.csv)
     # (c) part 2 uploaded: only the new distinct (body, stars) states are judged
     uv run python scripts/score.py --production --run --mode live --increment --append
     # (d) the rerun check: a build with nothing new, then a rebuild that must make 0 requests
@@ -48,6 +49,8 @@ GOLDEN_PATH = ROOT / "eval" / "golden_defects.csv"
 REFERENCE_PATH = ROOT / "eval" / "demo04_reference.json"
 FLIPS_PATH = ROOT / "eval" / "production_flips.csv"
 LABELS_PATH = ROOT / "eval" / "production_audit_labels.csv"
+FLIP_LABELS_PATH = ROOT / "eval" / "production_flip_audit_labels.csv"
+AGREEMENT_PATH = ROOT / "eval" / "production_audit_agreement.json"
 AUDIT_SAMPLE_PATH = ROOT / "data" / "production_audit.csv"
 DOCS_PATH = ROOT / "docs" / "eval-results.md"
 
@@ -69,6 +72,12 @@ PROD_MODEL = "jev_demo.jaffle_shop.stg_product_reviews"
 PROD_VARS = "{production: true, jev_max_concurrency: 2}"
 
 PRECISION_MIN = RECALL_MIN = 0.85
+PROTOCOL_SENTENCE = ("Audit labels by two independent LLM labellers (Claude Opus, Claude Sonnet), "
+                     "blind to Jev's output; disagreements resolved against Jev.")
+CORRECTED_LABEL = "key-noise corrected (LLM-labelled audit)"
+CORRECTED_METHOD = ("method: flagged and unflagged loaded flips are each scaled from their audited "
+                    "share of real flips; corrected recall = estimated real flips flagged / all "
+                    "estimated real flips (point estimate)")
 PENDING_REASONS = {"audited precision: audit pending", "rerun not checked (use --rerun)"}
 _ANSI = re.compile(r"\x1b\[[0-9;]*m")
 _DONE = re.compile(r"Done\.\s.*?ERROR=(\d+)")
@@ -501,6 +510,126 @@ def audit_for(flagged: set[int], planted: set[int], audit: dict[int, str]) -> di
 
 
 @dataclass(frozen=True)
+class KeyAudit:
+    """The key audit: are the planted flips really label/text mismatches? `labels` are an LLM
+    audit of random planted flips among the loaded rows, drawn without regard to Jev's flags."""
+
+    n: int  # audited flips (loaded ones only)
+    real: int  # of those, labelled real
+    key_precision: float  # real / n: the share of planted flips that are real mismatches
+    key_lo: float
+    key_hi: float
+    flagged_real: int  # audited real flips that Jev flagged
+    recall_vs_real: float | None  # flagged_real / real (None: no real flip audited)
+    recall_lo: float | None
+    recall_hi: float | None
+    corrected_recall: float | None  # extrapolated over all loaded flips (None: not estimable)
+    loaded_flips: int
+    flagged_flips: int  # loaded planted flips Jev flagged
+
+
+def _stratum_real_estimate(population: int, audited: int, real: int) -> float | None:
+    """Estimated real flips in a stratum of `population` flips, scaled from its audited share."""
+    if population == 0:
+        return 0.0
+    if audited == 0:
+        return None
+    return population * real / audited
+
+
+def key_audit(
+    flagged: set[int], loaded_planted: set[int], labels: dict[int, str]
+) -> KeyAudit | None:
+    """Score the planted key from the key-audit labels. None if no label is about a loaded flip.
+    Corrected recall = estimated real flips Jev flagged / estimated real flips, where the flagged
+    and the unflagged loaded flips are each scaled from their own audited real share."""
+    bad = {v for v in labels.values() if v not in ("real", "ok")}
+    if bad:
+        raise ValueError(f"key audit label must be 'real' or 'ok', got {sorted(bad)}")
+    labels = {i: v for i, v in labels.items() if i in loaded_planted}
+    if not labels:
+        return None
+    n = len(labels)
+    real_ids = {i for i, v in labels.items() if v == "real"}
+    key_lo, key_hi = wilson(len(real_ids), n)
+    flagged_real = len(real_ids & flagged)
+    recall = lo = hi = None
+    if real_ids:
+        recall = flagged_real / len(real_ids)
+        lo, hi = wilson(flagged_real, len(real_ids))
+    flagged_flips = loaded_planted & flagged
+    unflagged_flips = loaded_planted - flagged
+    est = []
+    for stratum in (flagged_flips, unflagged_flips):
+        audited = [i for i in labels if i in stratum]
+        est.append(_stratum_real_estimate(
+            len(stratum), len(audited), sum(1 for i in audited if i in real_ids)))
+    corrected = None
+    if None not in est and sum(est) > 0:
+        corrected = est[0] / sum(est)
+    return KeyAudit(
+        n=n, real=len(real_ids), key_precision=len(real_ids) / n, key_lo=key_lo, key_hi=key_hi,
+        flagged_real=flagged_real, recall_vs_real=recall, recall_lo=lo, recall_hi=hi,
+        corrected_recall=corrected, loaded_flips=len(loaded_planted),
+        flagged_flips=len(flagged_flips))
+
+
+def corrected_recall_line(ka: KeyAudit | None) -> str:
+    """The separate key-noise-corrected recall gate line (the raw gate is `production_gate`)."""
+    head = f"recall (key-noise corrected) ≥ {RECALL_MIN:.2f}:"
+    if ka is None:
+        return f"{head} PENDING (key audit not labelled)"
+    if ka.corrected_recall is None:
+        return f"{head} PENDING (not estimable from the audit)"
+    word = "PASS" if ka.corrected_recall >= RECALL_MIN else "FAIL"
+    return f"{head} {word} ({ka.corrected_recall:.2f})"
+
+
+def read_agreement(path: Path) -> dict | None:
+    """eval/production_audit_agreement.json (written by scripts/audit_merge.py), or None."""
+    path = Path(path)
+    if not path.exists():
+        return None
+    return json.loads(path.read_text())
+
+
+def agreement_lines(agreement: dict | None) -> list[str]:
+    """One line per merged audit: raw agreement, Cohen's kappa and the tie-resolved count."""
+    names = (("precision_audit", "precision audit"), ("key_audit", "key audit"))
+    lines = []
+    for key, name in names:
+        a = (agreement or {}).get(key)
+        if a is None:
+            continue
+        d = len(a["disagreements"])
+        lines.append(
+            f"- labeller agreement, {name}: {a['agreement']:.0%} raw, kappa {a['kappa']:.2f} "
+            f"(n={a['n']}, {d} disagreement{'' if d == 1 else 's'} resolved to {a['tie']})")
+    return lines
+
+
+def key_audit_lines(ka: KeyAudit) -> list[str]:
+    """The key-noise corrected block, as plain text lines (shared by the console and the log)."""
+    lines = [
+        f"key precision {ka.key_precision:.2f} (95% Wilson {ka.key_lo:.2f}–{ka.key_hi:.2f}, "
+        f"n={ka.n}): share of audited planted flips labelled real"]
+    if ka.recall_vs_real is None:
+        lines.append("recall vs audited-real flips: n/a (no audited flip is real)")
+    else:
+        lines.append(
+            f"recall vs audited-real flips {ka.recall_vs_real:.2f} (95% Wilson "
+            f"{ka.recall_lo:.2f}–{ka.recall_hi:.2f}, {ka.flagged_real} of {ka.real} flagged)")
+    if ka.corrected_recall is None:
+        lines.append(f"corrected recall over all {ka.loaded_flips:,} loaded flips: "
+                     "not estimable from the audit")
+    else:
+        lines.append(f"corrected recall over all {ka.loaded_flips:,} loaded flips "
+                     f"{ka.corrected_recall:.2f}")
+    lines.append(CORRECTED_METHOD)
+    return lines
+
+
+@dataclass(frozen=True)
 class ProductionMetrics:
     flagged: int
     planted: int  # planted flips that are loaded (in the production model)
@@ -516,6 +645,7 @@ class ProductionMetrics:
     audit_hi: float | None
     audited_f1: float | None
     planted_total: int = 0  # every planted flip in eval/production_flips.csv
+    key_audit: KeyAudit | None = None  # None: key audit pending
 
 
 def production_metrics(
@@ -524,6 +654,7 @@ def production_metrics(
     baseline_flagged: set[int],
     audit: dict[int, str] | None,
     loaded: set[int] | None = None,
+    flip_audit: dict[int, str] | None = None,
 ) -> ProductionMetrics:
     """Metrics against the planted flips. With `loaded` (the ids the production model holds), only
     loaded flips count: after part 1 alone, the part-2 flips cannot be recalled."""
@@ -543,6 +674,7 @@ def production_metrics(
         recall=jev.recall, raw_precision=jev.precision, jev_raw=jev, baseline=base,
         audit_n=len(audit or {}), audited_precision=point, audit_lo=lo, audit_hi=hi,
         audited_f1=f1, planted_total=planted_total,
+        key_audit=key_audit(flagged, planted, flip_audit) if flip_audit else None,
     )
 
 
@@ -935,7 +1067,7 @@ def print_report(console: Console, results: GateResults, run: Run | None, ref: d
 
 def print_production_report(
     console: Console, m: ProductionMetrics, run: Run | None, rerun_requests: int | None,
-    *, increment: Increment | None = None,
+    *, increment: Increment | None = None, agreement: dict | None = None,
 ) -> None:
     from rich.table import Table
 
@@ -978,8 +1110,15 @@ def print_production_report(
         console.print("rerun: not checked (use --rerun)")
     else:
         console.print(f"rerun: {rerun_requests:,} requests (expected 0)")
+    if m.key_audit is not None:
+        console.print(f"[bold]{CORRECTED_LABEL}[/bold]")
+        for line in key_audit_lines(m.key_audit):
+            console.print(f"  {line}")
+    for line in agreement_lines(agreement):
+        console.print(line)
     ok, reasons = production_gate(m, run, rerun_requests)
     _print_gate(console, ok, reasons)
+    console.print(corrected_recall_line(m.key_audit))
 
 
 def _provenance_lines(run: Run, warehouse: str, sources: list[Source] | None = None
@@ -1043,7 +1182,7 @@ def append_report(
 def append_production_report(
     path: Path, m: ProductionMetrics, run: Run | None, warehouse: str,
     rerun_requests: int | None, *, increment: Increment | None = None,
-    sources: list[Source] | None = None,
+    sources: list[Source] | None = None, agreement: dict | None = None,
 ) -> None:
     refuse_append_if_simulated(run)
     assert run is not None
@@ -1068,10 +1207,14 @@ def append_production_report(
         "- rerun requests " + ("not run" if rerun_requests is None else str(rerun_requests)),
         "",
     ]
+    if m.key_audit is not None:
+        lines += [f"- {CORRECTED_LABEL}:", *(f"  - {t}" for t in key_audit_lines(m.key_audit)), ""]
+    if agreement or m.key_audit is not None:
+        lines += [f"- {PROTOCOL_SENTENCE}", *agreement_lines(agreement), ""]
     gate_line = f"**Gate: {gate_word(ok, reasons)}**"
     if not ok:
         gate_line += " — " + "; ".join(reasons)
-    lines += [gate_line, ""]
+    lines += [gate_line, "", corrected_recall_line(m.key_audit), ""]
     _write(path, lines)
 
 
@@ -1196,15 +1339,21 @@ def _main_production(console: Console, sql, args, warehouse: str | None) -> int:
         console.print(f"[yellow]audit pending: {audit_labels.pending}[/yellow]")
     audit = (audit_for(flagged, planted, audit_labels.labels)
              if audit_labels.labels is not None else None)
-    m = production_metrics(flagged, planted, baseline, audit, loaded=loaded)
+    try:
+        flip_audit = read_audit_labels(FLIP_LABELS_PATH)
+    except ValueError as e:
+        raise SystemExit(str(e)) from None
+    agreement = read_agreement(AGREEMENT_PATH)
+    m = production_metrics(flagged, planted, baseline, audit, loaded=loaded, flip_audit=flip_audit)
     rerun_requests = (_rerun(sql, args, [PROD_TEST], run, production=True)
                       if args.rerun and run is not None else None)
-    print_production_report(console, m, run, rerun_requests, increment=increment)
+    print_production_report(console, m, run, rerun_requests, increment=increment,
+                            agreement=agreement)
     if args.append:
         sources = (load_sources(sql, [PROD_TEST], run.mode)
                    if run is not None and run.tested > run.missing else [])
         append_production_report(DOCS_PATH, m, run, warehouse, rerun_requests,
-                                 increment=increment, sources=sources)
+                                 increment=increment, sources=sources, agreement=agreement)
         console.print(f"Appended run to {DOCS_PATH.relative_to(ROOT)}")
         if audit_labels.source == "sample":
             write_audit_labels(audit_labels.labels, LABELS_PATH)

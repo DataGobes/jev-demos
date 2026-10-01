@@ -989,3 +989,218 @@ def test_print_report_notes_how_packs_differ_from_demo04():
     results = {n: (score.metrics(set(), {}), score.metrics(set(), {})) for n in score.TESTS}
     text = _render(score.print_report, results, live_run(budget=48_000), ref)
     assert "pack=64/nested" in text and "estimated tokens" in text and "256" in text
+
+
+# -- R26: key audit (is the planted key right?) and the LLM-labelled audit protocol ---------------
+
+LOADED = set(range(1, 101))
+KEY_FLAGGED = set(range(1, 81)) | {500, 501}  # 80 of the 100 loaded flips, plus 2 unplanted
+# audited: 10 flagged flips (8 real) and 5 unflagged flips (2 real)
+KEY_LABELS = ({i: "real" for i in range(1, 9)} | {9: "ok", 10: "ok"}
+              | {81: "real", 82: "real", 83: "ok", 84: "ok", 85: "ok"})
+PROTOCOL = ("Audit labels by two independent LLM labellers (Claude Opus, Claude Sonnet), blind to "
+            "Jev's output; disagreements resolved against Jev.")
+AGREEMENT = {
+    "precision_audit": {"n": 100, "agreement": 0.94, "kappa": 0.81, "tie": "ok",
+                        "disagreements": [3, 9, 12, 40, 41, 77]},
+    "key_audit": {"n": 100, "agreement": 0.9, "kappa": 0.7, "tie": "real",
+                  "disagreements": list(range(10))},
+}
+
+
+def test_key_audit_numbers():
+    ka = score.key_audit(KEY_FLAGGED, LOADED, KEY_LABELS)
+    assert (ka.n, ka.real, ka.loaded_flips, ka.flagged_flips) == (15, 10, 100, 80)
+    assert ka.key_precision == pytest.approx(10 / 15)
+    assert ka.key_lo < ka.key_precision < ka.key_hi
+    assert (ka.flagged_real, ka.recall_vs_real) == (8, pytest.approx(0.8))
+    assert ka.recall_lo < 0.8 < ka.recall_hi
+    # flagged flips scaled from their audited real share (8/10), unflagged from theirs (2/5)
+    assert ka.corrected_recall == pytest.approx(64 / 72)
+
+
+def test_key_audit_ignores_labels_of_flips_that_are_not_loaded():
+    ka = score.key_audit(KEY_FLAGGED, LOADED, KEY_LABELS | {999: "real"})
+    assert ka.n == 15
+
+
+def test_key_audit_corrected_recall_needs_both_strata_when_both_exist():
+    only_flagged = {i: v for i, v in KEY_LABELS.items() if i <= 10}
+    assert score.key_audit(KEY_FLAGGED, LOADED, only_flagged).corrected_recall is None
+    # nothing unflagged exists: the unflagged stratum contributes nothing, so recall is 1.0
+    ka = score.key_audit(LOADED, LOADED, only_flagged)
+    assert ka.corrected_recall == pytest.approx(1.0)
+
+
+def test_key_audit_with_no_real_flips_has_no_recall():
+    ka = score.key_audit(KEY_FLAGGED, LOADED, {1: "ok", 81: "ok"})
+    assert ka.real == 0 and ka.recall_vs_real is None and ka.corrected_recall is None
+    assert ka.key_precision == 0.0
+
+
+def test_key_audit_needs_labels_and_valid_ones():
+    assert score.key_audit(KEY_FLAGGED, LOADED, {}) is None
+    assert score.key_audit(KEY_FLAGGED, LOADED, {999: "real"}) is None
+    with pytest.raises(ValueError, match="label"):
+        score.key_audit(KEY_FLAGGED, LOADED, {1: "maybe"})
+
+
+def test_corrected_recall_gate_is_a_separate_line():
+    ka = score.key_audit(KEY_FLAGGED, LOADED, KEY_LABELS)
+    assert score.corrected_recall_line(ka) == "recall (key-noise corrected) ≥ 0.85: PASS (0.89)"
+    low = score.key_audit(set(range(1, 51)), LOADED,
+                          {1: "real", 2: "real", 51: "real", 52: "real"})
+    assert score.corrected_recall_line(low) == "recall (key-noise corrected) ≥ 0.85: FAIL (0.50)"
+    assert score.corrected_recall_line(None) == (
+        "recall (key-noise corrected) ≥ 0.85: PENDING (key audit not labelled)")
+    unestimable = score.key_audit(KEY_FLAGGED, LOADED, {1: "real", 2: "ok"})
+    assert score.corrected_recall_line(unestimable) == (
+        "recall (key-noise corrected) ≥ 0.85: PENDING (not estimable from the audit)")
+
+
+def test_the_raw_gate_does_not_change_when_a_key_audit_exists():
+    base = score.production_metrics(**prod_inputs(flagged=set(range(1, 50))))
+    keyed = score.production_metrics(**prod_inputs(flagged=set(range(1, 50))),
+                                     flip_audit={1: "ok", 60: "ok"})
+    assert keyed.key_audit is not None and base.key_audit is None
+    assert score.production_gate(base, live_run(), 0) == score.production_gate(
+        keyed, live_run(), 0)
+
+
+def test_production_metrics_builds_the_key_audit_from_the_loaded_flips():
+    m = score.production_metrics(KEY_FLAGGED, LOADED | {7000}, set(), None, loaded=LOADED,
+                                 flip_audit=KEY_LABELS)
+    assert m.key_audit.loaded_flips == 100 and m.key_audit.flagged_flips == 80
+
+
+def test_read_agreement(tmp_path):
+    p = tmp_path / "a.json"
+    assert score.read_agreement(p) is None
+    p.write_text(json.dumps(AGREEMENT))
+    assert score.read_agreement(p) == AGREEMENT
+
+
+def test_agreement_lines_report_both_audits_and_the_tie():
+    lines = score.agreement_lines(AGREEMENT)
+    text = "\n".join(lines)
+    assert "precision audit" in text and "94%" in text and "kappa 0.81" in text
+    assert "6 disagreements resolved to ok" in text
+    assert "key audit" in text and "90%" in text and "kappa 0.70" in text
+    assert "10 disagreements resolved to real" in text
+    assert score.agreement_lines(None) == []
+    assert score.agreement_lines({"key_audit": AGREEMENT["key_audit"]})[0].startswith(
+        "- labeller agreement, key audit")
+
+
+def test_report_prints_key_noise_corrected_numbers_next_to_the_raw_gate():
+    m = score.production_metrics(KEY_FLAGGED, LOADED, set(), KEY_LABELS | {500: "ok"},
+                                 loaded=LOADED, flip_audit=KEY_LABELS)
+    text = _render(lambda c, *a: score.print_production_report(c, *a, agreement=AGREEMENT),
+                   m, live_run(), 0)
+    assert "key-noise corrected (LLM-labelled audit)" in text
+    assert "key precision 0.67" in text
+    assert "recall vs audited-real flips 0.80" in text
+    assert "corrected recall over all 100 loaded flips 0.89" in text
+    assert "recall (key-noise corrected) ≥ 0.85: PASS" in text
+    assert "kappa 0.81" in text and "recall on planted flips" in text  # raw row kept
+    assert "GATE" in text
+
+
+def test_report_without_a_key_audit_says_it_is_pending():
+    m = score.production_metrics(**prod_inputs())
+    text = _render(score.print_production_report, m, live_run(), 0)
+    assert "recall (key-noise corrected) ≥ 0.85: PENDING (key audit not labelled)" in text
+    assert "key-noise corrected (LLM-labelled audit)" not in text
+
+
+def test_append_records_corrected_numbers_the_gate_line_and_the_protocol(tmp_path):
+    path = tmp_path / "e.md"
+    m = score.production_metrics(KEY_FLAGGED, LOADED, set(), KEY_LABELS | {500: "ok"},
+                                 loaded=LOADED, flip_audit=KEY_LABELS)
+    run = live_run(tested=5, missing=5, inserted=5, pack_rows=5)
+    score.append_production_report(path, m, run, "w", 0, agreement=AGREEMENT)
+    text = path.read_text()
+    assert PROTOCOL in text
+    assert "key-noise corrected (LLM-labelled audit)" in text
+    assert "key precision 0.67 (95% Wilson" in text and "n=15" in text
+    assert "recall vs audited-real flips 0.80" in text
+    assert "recall (key-noise corrected) ≥ 0.85: PASS" in text
+    assert "kappa 0.81" in text and "kappa 0.70" in text
+    # the raw recall and the raw gate line are still there, unchanged in form
+    assert "- Jev: recall 0.80 on 100 planted flips" in text
+    assert text.count("**Gate:") == 1
+    assert text.index("**Gate:") < text.index("recall (key-noise corrected) ≥ 0.85")
+
+
+def test_append_without_any_llm_audit_has_no_protocol_sentence(tmp_path):
+    path = tmp_path / "e.md"
+    m = score.production_metrics(**prod_inputs())
+    score.append_production_report(path, m, live_run(tested=1, missing=1, inserted=1,
+                                                     pack_rows=1), "w", 0)
+    text = path.read_text()
+    assert PROTOCOL not in text and "key-noise corrected (LLM-labelled audit)" not in text
+    assert "recall (key-noise corrected) ≥ 0.85: PENDING" in text
+
+
+def test_production_committed_paths():
+    assert score.FLIP_LABELS_PATH == ROOT / "eval" / "production_flip_audit_labels.csv"
+    assert score.AGREEMENT_PATH == ROOT / "eval" / "production_audit_agreement.json"
+
+
+def test_main_production_reads_the_key_audit_and_agreement_files(tmp_path, monkeypatch):
+    from argparse import Namespace
+
+    from rich.console import Console
+
+    flips = tmp_path / "flips.csv"
+    flips.write_text("id,original_stars,planted_stars\n" + "".join(
+        f"{i},5,1\n" for i in sorted(LOADED)))
+    labels = tmp_path / "labels.csv"
+    labels.write_text("id,label\n500,real\n501,ok\n")
+    flip_labels = tmp_path / "flip_labels.csv"
+    flip_labels.write_text("id,label\n" + "".join(f"{i},{v}\n" for i, v in KEY_LABELS.items()))
+    agreement = tmp_path / "agreement.json"
+    agreement.write_text(json.dumps(AGREEMENT))
+    docs = tmp_path / "eval-results.md"
+    monkeypatch.setattr(score, "ROOT", tmp_path)
+    for name, value in dict(FLIPS_PATH=flips, LABELS_PATH=labels, FLIP_LABELS_PATH=flip_labels,
+                            AGREEMENT_PATH=agreement, DOCS_PATH=docs,
+                            AUDIT_SAMPLE_PATH=tmp_path / "none.csv").items():
+        monkeypatch.setattr(score, name, value)
+    run = live_run(tested=5, missing=5, inserted=5, pack_rows=5)
+    monkeypatch.setattr(score, "_obtain_run", lambda *a, **k: (run, None))
+    monkeypatch.setattr(score, "load_flagged", lambda sql, table, id_col, judged_only=False: (
+        KEY_FLAGGED if "baseline" not in table else set()))
+    monkeypatch.setattr(score, "load_loaded", lambda sql, ids: set(LOADED))
+    monkeypatch.setattr(score, "load_sources", lambda *a, **k: [])
+    console = Console(record=True, width=140)
+    args = Namespace(append=True, rerun=False, run=True, mode="live")
+    assert score._main_production(console, None, args, "w") == 0
+    out = console.export_text()
+    assert "key precision 0.67" in out and "kappa 0.81" in out
+    text = docs.read_text()
+    assert PROTOCOL in text and "recall (key-noise corrected) ≥ 0.85: PASS" in text
+    assert "- Jev: recall 0.80 on 100 planted flips" in text
+
+
+def test_main_production_without_key_audit_files_is_pending(tmp_path, monkeypatch):
+    from argparse import Namespace
+
+    from rich.console import Console
+
+    flips = tmp_path / "flips.csv"
+    flips.write_text("id,original_stars,planted_stars\n" + "".join(
+        f"{i},5,1\n" for i in sorted(LOADED)))
+    for name, value in dict(FLIPS_PATH=flips, LABELS_PATH=tmp_path / "l.csv",
+                            FLIP_LABELS_PATH=tmp_path / "fl.csv",
+                            AGREEMENT_PATH=tmp_path / "a.json",
+                            AUDIT_SAMPLE_PATH=tmp_path / "none.csv").items():
+        monkeypatch.setattr(score, name, value)
+    monkeypatch.setattr(score, "_obtain_run", lambda *a, **k: (live_run(), None))
+    monkeypatch.setattr(score, "load_flagged", lambda *a, **k: KEY_FLAGGED)
+    monkeypatch.setattr(score, "load_loaded", lambda sql, ids: set(LOADED))
+    console = Console(record=True, width=140)
+    args = Namespace(append=False, rerun=False, run=False, mode=None)
+    assert score._main_production(console, None, args, None) == 0
+    assert "recall (key-noise corrected) ≥ 0.85: PENDING (key audit not labelled)" in (
+        console.export_text())
