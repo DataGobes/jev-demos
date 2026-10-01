@@ -1,0 +1,36 @@
+name: bench
+version: "1.0.0"
+profile: bench
+model-paths: ["models"]
+seed-paths: ["seeds"]
+macro-paths: ["macros"]
+test-paths: ["tests"]
+
+on-run-end:
+  - "{{ jev_summary() }}"
+
+vars:
+  jev_catalog: jev_demo
+  jev_schema: bench
+  jev_function_schema: jev       # noul_pack / noul_pack_demo deployed by demo 05
+  jev_mode: live                 # env JEV_MODE=demo (SIMULATED) overrides
+  judge: jev                     # or one of jev_llm_endpoints
+  jev_model: jev-1.13.0          # pinned; part of the cache key
+  jev_prompt_version: p1         # bump only with a logged rerun of every judge
+  jev_pack_token_budget: 48000
+  jev_pack_max_rows: 256
+  jev_row_token_limit: 30000
+  jev_max_concurrency: 4
+  jev_price_per_mtok_usd: 0.042  # https://docs.typesafe.ai/models
+  jev_llm_endpoints:
+    - databricks-gpt-oss-20b
+    - databricks-meta-llama-3-3-70b-instruct
+    - databricks-claude-opus-5
+  jev_llm_reasoning_low: [databricks-gpt-oss-20b]   # Task 3 (S2): [] if the endpoint rejects it
+  jev_llm_response_format: '{"type": "json_schema", "json_schema": {"name": "judgment", "schema": {"type": "object", "properties": {"decision": {"type": "boolean"}, "probability": {"type": "number"}}, "required": ["decision", "probability"], "additionalProperties": false}, "strict": true}}'
+  bench_scope: sample            # pilot | sample | full
+
+models:
+  bench:
+    +materialized: table
+    +post-hook: "{{ jev_judge() }}"
