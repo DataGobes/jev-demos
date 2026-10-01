@@ -18,7 +18,10 @@ dbutils.widgets.text("warehouse", "jev-demo-5")
 # COMMAND ----------
 
 # action=results: show the logged live run and stop here. Nothing below runs (no pip install, no
-# dbt, no Jev call, no token): only spark.sql on the ledger tables and the synced eval log.
+# dbt, no Jev call): only the ledger queries and the synced eval log. The queries run on the SQL
+# warehouse, like the rest of the project's SQL (dbt, score.py): evallog's SQL does not resolve on
+# serverless notebook compute (Spark), so one engine runs it all. The SDK's notebook auth
+# supplies the client; no credential is read or shown here.
 action = dbutils.widgets.get("action")
 if action == "results":
     import html
@@ -28,23 +31,37 @@ if action == "results":
 
     results_root = Path(os.getcwd()).parent
     sys.path.insert(0, str(results_root / "src"))
+    import pandas as pd
+    from databricks.sdk import WorkspaceClient
+
     from jevdbx import evallog
+    from jevdbx.databricks import Sql, resolve_warehouse_id
+
+    client = WorkspaceClient()
+    warehouse_id = resolve_warehouse_id(client, dbutils.widgets.get("warehouse"))
+    sql = Sql(client=client, warehouse_id=warehouse_id)
+
+    def run_sql(statement: str):
+        res = sql.run(statement)
+        if res.state != "SUCCEEDED":
+            raise RuntimeError(f"warehouse query failed ({res.state}): {res.error}")
+        return res
 
     selection = dbutils.widgets.get("selection")
     tests = evallog.scored_tests(selection)
-    latest = spark.sql(evallog.latest_live_invocation_sql(tests)).collect()
+    latest = run_sql(evallog.latest_live_invocation_sql(tests)).rows
     if not latest:
         message = (f"No live run found for the {selection} selection: no invocation in "
                    "jev_demo.jev.hook_runs covers all of its scored tests in live mode.")
         displayHTML(f"<p><b>{html.escape(message)}</b></p>")
         dbutils.notebook.exit(message)
-    invocation = latest[0]["invocation_id"]
-    judged_at = evallog.utc_stamp(latest[0]["recorded_micros"])
+    invocation, recorded_micros = latest[0]  # columns: invocation_id, recorded_micros
+    judged_at = evallog.utc_stamp(recorded_micros)
 
     # The rows on screen were judged by every live run that made a successful judgment on record,
     # not only the latest invocation (a rerun judges nothing and costs $0).
     judges = evallog.judging_from_rows(
-        tuple(r) for r in spark.sql(evallog.judging_invocations_sql(tests)).collect())
+        tuple(r) for r in run_sql(evallog.judging_invocations_sql(tests)).rows)
     if not judges:
         message = (f"No successful live judgments on record for the {selection} selection, "
                    "so there are no results to show.")
@@ -67,7 +84,7 @@ if action == "results":
                 f"run, invocation {invocation}, judged at {judged_at}.</p>")
     for t in tests:
         try:
-            total, matching = spark.sql(evallog.stored_failures_sql(t, invocation)).collect()[0]
+            total, matching = run_sql(evallog.stored_failures_sql(t, invocation)).rows[0]
             status = evallog.failure_rows_status(int(total), int(matching))
             detail = f"{matching} of {total} stored rows are this run's"
         except Exception as e:  # noqa: BLE001 -- older stored failures have no provenance columns
@@ -75,8 +92,9 @@ if action == "results":
             detail = f"the stored failures could not be read ({type(e).__name__})"
         if status == "show":
             displayHTML(f"<p>{t}</p>")
-            display(spark.sql(f"select * from {evallog.AUDIT}.{t} "
-                              "order by jev_p desc nulls last limit 20"))
+            shown = run_sql(f"select * from {evallog.AUDIT}.{t} "
+                            "order by jev_p desc nulls last limit 20")
+            display(pd.DataFrame(shown.rows, columns=shown.columns))
         elif status == "empty":
             displayHTML(f"<p>{t}: no failing rows stored.</p>")
         else:

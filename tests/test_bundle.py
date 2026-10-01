@@ -123,7 +123,7 @@ def test_results_mode_runs_before_and_instead_of_dbt_and_never_calls_jev():
     assert "dbutils.notebook.exit(" in cell  # nothing below this cell runs in results mode
     ahead = "\n".join(cells[: i + 1])
     for banned in ("subprocess", "dbt_cli", "%pip", "dbt_env", "noul_pack(", "noul_pack_demo(",
-                   "apiToken", "authenticate()", "WorkspaceClient"):
+                   "apiToken", "authenticate()"):
         assert banned not in ahead, banned
     # every dbt-running cell comes after the exit
     later = "\n".join(cells[i + 1:])
@@ -131,13 +131,35 @@ def test_results_mode_runs_before_and_instead_of_dbt_and_never_calls_jev():
     assert "noul_pack(" not in _notebook()  # the notebook itself never calls the Jev function
 
 
-def test_results_mode_queries_with_spark_sql_from_the_ledger_helpers():
+def test_results_mode_queries_with_the_ledger_helpers():
     _, cell = _results_cell()
-    assert "spark.sql(" in cell
     for fn in ("latest_live_invocation_sql(", "judging_invocations_sql(", "judging_from_rows(",
-               "judging_lines(", "judging_caption(", "entries_for_runs("):
+               "judging_lines(", "judging_caption(", "entries_for_runs(", "stored_failures_sql("):
         assert fn in cell
     assert "sys.path.insert(0," in cell and "from jevdbx import evallog" in cell
+
+
+def test_results_mode_runs_every_query_on_the_sql_warehouse_not_on_spark():
+    """One engine: evallog's SQL was written and verified on the SQL warehouse; on serverless
+    notebook compute (spark.sql) latest_live_invocation_sql fails with UNRESOLVED_COLUMN."""
+    _, cell = _results_cell()
+    assert "spark.sql(" not in cell and "spark." not in cell
+    assert "spark.sql(evallog." not in cell
+    assert "from jevdbx.databricks import" in cell and "Sql" in cell
+    assert "from databricks.sdk import WorkspaceClient" in cell
+    # the notebook's own client and the warehouse resolved from the `warehouse` widget
+    assert "WorkspaceClient()" in cell
+    assert 'dbutils.widgets.get("warehouse")' in cell
+    assert "resolve_warehouse_id(" in cell
+    assert re.search(r"Sql\(\s*client=\w+,\s*warehouse_id=\w+\s*\)", cell)
+    # every ledger query goes through the warehouse client
+    for fn in ("latest_live_invocation_sql(", "judging_invocations_sql(", "stored_failures_sql("):
+        assert re.search(rf"run_sql\(\s*evallog\.{re.escape(fn)}", cell), fn
+    assert "sql.run(statement)" in cell  # run_sql is the one door to the warehouse client
+    assert "order by jev_p desc" in cell and "display(pd.DataFrame(" in cell
+    # still no token: neither printed nor read in results mode
+    for leak in ("print(", "token", "Authorization", "authenticate"):
+        assert leak not in cell, leak
 
 
 def test_results_mode_shows_every_run_that_judged_the_rows_not_only_the_latest():
