@@ -19,3 +19,13 @@
 {% macro jev_render_state(column_name, context) %}
   {{ print('-- BEGIN\n' ~ jev_state_expr(column_name, context) ~ '\n-- END') }}
 {% endmacro %}
+
+{% macro jev_render_judge(model_name) %}
+  {%- set node = graph.nodes['model.bench.' ~ model_name] -%}
+  {%- set parts = [] -%}
+  {%- for t in jev_tests_for(node.unique_id, none) -%}
+    {%- set s = jev_judge_sql(t, node.relation_name) -%}
+    {%- do parts.append('-- count\n' ~ s['count'] ~ '\n-- insert\n' ~ s['insert'] ~ '\n-- inserted\n' ~ s['inserted']) -%}
+  {%- endfor -%}
+  {{ print('-- BEGIN\n' ~ (parts | join('\n')) ~ '\n-- END') }}
+{% endmacro %}

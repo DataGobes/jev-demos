@@ -110,6 +110,8 @@ time and cost per judge so the difference is visible.
   `system.billing.usage` had no `MODEL_SERVING` rows yet (billing lag). How LLM cost is measured is
   decided before Task 11 (open item); until then every LLM cost is an estimate.
 
+- *Amended 2026-10-01 (Task 6):* Jev flags `p >= threshold` (demo 05's rule, kept for continuity), not `p > threshold`.
+
 ## 5. Platform
 
 - Workspace, CLI profile and dev warehouse as demo 05 (`jev-demo-5`, 2X-Small). No workspace host,

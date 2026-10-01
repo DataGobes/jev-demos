@@ -1,3 +1,12 @@
 version: 2
 models:
   - name: stg_fixture
+    columns:
+      - name: body
+        data_tests:
+          - jev_expect:
+              name: fixture_body_is_odd
+              arguments:
+                fails_if: "The `body` is odd."
+                threshold: 0.8
+              config: {severity: warn, store_failures: true, tags: [semantic]}
