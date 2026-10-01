@@ -5,7 +5,8 @@
 # MAGIC function `jev_demo.jev.noul_pack`, whose key never leaves Unity Catalog.
 # MAGIC
 # MAGIC `action=build` (default) installs dbt and builds. `action=results` runs no dbt and makes no
-# MAGIC Jev call: it shows the latest logged **live** run of the selection (`mode` is ignored).
+# MAGIC Jev call: it shows every **live** run that judged the rows on record (a rerun judges
+# MAGIC nothing), with the stored failing rows of the latest one (`mode` is ignored).
 
 # COMMAND ----------
 

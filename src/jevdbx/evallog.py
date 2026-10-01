@@ -6,7 +6,7 @@ Pure functions: they build SQL text and format numbers; the notebook runs the SQ
 
 import re
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 
 from jevdbx.deploy import sql_string
 from jevdbx.pricing import PRICE_PER_MTOK_USD, cost_usd
@@ -77,7 +77,8 @@ def latest_live_invocation_sql(tests: list[str]) -> str:
 
 def utc_stamp(micros: int) -> str:
     """An epoch-microseconds timestamp as UTC, to the second: 2026-10-01T03:54:19Z."""
-    return datetime.fromtimestamp(int(micros) // 1_000_000, UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+    moment = datetime.fromtimestamp(int(micros) // 1_000_000, timezone.utc)  # noqa: UP017
+    return moment.strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def judging_invocations_sql(tests: list[str]) -> str:
@@ -147,9 +148,9 @@ def judging_total(runs: list[Judging]) -> Judging:
 
 
 def judging_caption(runs: list[Judging]) -> str:
-    rows = judging_total(runs).states
-    return (f"These {rows:,} rows were judged in {len(runs)} live run(s) (listed below), logged "
-            "in docs/eval-results.md; no Jev calls are made now.")
+    states = judging_total(runs).states
+    return (f"These {states:,} distinct states were judged in {len(runs)} live run(s) (listed "
+            "below); no Jev calls are made now. See docs/eval-results.md.")
 
 
 def _judging_row(r: Judging, span: bool = True) -> str:

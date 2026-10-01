@@ -56,7 +56,9 @@ PROD_WAREHOUSE="${JEV_PROD_WAREHOUSE:-jev-demo-5-prod}"
 # command stays the short, readable `dbt ...`.
 dbt() { python "$ROOT/scripts/dbtw.py" "$@"; }
 
-if [[ $MODE == live ]]; then
+if [[ $RESULTS == 1 ]]; then
+  echo "results only: no Jev calls (the notebook job shows the logged live runs)." >&2
+elif [[ $MODE == live ]]; then
   echo "LIVE mode: this run calls Jev (TypeSafe billing). Ctrl-C now to stop." >&2
 else
   echo "SIMULATED (demo mode): smoke test only, none of this is a result." >&2
@@ -180,7 +182,10 @@ if [[ $PRODUCTION == 1 ]]; then
   beat "python scripts/show.py production" \
     "50,000 real reviews, the logged run: planted flips, audited precision, cost."
   export JEV_WAREHOUSE="$PROD_WAREHOUSE"
-  if [[ $NOTEBOOK == 1 ]]; then
+  if [[ $RESULTS == 1 ]]; then
+    # --results: the logged runs (states, requests, cost), not a rerun
+    notebook_beat production "The logged production runs: states, requests, cost."
+  elif [[ $NOTEBOOK == 1 ]]; then
     notebook_beat production "Rerun: nothing new to judge. 0 requests."
   else
     beat "dbt build --vars '{production: true, jev_max_concurrency: 2}' --select +tag:production tag:production_baseline" \

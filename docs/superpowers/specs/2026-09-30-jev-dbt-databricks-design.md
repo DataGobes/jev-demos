@@ -260,8 +260,8 @@ was cached and nothing was inserted.
 
 TypeSafe: 1,200 requests/min, 250k tokens/s, 64k tokens/request, all "adjusting dynamically".
 
-- Requests will not bind (50,000 review rows: 10.8–11.1M estimated tokens, so 230+ packs of up
-  to 48k). Tokens/s will: 8 concurrent 48k
+- Requests will not bind (50,000 review rows ≈ 225–231+ packs; estimate: 10.8–11.1M tokens ÷ 48k).
+  Tokens/s will: 8 concurrent 48k
   packs ≈ 380k tokens/s.
 - Layer 1: `REPARTITION(n)`, `n = var('jev_max_concurrency', 4)`, caps concurrent packs.
 - Layer 2: in-function retry with backoff on 429/529/5xx (§5.1). Each pack records attempts and
@@ -492,8 +492,8 @@ Local dbt (uv) stays for development and tests. For the demo and the production 
   the distinct live invocations of the successful judgments (`p is not null`, latest question) of
   the selected tests, each with its recorded time, states judged, requests, retries and 429s,
   input tokens, Jev cost at 0.042 per million tokens and Jev span, plus a total row, under the
-  caption "These N rows were judged in K live run(s) (listed below), logged in
-  docs/eval-results.md; no Jev calls are made now." Each judging invocation's
+  caption "These N distinct states were judged in K live run(s) (listed below); no Jev calls are
+  made now. See docs/eval-results.md." (N is distinct judged states, not rows.) Each judging invocation's
   `docs/eval-results.md` entry (its `- invocation <id>` line) is printed verbatim, or reported as
   not appended. `docs/eval-results.md` is in the bundle's `sync.include`. The pure parts
   live in `src/jevdbx/evallog.py`.

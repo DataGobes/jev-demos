@@ -77,3 +77,44 @@ def test_results_flag_makes_the_notebook_beats_show_the_logged_run_without_judgi
     assert "action=results" in prod and "warehouse=" not in prod  # results need no warehouse
     plain = next(ln for ln in _notebook_beat("yardstick").splitlines() if ln.startswith("CMD:"))
     assert "action=results" not in plain and "mode=live" in plain
+
+
+def _top_level_block(start_pattern: str) -> str:
+    """The script's top-level (unindented) `if ... fi` block that starts at `start_pattern`."""
+    return subprocess.run(
+        ["sed", "-n", f"/^{start_pattern}/,/^fi$/p", str(SCRIPT)],
+        capture_output=True, text=True, check=True).stdout
+
+
+def _run_beat7(results: int, notebook: int) -> str:
+    script = (
+        'beat() { echo "BEAT: $1 | $2"; }\n'
+        'notebook_beat() { echo "NOTEBOOK: $1 | $2"; }\n'
+        f"PRODUCTION=1; PROD_WAREHOUSE=w; RESULTS={results}; NOTEBOOK={notebook}\n"
+        + _top_level_block(r"if \[\[ \$PRODUCTION == 1 \]\]; then")
+    )
+    return subprocess.run(["bash", "-c", script], capture_output=True, text=True,
+                          check=True).stdout
+
+
+def test_results_beat7_has_its_own_caption_not_the_rerun_one():
+    out = _run_beat7(results=1, notebook=1)
+    assert "NOTEBOOK: production | The logged production runs: states, requests, cost." in out
+    assert "Rerun" not in out and "0 requests" not in out
+    # without --results the rerun caption is unchanged
+    assert "Rerun: nothing new to judge. 0 requests." in _run_beat7(results=0, notebook=1)
+    assert "Rerun: nothing new to judge. 0 requests." in _run_beat7(results=0, notebook=0)
+
+
+def _banner(results: int, mode: str) -> str:
+    script = f"RESULTS={results}; MODE={mode}\n" + _top_level_block(r"if \[\[ \$RESULTS == 1 \]\]")
+    res = subprocess.run(["bash", "-c", script], capture_output=True, text=True, check=True)
+    return res.stderr
+
+
+def test_results_banner_says_no_jev_calls_not_live_billing():
+    err = _banner(1, "live")
+    assert "results only: no Jev calls" in err
+    assert "LIVE" not in err and "TypeSafe billing" not in err
+    assert "LIVE mode: this run calls Jev" in _banner(0, "live")
+    assert "SIMULATED (demo mode)" in _banner(0, "demo")

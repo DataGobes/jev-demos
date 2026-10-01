@@ -190,11 +190,11 @@ dbt-databricks, runs `dbt build` for the chosen `mode` (demo|live) and `selectio
 (yardstick|production) against the SQL warehouse, then shows the summary and the flagged rows.
 It authenticates with the notebook's own short-lived credential.
 
-`action=results` (default `build`) makes no Jev call and runs no dbt: it shows the latest **live**
-run of the selection that is already in the ledger (`jev_demo.jev.hook_runs`), labelled LIVE: every
-live run that judged the rows on record (a rerun judges nothing) with its states, requests, retries
+`action=results` (default `build`) makes no Jev call and runs no dbt. It reads the ledger
+(`jev_demo.jev.hook_runs`) and shows, labelled LIVE, every live run that judged the rows on record
+(a rerun judges nothing; N counts distinct states, not rows) with its states, requests, retries
 and 429s, input tokens, Jev cost and span, a total, each run's entry of `docs/eval-results.md`
-verbatim, and the failing rows when every stored row is the latest live run's. Use it
+verbatim, and the failing rows of the latest live run when every stored row is that run's. Use it
 to show a logged result on camera without judging. `mode` is ignored; with no live run it says so.
 
 ```bash

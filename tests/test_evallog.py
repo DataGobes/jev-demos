@@ -154,13 +154,19 @@ def test_judging_total_sums_requests_tokens_cost_and_states():
     assert evallog.judging_total([]).requests == 0
 
 
-def test_judging_caption_counts_rows_and_runs():
+def test_judging_caption_counts_distinct_states_and_runs():
     js = evallog.judging_from_rows([ROW_A, ROW_B])
     assert evallog.judging_caption(js) == (
-        "These 1,157 rows were judged in 2 live run(s) (listed below), logged in "
-        "docs/eval-results.md; no Jev calls are made now.")
+        "These 1,157 distinct states were judged in 2 live run(s) (listed below); "
+        "no Jev calls are made now. See docs/eval-results.md.")
     one = evallog.judging_caption(evallog.judging_from_rows([ROW_A]))
-    assert "These 1,057 rows were judged in 1 live run(s)" in one
+    assert "These 1,057 distinct states were judged in 1 live run(s)" in one
+    assert "rows" not in one and "logged in" not in one
+
+
+def test_evallog_uses_timezone_utc():
+    src = (ROOT / "src" / "jevdbx" / "evallog.py").read_text()
+    assert "from datetime import UTC" not in src and "timezone.utc" in src
 
 
 def test_judging_lines_list_each_run_then_a_total_labelled_live():

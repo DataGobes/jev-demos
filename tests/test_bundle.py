@@ -179,3 +179,12 @@ def test_readme_and_claude_md_document_results_mode():
     readme = (ROOT / "README.md").read_text()
     assert "action=results" in readme and "no Jev call" in readme
     assert "action=results" in (ROOT / "CLAUDE.md").read_text()
+
+
+def test_results_mode_is_described_as_every_judging_run_not_the_latest_one():
+    head = _notebook().split("# COMMAND ----------")[0]
+    assert "every **live** run that judged the rows" in head and "latest logged" not in head
+    readme = " ".join((ROOT / "README.md").read_text().split())
+    assert "every live run that judged the rows on record" in readme
+    assert "N counts distinct states, not rows" in readme
+    assert "shows the latest **live** run" not in readme
