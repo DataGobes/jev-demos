@@ -27,6 +27,19 @@ def test_record_script_never_deploys_or_runs_the_bundle():
     assert "--notebook" in SCRIPT.read_text()
 
 
+def test_beat7_caption_numbers_are_the_last_logged_production_entry():
+    caption = re.search(r'"50,000 real reviews: recall ([\d.]+), just under the ([\d.]+) gate; '
+                        r'audited precision ([\d.]+)\."', SCRIPT.read_text())
+    assert caption, "beat 7 caption not found"
+    log = (ROOT / "docs" / "eval-results.md").read_text()
+    last = log[log.rindex("· production live/"):]
+    logged = re.search(r"Jev: recall ([\d.]+) on [\d,]+ planted flips · raw precision [\d.]+ · "
+                       r"audited precision ([\d.]+)", last)
+    assert logged, "last production entry has no audited precision"
+    assert (caption[1], caption[3]) == (logged[1], logged[2])
+    assert "Gate: FAIL" in last and float(caption[1]) < float(caption[2])
+
+
 def test_record_script_has_no_workspace_details():
     text = SCRIPT.read_text()
     assert not re.search(r"https?://\S*(databricks|azure)", text)
