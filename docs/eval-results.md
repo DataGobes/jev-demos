@@ -82,11 +82,33 @@ Demo 04: 1,300 judgments · 1,057 unique (distinct test/state pairs) · 18 reque
 
 ## Runs
 
-No live demo 05 run has been made yet. `score.py --append` adds entries below this line, newest
-last. The first entry will be the yardstick run
+`score.py --append` adds entries below this line, newest last. The first entry is the yardstick run
 (`scripts/score.py --run --fresh --mode live --append`), then the production run in four steps:
 (a) part 1, `scripts/score.py --production --run --fresh --mode live --append` (PENDING);
 (b) the audit labels; (c) part 2, `scripts/score.py --production --run --mode live --increment
 --append` (`increment: N new distinct states judged (M rows loaded)`); (d) the rerun check,
 `scripts/score.py --production --run --rerun --mode live --append` (PASS or FAIL). The recording
 prints the last production entry (`scripts/show.py production`).
+
+## 2026-10-01T03:54:19Z · live/budget=48k
+
+Jev · 1,057 judgments · 0% cached · 6 requests · 0 retries (0× 429) · 8.7 s Jev · $0.006 · LIVE jev-1.13.0 budget=48k
+
+- invocation 6973d4ec-61ee-46ed-a5fa-dbe621e38318
+- warehouse jev-demo-5 · budget 48,000 tokens · 6 requests · 0 retries (0× 429) · 146,994 tokens · Jev cost $0.006174 · est/actual tokens 1.25
+- once-per-row OK: 1,057 inserted = 1,057 missing · packs sum 1,057 (+0 too long) · 0 duplicate keys · 0 errors
+- cached 0% (0 of 1,057 states from earlier invocations; 1,057 judged in this run)
+
+| test | defects | Jev P | Jev R | Jev hard-neg | regex P | regex R | regex hard-neg |
+|---|---|---|---|---|---|---|---|
+| customers_full_name_is_a_person | 25 | 0.96 | 0.92 | 1 | 0.71 | 0.60 | 6 |
+| returns_comment_matches_reason_code | 12 | 1.00 | 0.92 | 0 | 0.45 | 0.75 | 6 |
+| reviews_body_matches_stars | 24 | 1.00 | 1.00 | 0 | 0.39 | 0.92 | 8 |
+| tickets_body_has_no_pii | 14 | 0.93 | 1.00 | 1 | 0.48 | 0.86 | 13 |
+
+**Gate: PASS**
+
+- `customers_full_name_is_a_person`: hard negatives flagged = [406], defects missed = [174, 379]
+- `returns_comment_matches_reason_code`: hard negatives flagged = [], defects missed = [144]
+- `reviews_body_matches_stars`: hard negatives flagged = [], defects missed = []
+- `tickets_body_has_no_pii`: hard negatives flagged = [131], defects missed = []
