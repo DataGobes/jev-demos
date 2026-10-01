@@ -1,8 +1,8 @@
 """Spike S2: 3 fixed rows through each LLM endpoint with ai_query (confirm-first: billed).
 
     uv run python scripts/probe_endpoints.py --print            # SQL only, no call
-    uv run python scripts/probe_endpoints.py --run              # 3 rows x 3 endpoints
-    uv run python scripts/probe_endpoints.py --usage            # columns of system.serving tables
+    uv run python scripts/probe_endpoints.py --run              # 4 sets: gpt-oss x2, llama, sonnet
+    uv run python scripts/probe_endpoints.py --usage            # system.serving table columns
 """
 
 import argparse
@@ -23,10 +23,11 @@ RESPONSE_FORMAT = json.dumps({
         "strict": True,
     },
 })
+_STMT = "Statement: the review contradicts its rating.\n"
 ROWS = [
-    "Statement: the review contradicts its rating.\nrecord = {\"comment\": \"Terrible stay\", \"rating\": 4.8}",
-    "Statement: the review contradicts its rating.\nrecord = {\"comment\": \"Lovely place\", \"rating\": 4.9}",
-    "Statement: the review contradicts its rating.\nrecord = {\"comment\": \"Lovely place\", \"rating\": 1.2}",
+    _STMT + 'record = {"comment": "Terrible stay", "rating": 4.8}',
+    _STMT + 'record = {"comment": "Lovely place", "rating": 4.9}',
+    _STMT + 'record = {"comment": "Lovely place", "rating": 1.2}',
 ]
 
 
