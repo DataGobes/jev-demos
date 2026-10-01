@@ -222,3 +222,67 @@ Jev · 44,292 judgments · 0% cached · 277 requests · 0 retries (0× 429) · 7
 - rerun requests not run
 
 **Gate: FAIL** — recall on planted flips 0.84 < 0.85; audited precision: audit pending; rerun not checked (use --rerun)
+
+## 2026-10-01T05:41:01Z · production live/budget=48k
+
+Jev · 46,511 judgments · 95% cached · 14 requests · 0 retries (0× 429) · 5.0 s Jev · $0.022 · LIVE jev-1.13.0 budget=48k
+
+- invocation c88caa3c-f8a5-42bb-ae53-5e8d6357d925
+- warehouse jev-demo-5 · budget 48,000 tokens · 14 requests · 0 retries (0× 429) · 514,987 tokens · Jev cost $0.021629 · est/actual tokens 1.27
+- once-per-row OK: 2,219 inserted = 2,219 missing · packs sum 2,219 (+0 too long) · 0 duplicate keys · 0 errors
+- cached 95% (44,292 of 46,511 states from earlier invocations; 2,219 judged in this run)
+- judged in invocation d2b515b8-a97d-4af4-b7cf-6a3a0fdc4002: 44,292 states · 277 requests · 10,408,755 tokens · $0.437168 · 72.5 s Jev
+- judged in invocation c88caa3c-f8a5-42bb-ae53-5e8d6357d925: 2,219 states · 14 requests · 514,987 tokens · $0.021629 · 5.0 s Jev
+
+- increment: 2,219 new distinct states judged (2,500 rows loaded)
+
+- planted flips loaded: 1,386 of 1,386
+- Jev: recall 0.84 on 1,386 planted flips · raw precision 0.87 · audited precision 0.94 (95% Wilson 0.93–0.95, n=100)
+- regex baseline (same data): recall 0.73 · raw precision 0.24 · F1 0.36 (Jev raw F1 0.85)
+- flagged 1,328 = 1,160 planted + 168 unplanted
+- rerun requests not run
+
+- key-noise corrected (LLM-labelled audit):
+  - key precision 0.98 (95% Wilson 0.93–0.99, n=100): share of audited planted flips labelled real
+  - recall vs audited-real flips 0.90 (95% Wilson 0.82–0.94, 88 of 98 flagged)
+  - corrected recall over all 1,386 loaded flips 0.86
+  - method: flagged and unflagged loaded flips are each scaled from their audited share of real flips; corrected recall = estimated real flips flagged / all estimated real flips (point estimate)
+
+- Audit labels by two independent LLM labellers (Claude Opus, Claude Sonnet), blind to Jev's output; disagreements resolved against Jev.
+- labeller agreement, precision audit: 81% raw, kappa 0.60 (n=100, 19 disagreements resolved to ok)
+- labeller agreement, key audit: 99% raw, kappa 0.80 (n=100, 1 disagreement resolved to real)
+
+**Gate: FAIL** — recall on planted flips 0.84 < 0.85; rerun not checked (use --rerun)
+
+recall (key-noise corrected) ≥ 0.85: PASS (0.86) (point estimate, LLM-labelled; see the Wilson interval of recall vs audited-real)
+
+## 2026-10-01T05:42:08Z · production live/budget=48k
+
+Jev · 46,511 judgments · 100% cached · 0 requests · 0 retries (0× 429) · 0.0 s Jev · $0.000 · LIVE jev-1.13.0 budget=48k
+
+- invocation 47e0d1e6-0f6a-4f71-bb2a-8c13dbd784ad
+- warehouse jev-demo-5 · budget 48,000 tokens · 0 requests · 0 retries (0× 429) · 0 tokens · Jev cost $0.000000 · est/actual tokens n/a
+- once-per-row OK: 0 inserted = 0 missing · packs sum 0 (+0 too long) · 0 duplicate keys · 0 errors
+- cached 100% (46,511 of 46,511 states from earlier invocations; 0 judged in this run)
+- judged in invocation d2b515b8-a97d-4af4-b7cf-6a3a0fdc4002: 44,292 states · 277 requests · 10,408,755 tokens · $0.437168 · 72.5 s Jev
+- judged in invocation c88caa3c-f8a5-42bb-ae53-5e8d6357d925: 2,219 states · 14 requests · 514,987 tokens · $0.021629 · 5.0 s Jev
+
+- planted flips loaded: 1,386 of 1,386
+- Jev: recall 0.84 on 1,386 planted flips · raw precision 0.87 · audited precision 0.94 (95% Wilson 0.93–0.95, n=100)
+- regex baseline (same data): recall 0.73 · raw precision 0.24 · F1 0.36 (Jev raw F1 0.85)
+- flagged 1,328 = 1,160 planted + 168 unplanted
+- rerun requests 0
+
+- key-noise corrected (LLM-labelled audit):
+  - key precision 0.98 (95% Wilson 0.93–0.99, n=100): share of audited planted flips labelled real
+  - recall vs audited-real flips 0.90 (95% Wilson 0.82–0.94, 88 of 98 flagged)
+  - corrected recall over all 1,386 loaded flips 0.86
+  - method: flagged and unflagged loaded flips are each scaled from their audited share of real flips; corrected recall = estimated real flips flagged / all estimated real flips (point estimate)
+
+- Audit labels by two independent LLM labellers (Claude Opus, Claude Sonnet), blind to Jev's output; disagreements resolved against Jev.
+- labeller agreement, precision audit: 81% raw, kappa 0.60 (n=100, 19 disagreements resolved to ok)
+- labeller agreement, key audit: 99% raw, kappa 0.80 (n=100, 1 disagreement resolved to real)
+
+**Gate: FAIL** — recall on planted flips 0.84 < 0.85
+
+recall (key-noise corrected) ≥ 0.85: PASS (0.86) (point estimate, LLM-labelled; see the Wilson interval of recall vs audited-real)
