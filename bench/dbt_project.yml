@@ -34,3 +34,10 @@ models:
   bench:
     +materialized: table
     +post-hook: "{{ jev_judge() }}"
+
+seeds:
+  bench:
+    banking77_relabel: {+column_types: {query_id: string, labelled_intent: string}}
+    banking77_sample: {+column_types: {query_id: string}}
+    baseline_params: {+column_types: {name: string, value: string}}
+    wanderbricks_flips: {+column_types: {comment_sha256: string, rating: double}}
