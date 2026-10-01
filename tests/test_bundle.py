@@ -120,15 +120,37 @@ def test_notebook_has_an_action_widget_defaulting_to_build():
 def test_results_mode_runs_before_and_instead_of_dbt_and_never_calls_jev():
     cells = _cells()
     i, cell = _results_cell()
-    assert "dbutils.notebook.exit(" in cell  # nothing below this cell runs in results mode
-    ahead = "\n".join(cells[: i + 1])
+    assert "dbutils.notebook.exit(" in cells[i + 1]  # nothing below runs in results mode
+    ahead = "\n".join(cells[: i + 2])
     for banned in ("subprocess", "dbt_cli", "%pip", "dbt_env", "noul_pack(", "noul_pack_demo(",
                    "apiToken", "authenticate()"):
         assert banned not in ahead, banned
     # every dbt-running cell comes after the exit
-    later = "\n".join(cells[i + 1:])
+    later = "\n".join(cells[i + 2:])
     assert "subprocess.run" in later and "%pip install" in later
     assert "noul_pack(" not in _notebook()  # the notebook itself never calls the Jev function
+
+
+def test_results_exit_is_its_own_cell_so_it_does_not_replace_the_displayed_output():
+    """On Databricks a dbutils.notebook.exit in the same cell replaces that cell's displayed output
+    with the exit value; the captions, table, entries and failing rows must stay visible."""
+    cells = _cells()
+    i, cell = _results_cell()
+    # the final exit is not in the cell that displays the results
+    assert "results_exit_message" in cell
+    assert "dbutils.notebook.exit(f" not in cell
+    assert "dbutils.notebook.exit(results_exit_message" not in cell
+    assert cell.index("results_exit_message =") > cell.rindex("display(")
+    # the next cell is only the results-mode guard + exit (comments aside)
+    lines = [ln.strip() for ln in cells[i + 1].splitlines()]
+    code = [ln for ln in lines if ln and not ln.startswith("#")]
+    assert code == [
+        'if dbutils.widgets.get("action") == "results":',
+        "dbutils.notebook.exit(results_exit_message)",
+    ]
+    # build mode: the exit message is only ever set inside the results branch
+    assert not re.search(r"^results_exit_message", cell, re.M)
+    assert "%pip install" not in cells[i + 1]
 
 
 def test_results_mode_queries_with_the_ledger_helpers():

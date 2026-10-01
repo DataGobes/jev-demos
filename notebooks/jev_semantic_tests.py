@@ -100,7 +100,15 @@ if action == "results":
         else:
             displayHTML(f"<p><b>Warning, {t}:</b> stored failures come from a different run "
                         f"({detail}); rebuild or pick that run.</p>")
-    dbutils.notebook.exit(f"results of live invocation {invocation}")
+    # Exited in the next cell: an exit in this cell would replace everything displayed above.
+    results_exit_message = f"results of live invocation {invocation}"
+
+# COMMAND ----------
+
+# The exit is its own cell: dbutils.notebook.exit in the cell that displays the results replaces
+# that cell's output with the exit value. In build mode this cell does nothing.
+if dbutils.widgets.get("action") == "results":
+    dbutils.notebook.exit(results_exit_message)
 
 # The install cell below comes after the results branch on purpose: results mode installs nothing.
 # The Python restart that follows an install clears state; widgets persist and every cell below
