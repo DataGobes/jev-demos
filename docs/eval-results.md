@@ -112,3 +112,96 @@ Jev · 1,057 judgments · 0% cached · 6 requests · 0 retries (0× 429) · 8.7 
 - `returns_comment_matches_reason_code`: hard negatives flagged = [], defects missed = [144]
 - `reviews_body_matches_stars`: hard negatives flagged = [], defects missed = []
 - `tickets_body_has_no_pii`: hard negatives flagged = [131], defects missed = []
+
+## 2026-10-01T04:10:59Z · live/budget=48k
+
+Jev · 1,057 judgments · 0% cached · 6 requests · 0 retries (0× 429) · 9.5 s Jev · $0.006 · LIVE jev-1.13.0 budget=48k
+
+- invocation cc2b0646-d666-47c4-883d-a726e60e7205
+- warehouse jev-demo-5 · budget 48,000 tokens · 6 requests · 0 retries (0× 429) · 146,994 tokens · Jev cost $0.006174 · est/actual tokens 1.25
+- once-per-row OK: 1,057 inserted = 1,057 missing · packs sum 1,057 (+0 too long) · 0 duplicate keys · 0 errors
+- cached 0% (0 of 1,057 states from earlier invocations; 1,057 judged in this run)
+
+| test | defects | Jev P | Jev R | Jev hard-neg | regex P | regex R | regex hard-neg |
+|---|---|---|---|---|---|---|---|
+| customers_full_name_is_a_person | 25 | 0.96 | 0.96 | 1 | 0.71 | 0.60 | 6 |
+| returns_comment_matches_reason_code | 12 | 1.00 | 1.00 | 0 | 0.45 | 0.75 | 6 |
+| reviews_body_matches_stars | 24 | 1.00 | 1.00 | 0 | 0.39 | 0.92 | 8 |
+| tickets_body_has_no_pii | 14 | 0.93 | 1.00 | 1 | 0.48 | 0.86 | 13 |
+
+**Gate: PASS**
+
+- `customers_full_name_is_a_person`: hard negatives flagged = [406], defects missed = [174]
+- `returns_comment_matches_reason_code`: hard negatives flagged = [], defects missed = []
+- `reviews_body_matches_stars`: hard negatives flagged = [], defects missed = []
+- `tickets_body_has_no_pii`: hard negatives flagged = [131], defects missed = []
+
+## 2026-10-01T04:12:17Z · live/budget=48k
+
+Jev · 1,057 judgments · 0% cached · 6 requests · 0 retries (0× 429) · 9.1 s Jev · $0.006 · LIVE jev-1.13.0 budget=48k
+
+- invocation 24133bcf-4760-4f99-9116-11a09c86e4b8
+- warehouse jev-demo-5 · budget 48,000 tokens · 6 requests · 0 retries (0× 429) · 146,994 tokens · Jev cost $0.006174 · est/actual tokens 1.25
+- once-per-row OK: 1,057 inserted = 1,057 missing · packs sum 1,057 (+0 too long) · 0 duplicate keys · 0 errors
+- cached 0% (0 of 1,057 states from earlier invocations; 1,057 judged in this run)
+
+| test | defects | Jev P | Jev R | Jev hard-neg | regex P | regex R | regex hard-neg |
+|---|---|---|---|---|---|---|---|
+| customers_full_name_is_a_person | 25 | 0.96 | 0.96 | 1 | 0.71 | 0.60 | 6 |
+| returns_comment_matches_reason_code | 12 | 1.00 | 1.00 | 0 | 0.45 | 0.75 | 6 |
+| reviews_body_matches_stars | 24 | 1.00 | 1.00 | 0 | 0.39 | 0.92 | 8 |
+| tickets_body_has_no_pii | 14 | 0.93 | 1.00 | 1 | 0.48 | 0.86 | 13 |
+
+**Gate: PASS**
+
+- `customers_full_name_is_a_person`: hard negatives flagged = [406], defects missed = [174]
+- `returns_comment_matches_reason_code`: hard negatives flagged = [], defects missed = []
+- `reviews_body_matches_stars`: hard negatives flagged = [], defects missed = []
+- `tickets_body_has_no_pii`: hard negatives flagged = [131], defects missed = []
+
+## 2026-10-01T04:13:37Z · live/budget=48k
+
+Jev · 1,057 judgments · 0% cached · 6 requests · 0 retries (0× 429) · 9.4 s Jev · $0.006 · LIVE jev-1.13.0 budget=48k
+
+- invocation 5a1fa0a8-bec8-4d94-9bf8-7e6f3467529d
+- warehouse jev-demo-5 · budget 48,000 tokens · 6 requests · 0 retries (0× 429) · 146,994 tokens · Jev cost $0.006174 · est/actual tokens 1.25
+- once-per-row OK: 1,057 inserted = 1,057 missing · packs sum 1,057 (+0 too long) · 0 duplicate keys · 0 errors
+- cached 0% (0 of 1,057 states from earlier invocations; 1,057 judged in this run)
+
+| test | defects | Jev P | Jev R | Jev hard-neg | regex P | regex R | regex hard-neg |
+|---|---|---|---|---|---|---|---|
+| customers_full_name_is_a_person | 25 | 0.96 | 0.96 | 1 | 0.71 | 0.60 | 6 |
+| returns_comment_matches_reason_code | 12 | 1.00 | 1.00 | 0 | 0.45 | 0.75 | 6 |
+| reviews_body_matches_stars | 24 | 1.00 | 1.00 | 0 | 0.39 | 0.92 | 8 |
+| tickets_body_has_no_pii | 14 | 0.93 | 1.00 | 1 | 0.48 | 0.86 | 13 |
+
+**Gate: PASS**
+
+- `customers_full_name_is_a_person`: hard negatives flagged = [406], defects missed = [174]
+- `returns_comment_matches_reason_code`: hard negatives flagged = [], defects missed = []
+- `reviews_body_matches_stars`: hard negatives flagged = [], defects missed = []
+- `tickets_body_has_no_pii`: hard negatives flagged = [131], defects missed = []
+
+## Run-to-run noise (2026-10-01, four fresh live runs)
+
+The four yardstick runs above (03:54, 04:10, 04:12, 04:13 UTC) are identical apart from Jev's
+own run-to-run variation: same data, questions, thresholds, layout and budget, `--fresh` each time.
+Every run passed the gate with 6 requests, 0 retries and once-per-row OK. Before each `--fresh`
+run deleted the previous judgments, the per-state probabilities were saved, so the same 1,057
+states can be compared across the four runs.
+
+| test | states | mean SD of p | 95th pct range | max range | pass/fail flips |
+|---|---|---|---|---|---|
+| customers_full_name_is_a_person | 500 | 0.0052 | 0.02 | 0.06 | 1 (id 379) |
+| returns_comment_matches_reason_code | 139 | 0.0063 | 0.05 | 0.12 | 1 (id 144) |
+| reviews_body_matches_stars | 241 | 0.0025 | 0.02 | 0.05 | 0 |
+| tickets_body_has_no_pii | 177 | 0.0019 | 0.02 | 0.05 | 0 |
+
+- Overall: mean SD 0.0042 and median range 0.01 across the four runs, the same order as demo 04's
+  layout drift (0.0049).
+- Only two rows changed their pass/fail decision, both golden defects sitting on the threshold:
+  customer 379 (p = 0.69, 0.74, 0.75, 0.74 vs threshold 0.7) and return 144 (0.79, 0.83, 0.83, 0.82
+  vs 0.8). The first run had both just below; runs 2–4 match demo 04's pack=64 numbers exactly
+  (customers R 0.96, returns R 1.00). Customer 174 is missed in every run (a stable miss, not noise).
+- So recall on these tests moves by one row (≈0.04 on customers, ≈0.08 on returns) between
+  identical runs; precision did not move. A single run's recall is reliable to about one row.
