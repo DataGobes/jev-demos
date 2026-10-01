@@ -30,9 +30,12 @@ def test_kappa_matches_the_textbook_value():
     assert kappa == pytest.approx((0.75 - 0.53) / 0.47)
 
 
-def test_kappa_when_both_labellers_use_one_label_everywhere():
+def test_kappa_is_undefined_when_both_labellers_use_one_label_everywhere():
     a = {1: "ok", 2: "ok"}
-    assert audit.merge_labels(a, dict(a), tie="ok")[2] == 1.0  # degenerate: chance agreement is 1
+    merged, agreement, kappa, _ = audit.merge_labels(a, dict(a), tie="ok")
+    assert merged == a and agreement == 1.0 and kappa is None  # chance agreement is 1: n/a
+    # different single labels: chance agreement is 0, kappa is defined (and -0 agreement)
+    assert audit.merge_labels({1: "ok"}, {1: "real"}, tie="ok")[2] == 0.0
 
 
 def test_kappa_is_zero_or_negative_for_systematic_disagreement():

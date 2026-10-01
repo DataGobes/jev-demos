@@ -415,14 +415,16 @@ cost and Jev span. A yardstick `--append` requires 0% cached (in practice `--fre
 otherwise. `--run` requires an explicit `--mode`.
 
 *Amended 2026-10-01 (Ruling R26, decided before any labelling):* the first live production run
-(47,500 rows, gate FAIL on raw recall 0.836, logged) showed the planted key is noisy: mild 4→2 flips
-and flips that cancel a pre-existing real mismatch are not defects. The audit is therefore two
+(47,500 rows, gate FAIL on raw recall 0.836, logged): inspection of missed flips suggested the
+planted key may be noisy (not logged evidence; the key audit measures it), since a mild 4→2 flip, or
+a flip that cancels a pre-existing mismatch, may not be a defect. The audit is therefore two
 blind audits, labelled by two independent fresh LLM subagents (Claude Opus and Claude Sonnet) that
 see only `id, stars, body` (shuffled; never `jev_p`, never whether Jev flagged the row), using the
 test's own definition as the rubric: `real` = the overall sentiment clearly contradicts the star
 rating, `ok` = anything else (mixed, mild, sarcasm that matches a low rating).
 
-1. Precision audit: 100 random flagged-but-unplanted rows (seed 42). Disagreement → `ok`.
+1. Precision audit: 100 random flagged-but-unplanted rows (seed 42). Disagreement → `ok`. Its
+   Wilson interval has no finite-population correction (conservative).
 2. Key audit: 100 random planted flips among the loaded rows (seed 42), drawn from all planted
    flips whether or not Jev flagged them, shown with the planted stars. Disagreement → `real`.
 

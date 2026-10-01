@@ -258,12 +258,13 @@ the per-row token limit. The cost of the run is the logged one, once it has been
    --labeller-copies data/audit/` writes two blind files (text and stars only, never `jev_p`, never
    whether Jev flagged a row; `data/` is gitignored):
    - the **precision audit**, `data/production_audit.csv`: 100 random flagged-but-unplanted
-     reviews. Precision is extrapolated from that sample with a 95% Wilson interval; raw
-     precision against the planted flips is reported too.
+     reviews. Precision is extrapolated from that sample with a 95% Wilson interval (no
+     finite-population correction, so the interval is conservative); raw precision against the
+     planted flips is reported too.
    - the **key audit**, `data/production_flip_audit.csv`: 100 random planted flips among the loaded
      rows, whether or not Jev flagged them, shown with the planted stars. It tests the answer key
-     itself: a mild 4 to 2 flip, or a flip that cancels a mismatch the review already had, is not a
-     defect, so raw recall understates what Jev finds.
+     itself: a planted flip may not be a defect (too mild, or it cancels an existing mismatch), so
+     raw recall may understate or overstate what Jev catches; the key audit measures it.
 
    Each audit is labelled by two independent fresh LLM labellers (one Claude Opus, one Claude
    Sonnet) from a shuffled `id, stars, body` copy each (`--labeller-copies`), with this rubric (the

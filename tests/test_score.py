@@ -1204,3 +1204,96 @@ def test_main_production_without_key_audit_files_is_pending(tmp_path, monkeypatc
     assert score._main_production(console, None, args, None) == 0
     assert "recall (key-noise corrected) ≥ 0.85: PENDING (key audit not labelled)" in (
         console.export_text())
+
+
+# -- review fixes before labelling -------------------------------------------------------------
+
+
+def test_appended_corrected_gate_line_says_it_is_a_point_estimate(tmp_path):
+    path = tmp_path / "e.md"
+    m = score.production_metrics(KEY_FLAGGED, LOADED, set(), KEY_LABELS | {500: "ok"},
+                                 loaded=LOADED, flip_audit=KEY_LABELS)
+    score.append_production_report(path, m, live_run(tested=5, missing=5, inserted=5,
+                                                     pack_rows=5), "w", 0, agreement=AGREEMENT)
+    line = next(ln for ln in path.read_text().splitlines()
+                if ln.startswith("recall (key-noise corrected)"))
+    assert line.endswith("(point estimate, LLM-labelled; see the Wilson interval of "
+                         "recall vs audited-real)")
+
+
+def test_agreement_lines_print_an_undefined_kappa_as_na():
+    ag = {"precision_audit": AGREEMENT["precision_audit"] | {"kappa": None}}
+    assert "kappa n/a (one label only)" in score.agreement_lines(ag)[0]
+
+
+@pytest.mark.parametrize("bad", [
+    [],
+    {"key_audit": "x"},
+    {"key_audit": {"n": 1, "agreement": 1.0, "kappa": 1.0, "tie": "real"}},  # no disagreements
+    {"key_audit": AGREEMENT["key_audit"] | {"tie": "maybe"}},
+    {"precision_audit": {k: v for k, v in AGREEMENT["precision_audit"].items() if k != "n"}},
+    {"precision_audit": AGREEMENT["precision_audit"] | {"kappa": "high"}},
+])
+def test_agreement_lines_reject_a_malformed_file_with_a_clear_message(bad):
+    with pytest.raises(ValueError, match="agreement"):
+        score.agreement_lines(bad)
+
+
+def test_read_agreement_rejects_invalid_json_and_names_the_file(tmp_path):
+    p = tmp_path / "production_audit_agreement.json"
+    p.write_text("{not json")
+    with pytest.raises(ValueError, match="production_audit_agreement.json"):
+        score.read_agreement(p)
+
+
+def test_main_production_reports_a_malformed_agreement_file_as_a_clear_exit(tmp_path,
+                                                                           monkeypatch):
+    from argparse import Namespace
+
+    from rich.console import Console
+
+    flips = tmp_path / "flips.csv"
+    flips.write_text("id,original_stars,planted_stars\n1,5,1\n")
+    bad = tmp_path / "a.json"
+    bad.write_text(json.dumps({"key_audit": {"n": 3}}))
+    for name, value in dict(FLIPS_PATH=flips, LABELS_PATH=tmp_path / "l.csv",
+                            FLIP_LABELS_PATH=tmp_path / "fl.csv", AGREEMENT_PATH=bad,
+                            AUDIT_SAMPLE_PATH=tmp_path / "none.csv").items():
+        monkeypatch.setattr(score, name, value)
+    monkeypatch.setattr(score, "_obtain_run", lambda *a, **k: (live_run(), None))
+    monkeypatch.setattr(score, "load_flagged", lambda *a, **k: {1})
+    monkeypatch.setattr(score, "load_loaded", lambda sql, ids: {1})
+    with pytest.raises(SystemExit, match="agreement"):
+        score._main_production(Console(record=True), None,
+                               Namespace(append=False, rerun=False, run=False, mode=None), None)
+
+
+def test_read_audit_labels_rejects_duplicates_and_extra_columns(tmp_path):
+    p = tmp_path / "labels.csv"
+    p.write_text("id,label\n1,real\n1,ok\n")
+    with pytest.raises(ValueError, match="duplicate"):
+        score.read_audit_labels(p)
+    p.write_text("id,label,jev_p\n1,real,0.9\n")
+    with pytest.raises(ValueError, match="columns"):
+        score.read_audit_labels(p)
+
+
+def test_an_unlabelled_sample_does_not_shadow_the_labels_file(tmp_path):
+    import os
+
+    labels, sample = tmp_path / "labels.csv", tmp_path / "sample.csv"
+    labels.write_text("id,label\n1,ok\n2,real\n")
+    _sample(sample, [(1, ""), (2, "")])
+    os.utime(labels, (1_000, 1_000))
+    os.utime(sample, (2_000, 2_000))  # newer, but nothing is labelled in it
+    got = score.resolve_audit_labels(labels, sample)
+    assert got.labels == {1: "ok", 2: "real"} and got.source == "labels" and got.pending is None
+    _sample(sample, [(1, "real"), (2, "")])  # partly labelled and newer: still pending
+    os.utime(sample, (3_000, 3_000))
+    assert "1 of 2" in score.resolve_audit_labels(labels, sample).pending
+
+
+def test_pending_message_names_the_r26_flow(tmp_path):
+    got = score.resolve_audit_labels(tmp_path / "l.csv", tmp_path / "sample.csv")
+    assert "audit_sample.py" in got.pending and "--labeller-copies" in got.pending
+    assert "audit_merge.py" in got.pending and "label it" not in got.pending

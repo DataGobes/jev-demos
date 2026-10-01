@@ -104,3 +104,11 @@ def test_the_committed_files_have_no_review_text(repo):
     a = labels_file(repo / "a.csv", [(1, "ok")])
     am.main(["--precision", str(a), str(a)])
     assert (repo / "eval/production_audit_labels.csv").read_text().splitlines()[0] == "id,label"
+
+
+def test_a_single_label_audit_records_kappa_as_null(repo, capsys):
+    a = labels_file(repo / "a.csv", [(1, "ok"), (2, "ok")])
+    assert am.main(["--precision", str(a), str(a)]) == 0
+    entry = json.loads((repo / "eval/production_audit_agreement.json").read_text())
+    assert entry["precision_audit"]["kappa"] is None
+    assert "kappa n/a (one label only)" in capsys.readouterr().out

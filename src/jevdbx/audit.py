@@ -18,24 +18,25 @@ def _check(name: str, labels: dict[int, str]) -> None:
         raise ValueError(f"labeller {name}: label must be 'real' or 'ok', got {bad}")
 
 
-def cohens_kappa(a: dict[int, str], b: dict[int, str]) -> float:
-    """Cohen's kappa of two labellers over the same ids. When chance agreement is 1 (both used a
-    single label throughout) kappa is undefined; it is reported as 1.0 if they agreed, else 0.0."""
+def cohens_kappa(a: dict[int, str], b: dict[int, str]) -> float | None:
+    """Cohen's kappa of two labellers over the same ids, or None when it is undefined: chance
+    agreement is 1 only if both labellers used the same single label throughout."""
     n = len(a)
     observed = sum(1 for i in a if a[i] == b[i]) / n
     chance = sum((sum(1 for v in a.values() if v == lab) / n)
                  * (sum(1 for v in b.values() if v == lab) / n) for lab in LABELS)
     if chance == 1.0:
-        return 1.0 if observed == 1.0 else 0.0
+        return None
     return (observed - chance) / (1 - chance)
 
 
 def merge_labels(
     a: dict[int, str], b: dict[int, str], tie: str
-) -> tuple[dict[int, str], float, float, list[int]]:
-    """Merge two labellers' labels. Returns (merged, raw agreement, Cohen's kappa, sorted ids on
-    which they disagreed). Disagreements take the `tie` label. Raises ValueError for a label other
-    than real/ok, an unknown `tie`, an empty input or ids that are not exactly the same."""
+) -> tuple[dict[int, str], float, float | None, list[int]]:
+    """Merge two labellers' labels. Returns (merged, raw agreement, Cohen's kappa or None if it is
+    undefined, sorted ids on which they disagreed). Disagreements take the `tie` label. Raises
+    ValueError for a label other than real/ok, an unknown `tie`, an empty input or ids that are not
+    exactly the same."""
     if tie not in LABELS:
         raise ValueError(f"tie must be 'real' or 'ok', got {tie!r}")
     _check("a", a)

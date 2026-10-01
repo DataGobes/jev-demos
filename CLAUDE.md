@@ -47,7 +47,8 @@ dated inside it).
   labellers (Opus, Sonnet) label each copy blind (rubric: `real` = sentiment clearly contradicts the
   stars, `ok` = anything else); `scripts/audit_merge.py --precision A B --flip A B` merges them.
   Tie rule, against Jev: precision audit disagreement is `ok`, key audit disagreement is `real`.
-  Claude writes the files and the merge, never a label, and never reads the labeller copies' text.
+  The session that builds the files never writes a label and never reads the labeller copies'
+  text; labels come from two fresh labeller subagents.
   `score.py --production` reports the key-noise corrected numbers next to the raw ones; the raw
   recall gate and the logged raw FAIL stay.
 - Bundle (dbt inside Databricks, serverless notebook job): `databricks bundle validate` is fine;
@@ -97,5 +98,5 @@ dated inside it).
   (`fetch_reviews.py --download`), `databricks bundle deploy` / `bundle run` (creates a job),
   reading `system.billing`, dropping schemas (`jev_demo.spike`).
 - The user creates the UC secret (README: `read -s` + `jq` + `--json @/dev/stdin`, so the key is
-  never in argv). Claude never runs that command. The audits are labelled by the LLM labellers of
-  Ruling R26 (fresh subagents), not by the session that built the files.
+  never in argv). Claude never runs that command. The audits are labelled by two fresh labeller
+  subagents (Ruling R26); the session that builds the files never writes a label.

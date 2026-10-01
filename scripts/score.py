@@ -41,6 +41,7 @@ from pathlib import Path
 import yaml
 from rich.console import Console
 
+from jevdbx.audit import read_labels
 from jevdbx.pricing import cost_usd
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -75,6 +76,8 @@ PRECISION_MIN = RECALL_MIN = 0.85
 PROTOCOL_SENTENCE = ("Audit labels by two independent LLM labellers (Claude Opus, Claude Sonnet), "
                      "blind to Jev's output; disagreements resolved against Jev.")
 CORRECTED_LABEL = "key-noise corrected (LLM-labelled audit)"
+CORRECTED_NOTE = (" (point estimate, LLM-labelled; see the Wilson interval of recall vs "
+                  "audited-real)")
 CORRECTED_METHOD = ("method: flagged and unflagged loaded flips are each scaled from their audited "
                     "share of real flips; corrected recall = estimated real flips flagged / all "
                     "estimated real flips (point estimate)")
@@ -434,18 +437,12 @@ def load_demo04_reference(path: Path = REFERENCE_PATH) -> dict:
 
 
 def read_audit_labels(path: Path) -> dict[int, str] | None:
-    """eval/production_audit_labels.csv (id, label: real|ok), or None if it does not exist."""
+    """A merged labels file (exactly id,label; real|ok; no duplicates), or None if it does not
+    exist."""
     path = Path(path)
     if not path.exists():
         return None
-    labels: dict[int, str] = {}
-    with open(path, newline="", encoding="utf-8") as f:
-        for row in csv.DictReader(f):
-            labels[int(row["id"])] = row["label"].strip()
-    bad = {label for label in labels.values() if label not in ("real", "ok")}
-    if bad:
-        raise ValueError(f"{path}: label must be 'real' or 'ok', got {sorted(bad)}")
-    return labels
+    return read_labels(path)
 
 
 def labels_from_audit_sample(path: Path) -> tuple[int, int, dict[int, str]] | None:
@@ -477,6 +474,8 @@ def resolve_audit_labels(labels_path: Path, sample_path: Path) -> AuditLabels:
     labels_path, sample_path = Path(labels_path), Path(sample_path)
     have_labels = labels_path.exists()
     sample = labels_from_audit_sample(sample_path)
+    if sample is not None and sample[0] == 0 and have_labels:
+        sample = None  # nothing labelled in it: the committed labels stand
     newer = sample is not None and (
         not have_labels or sample_path.stat().st_mtime > labels_path.stat().st_mtime)
     if newer:
@@ -490,8 +489,9 @@ def resolve_audit_labels(labels_path: Path, sample_path: Path) -> AuditLabels:
         return AuditLabels(found, "sample", None)
     if have_labels:
         return AuditLabels(read_audit_labels(labels_path), "labels", None)
-    return AuditLabels(None, None, f"{sample_path.name} not found "
-                                   "(run scripts/audit_sample.py, label it)")
+    return AuditLabels(None, None, f"{sample_path.name} not found (run scripts/audit_sample.py "
+                                   "--labeller-copies DIR, have two labellers label the copies, "
+                                   "then run scripts/audit_merge.py)")
 
 
 def write_audit_labels(labels: dict[int, str], path: Path) -> None:
@@ -585,25 +585,62 @@ def corrected_recall_line(ka: KeyAudit | None) -> str:
     return f"{head} {word} ({ka.corrected_recall:.2f})"
 
 
+AGREEMENT_FIELDS = ("n", "agreement", "kappa", "tie", "disagreements")
+
+
 def read_agreement(path: Path) -> dict | None:
-    """eval/production_audit_agreement.json (written by scripts/audit_merge.py), or None."""
+    """eval/production_audit_agreement.json (written by scripts/audit_merge.py), or None. A file
+    that is not valid JSON raises ValueError naming it."""
     path = Path(path)
     if not path.exists():
         return None
-    return json.loads(path.read_text())
+    try:
+        return json.loads(path.read_text())
+    except json.JSONDecodeError as e:
+        raise ValueError(f"{path.name}: the agreement file is not valid JSON ({e})") from None
+
+
+def _check_agreement(agreement) -> None:
+    """The agreement file is {precision_audit|key_audit: {n, agreement, kappa, tie, disagreements}}.
+    Anything else is reported as one clear ValueError instead of a KeyError deep in the report."""
+    def bad(why: str):
+        return ValueError(f"production_audit_agreement.json: malformed agreement file ({why}); "
+                          "rerun scripts/audit_merge.py")
+
+    if not isinstance(agreement, dict):
+        raise bad("expected a JSON object")
+    for key, a in agreement.items():
+        if key not in ("precision_audit", "key_audit"):
+            raise bad(f"unknown audit {key!r}")
+        if not isinstance(a, dict):
+            raise bad(f"{key} is not an object")
+        missing = [f for f in AGREEMENT_FIELDS if f not in a]
+        if missing:
+            raise bad(f"{key} lacks {', '.join(missing)}")
+        numeric = (a["n"], a["agreement"]) + (() if a["kappa"] is None else (a["kappa"],))
+        if not all(isinstance(v, (int, float)) and not isinstance(v, bool) for v in numeric):
+            raise bad(f"{key} has a non-numeric n, agreement or kappa")
+        if a["tie"] not in ("real", "ok"):
+            raise bad(f"{key} tie must be real or ok")
+        if not isinstance(a["disagreements"], list):
+            raise bad(f"{key} disagreements must be a list")
 
 
 def agreement_lines(agreement: dict | None) -> list[str]:
     """One line per merged audit: raw agreement, Cohen's kappa and the tie-resolved count."""
+    if agreement is None:
+        return []
+    _check_agreement(agreement)
     names = (("precision_audit", "precision audit"), ("key_audit", "key audit"))
     lines = []
     for key, name in names:
-        a = (agreement or {}).get(key)
+        a = agreement.get(key)
         if a is None:
             continue
         d = len(a["disagreements"])
+        kappa = "n/a (one label only)" if a["kappa"] is None else f"{a['kappa']:.2f}"
         lines.append(
-            f"- labeller agreement, {name}: {a['agreement']:.0%} raw, kappa {a['kappa']:.2f} "
+            f"- labeller agreement, {name}: {a['agreement']:.0%} raw, kappa {kappa} "
             f"(n={a['n']}, {d} disagreement{'' if d == 1 else 's'} resolved to {a['tie']})")
     return lines
 
@@ -1214,7 +1251,7 @@ def append_production_report(
     gate_line = f"**Gate: {gate_word(ok, reasons)}**"
     if not ok:
         gate_line += " — " + "; ".join(reasons)
-    lines += [gate_line, "", corrected_recall_line(m.key_audit), ""]
+    lines += [gate_line, "", corrected_recall_line(m.key_audit) + CORRECTED_NOTE, ""]
     _write(path, lines)
 
 
@@ -1343,7 +1380,11 @@ def _main_production(console: Console, sql, args, warehouse: str | None) -> int:
         flip_audit = read_audit_labels(FLIP_LABELS_PATH)
     except ValueError as e:
         raise SystemExit(str(e)) from None
-    agreement = read_agreement(AGREEMENT_PATH)
+    try:
+        agreement = read_agreement(AGREEMENT_PATH)
+        agreement_lines(agreement)  # validate before any billed step is logged
+    except ValueError as e:
+        raise SystemExit(str(e)) from None
     m = production_metrics(flagged, planted, baseline, audit, loaded=loaded, flip_audit=flip_audit)
     rerun_requests = (_rerun(sql, args, [PROD_TEST], run, production=True)
                       if args.rerun and run is not None else None)

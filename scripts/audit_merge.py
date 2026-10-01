@@ -46,8 +46,9 @@ def merge_audit(kind: str, path_a: Path, path_b: Path) -> tuple[dict[int, str], 
             raise ValueError(
                 f"{kind}: the labelled ids are not the ids of the audit file {sample.name} "
                 f"({len(set(merged) ^ expected)} differ)")
-    entry = {"n": len(merged), "agreement": round(agreement, 4), "kappa": round(kappa, 4),
-             "tie": tie, "disagreements": disagreements}
+    entry = {"n": len(merged), "agreement": round(agreement, 4),
+             "kappa": None if kappa is None else round(kappa, 4), "tie": tie,
+             "disagreements": disagreements}
     return merged, entry
 
 
@@ -70,8 +71,10 @@ def main(argv: list[str] | None = None) -> int:
         write_labels(merged, ROOT / "eval" / labels_name)
         agreement[key] = entry
         real = sum(1 for v in merged.values() if v == "real")
+        kappa = ("n/a (one label only)" if entry["kappa"] is None
+                 else f"{entry['kappa']:.2f}")
         print(f"{key}: {entry['n']} labels ({real} real), agreement {entry['agreement']:.0%}, "
-              f"kappa {entry['kappa']:.2f}, {len(entry['disagreements'])} "
+              f"kappa {kappa}, {len(entry['disagreements'])} "
               f"disagreement(s) resolved to {entry['tie']}; wrote eval/{labels_name}")
     agreement_path.write_text(json.dumps(agreement, indent=2, sort_keys=True) + "\n")
     print("wrote eval/production_audit_agreement.json")
