@@ -20,8 +20,8 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
-from jevdbx import budget, evallog, keys, metrics
-from jevdbx.databricks import Sql
+from jevdbx import budget, evallog, keys, metrics, pricing
+from jevdbx.databricks import Result, Sql
 
 ROOT = Path(__file__).resolve().parents[1]
 EVAL, LOG = ROOT / "eval", ROOT / "docs" / "eval-results.md"
@@ -58,6 +58,14 @@ def state_expr(cols: list[str]) -> str:
     return "to_json(named_struct(" + ", ".join(f"'{c}', `{c}`" for c in cols) + "))"
 
 
+def _q(sql: Sql, text: str) -> Result:
+    """Run a read that scoring depends on; a failed statement raises instead of reading as empty."""
+    r = sql.run(text)
+    if r.state != "SUCCEEDED":
+        raise RuntimeError(f"query failed: {r.state}: {(r.error or '')[:300]}")
+    return r
+
+
 def _csv(name: str) -> list[dict]:
     return list(csv.DictReader((EVAL / name).open()))
 
@@ -69,7 +77,7 @@ def row_id(test: str, row: list) -> str:
 
 
 def universe(sql: Sql, spec: TestSpec) -> set[str]:
-    r = sql.run(f"select {', '.join(spec.id_cols)} from jev_demo.bench.{spec.model}")
+    r = _q(sql, f"select {', '.join(spec.id_cols)} from jev_demo.bench.{spec.model}")
     return {row_id(spec.name, row) for row in r.rows}
 
 
@@ -79,13 +87,13 @@ def positives(sql: Sql, spec: TestSpec) -> set[str]:
     if spec.name == "pairs_describe_same_product":
         return {p["pair_id"] for p in _csv("abt_buy_pairs.csv") if p["label"] == "1"}
     polarity = {p["comment_sha256"]: p["polarity"] for p in _csv("wanderbricks_polarity.csv")}
-    r = sql.run(f"select comment, rating from jev_demo.bench.{spec.model}")
+    r = _q(sql, f"select comment, rating from jev_demo.bench.{spec.model}")
     return {keys.state_id(c, float(x)) for c, x in r.rows
             if keys.contradiction(polarity[keys.comment_hash(c)], float(x))}
 
 
 def stored_flags(sql: Sql, spec: TestSpec, judge: str, is_llm: bool):
-    r = sql.run(f"select {', '.join(spec.id_cols)}, jev_p, jev_decision, jev_judge, "
+    r = _q(sql, f"select {', '.join(spec.id_cols)}, jev_p, jev_decision, jev_judge, "
                 f"jev_invocation_id from {AUDIT}.{spec.name}")
     flagged, unjudged, invs = set(), set(), set()
     for row in r.rows:
@@ -102,7 +110,7 @@ def stored_flags(sql: Sql, spec: TestSpec, judge: str, is_llm: bool):
 
 
 def baseline_flags(sql: Sql, spec: TestSpec) -> set[str]:
-    r = sql.run(f"select {', '.join(spec.id_cols)} from {AUDIT}.{spec.baseline}")
+    r = _q(sql, f"select {', '.join(spec.id_cols)} from {AUDIT}.{spec.baseline}")
     return {row_id(spec.name, row) for row in r.rows}
 
 
@@ -146,7 +154,8 @@ def swap_recall(flagged: set, scope_ids: set, swaps: list[dict]) -> dict[str, tu
 
 
 def natural_ids(sql: Sql, spec: TestSpec) -> set[str]:
-    r = sql.run(f"select comment, rating from jev_demo.bench.{spec.model} where review_rows > 0")
+    r = _q(sql, f"select comment, rating from jev_demo.bench.{spec.model} "
+                f"where review_rows > 0")
     return {keys.state_id(c, float(x)) for c, x in r.rows}
 
 
@@ -156,19 +165,76 @@ def false_alarms(flagged: set, natural: set, positives: set) -> tuple[int, int]:
     return (len(flagged & clean), len(clean))
 
 
+_HOOK_WALL = "coalesce((unix_micros(max(finished_at)) - unix_micros(min(started_at))) / 1e6, 0)"
+
+
 def run_stats(sql: Sql, invocation: str, is_llm: bool) -> dict:
-    """Requests, wall time (the hook windows) and, for Jev, the ledger cost of one invocation."""
+    """One invocation: overall {requests, judged, wall_s} (wall = first hook start to last hook
+    end) and per_test {judged, wall_s, jev_cost | est_tokens}."""
     inv = invocation.replace("'", "")
-    w = sql.run("select coalesce(sum(missing), 0), coalesce(sum(unix_micros(finished_at) - "
-                f"unix_micros(started_at)) / 1e6, 0) from jev_demo.bench.hook_runs "
-                f"where invocation_id = '{inv}'")
-    calls, wall = int(w.rows[0][0]), float(w.rows[0][1])
+    hooks = "jev_demo.bench.hook_runs"
+    o = _q(sql, f"select coalesce(sum(missing), 0), {_HOOK_WALL} from {hooks} "
+                f"where invocation_id = '{inv}'").rows[0]
+    per_test = {t: {"judged": int(n), "wall_s": float(w)} for t, n, w in _q(
+        sql, f"select test_name, coalesce(sum(missing), 0), {_HOOK_WALL} from {hooks} "
+             f"where invocation_id = '{inv}' group by test_name").rows}
+    judged = int(o[0])
     if is_llm:
-        return {"requests": calls, "wall_s": wall, "jev_cost": None}
-    r = sql.run("select count(*), coalesce(sum(pack_tokens), 0) from jev_demo.bench.requests "
-                f"where invocation_id = '{inv}'")
-    from jevdbx.pricing import cost_usd
-    return {"requests": int(r.rows[0][0]), "wall_s": wall, "jev_cost": cost_usd(int(r.rows[0][1]))}
+        for t, est in _q(sql, "select test_name, coalesce(sum(pack_est_tokens), 0) from "
+                              f"{JUDGMENTS} where invocation_id = '{inv}' group by test_name").rows:
+            per_test.setdefault(t, {"judged": 0, "wall_s": 0.0})["est_tokens"] = int(est)
+        for d in per_test.values():
+            d.setdefault("est_tokens", 0)
+        requests = judged
+    else:
+        requests = 0
+        for t, n, tok in _q(sql, "select test_name, count(*), coalesce(sum(pack_tokens), 0) from "
+                                 f"jev_demo.bench.requests where invocation_id = '{inv}' "
+                                 "group by test_name").rows:
+            requests += int(n)
+            per_test.setdefault(t, {"judged": 0, "wall_s": 0.0})["jev_cost"] = \
+                pricing.cost_usd(int(tok))
+        for d in per_test.values():
+            d.setdefault("jev_cost", 0.0)
+    return {"requests": requests, "judged": judged, "wall_s": float(o[1]), "per_test": per_test}
+
+
+def window_judged(sql: Sql, judge: str, since: str) -> dict[str, int]:
+    """States this judge judged per test since `since` (UTC, from the hook windows)."""
+    r = _q(sql, "select test_name, coalesce(sum(missing), 0) from jev_demo.bench.hook_runs "
+                f"where judge = '{judge}' and started_at >= timestamp'{since}' group by test_name")
+    return {t: int(n) for t, n in r.rows}
+
+
+def headline2_lines(per_test: dict, run_cost: float, source: str, is_llm: bool) -> list[str]:
+    """Headline 2, per dataset, on rows judged now (cached rows cost nothing and take no time).
+    An LLM run's measured/estimated cost is split across tests by estimated tokens."""
+    total_est = sum(d["est_tokens"] for d in per_test.values()) if is_llm else 0
+    total_judged = sum(d["judged"] for d in per_test.values())
+    out = []
+    for test, d in per_test.items():
+        n, head = d["judged"], (f"- headline 2 · {test} · judged now {d['judged']:,} · "
+                                f"wall time {d['wall_s']:.1f} s · cost per 1,000 judged rows ")
+        if n == 0:
+            out.append(head + "n/a (all cached)")
+        elif is_llm:
+            share = (d["est_tokens"] / total_est if total_est else n / total_judged)
+            out.append(head + f"${1000 * run_cost * share / n:.4f} "
+                              f"({source}, split by estimated tokens)")
+        else:
+            out.append(head + f"${1000 * d['jev_cost'] / n:.4f} (ledger)")
+    return out
+
+
+def refused_md(stamp: str, label: str, judge: str, invs: set, cost: float,
+               reasons: list[str]) -> str:
+    """A billed run that is not a result: logged cost-only so the $15 guard still counts it."""
+    lines = [f"## {stamp} · refused · {label} · {judge}", "",
+             f"- not a result: {'; '.join(reasons)}"]
+    if len(invs) == 1:
+        lines.append(f"- invocation {next(iter(invs))}")
+    lines.append(f"- llm cost ${cost:.3f} (estimated)")
+    return "\n".join(lines) + "\n"
 
 
 def dbt(*args: str) -> int:
@@ -197,10 +263,13 @@ def measure(append: bool) -> int:
     window = the run's hook_runs window ± 5 s; exactly one served entity must have been used."""
     sql = Sql()
     for label, judge, inv in unmeasured(LOG.read_text()):
-        w = sql.run("select min(started_at) - interval 5 seconds, max(finished_at) + interval 5 "
+        w = _q(sql, "select min(started_at) - interval 5 seconds, max(finished_at) + interval 5 "
                     "seconds from jev_demo.bench.hook_runs where invocation_id = "
                     f"'{inv.replace(chr(39), '')}'")
         start, end = w.rows[0]
+        if start is None or end is None:
+            print(f"{label} · {judge} · {inv}: no hook window recorded; cannot attribute usage")
+            continue
         r = sql.run(budget.usage_sql(str(start), str(end)))
         m = budget.window_cost(judge, r.rows) if r.state == "SUCCEEDED" else None
         if m is None:
@@ -238,7 +307,7 @@ def run(a) -> int:
               f" of ${budget.CAP_USD:.2f}")
         budget.check(spent, projected)
     if a.fresh:
-        sql.run(f"delete from {JUDGMENTS} where judge = '{a.judge}' and mode = '{a.mode}'")
+        _q(sql, f"delete from {JUDGMENTS} where judge = '{a.judge}' and mode = '{a.mode}'")
     t0 = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S")
     rc = dbt("build", "--vars", vars_, "--select", "+tag:semantic", "tag:baseline")
     t1 = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S")
@@ -265,7 +334,7 @@ def run(a) -> int:
     print("\n".join(rows))
     cost, source, tpr = 0.0, "estimated", {}
     if is_llm:
-        r = sql.run(budget.usage_sql(t0, t1))
+        r = sql.run(budget.usage_sql(t0, t1))  # tolerant: a failed or empty read stays estimated
         m = budget.window_cost(a.judge, r.rows) if r.state == "SUCCEEDED" else None
         if m is not None:
             cost, n_req, i, o = m
@@ -273,27 +342,31 @@ def run(a) -> int:
             if a.scope == "pilot":
                 tpr = {t: (i // n_req, o // n_req) for t in TESTS}
         else:
-            cost = sum(budget.project(a.judge, len(universe(sql, s)),
-                                      budget.DEFAULT_TOKENS_PER_ROW[t]) for t, s in TESTS.items())
+            now = window_judged(sql, a.judge, t0)
+            cost = sum(budget.project(a.judge, now.get(t, 0),
+                                      evallog.tokens_per_row(md, a.judge, t)
+                                      or budget.DEFAULT_TOKENS_PER_ROW[t]) for t in TESTS)
     if a.append:
         reasons = refuse_reasons(a.mode, a.judge, invs, errors)
         if rc != 0:
             reasons.append(f"dbt exited {rc}")
-        if reasons:
-            print("not appended: " + "; ".join(reasons))
-            return 1
         label = "pilot" if a.scope == "pilot" else f"pass {a.pass_}"
+        stamp = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+        if reasons:
+            if a.mode == "live" and is_llm:  # billed but not a result: the guard must count it
+                evallog.append(LOG, refused_md(stamp, label, a.judge, invs, cost, reasons))
+            print("not appended as a result: " + "; ".join(reasons))
+            return 1
         inv = next(iter(invs))
         st = run_stats(sql, inv, is_llm)
         n_rows = sum(len(universe(sql, s)) for s in TESTS.values())
-        run_cost = cost if is_llm else st["jev_cost"]
-        extra = [f"- scope {a.scope} · {n_rows:,} rows · requests {st['requests']:,} · "
-                 f"wall time {st['wall_s']:.1f} s",
-                 f"- cost per 1,000 rows ${1000 * run_cost / n_rows:.4f}"
-                 + ("" if is_llm else f" · jev cost ${run_cost:.4f} (ledger)"),
+        run_cost = cost if is_llm else sum(d["jev_cost"] for d in st["per_test"].values())
+        extra = [f"- scope {a.scope} · {n_rows:,} rows in scope · {st['judged']:,} judged now · "
+                 f"requests {st['requests']:,} · wall time {st['wall_s']:.1f} s "
+                 "(first hook start to last hook end)",
+                 *headline2_lines(st["per_test"], run_cost, source, is_llm),
                  *extra_lines]
-        evallog.append(LOG, entry_md(datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"), label,
-                                     a.judge, inv, rows, cost, source, tpr, extra))
+        evallog.append(LOG, entry_md(stamp, label, a.judge, inv, rows, cost, source, tpr, extra))
     return rc
 
 
@@ -302,8 +375,8 @@ THRESHOLD = 0.8  # every jev_expect in schema.yml (a test keeps them equal)
 
 def judged_rows(sql: Sql, spec: TestSpec) -> dict[str, dict[str, tuple]]:
     ids = ", ".join(f"m.`{c}`" for c in spec.id_cols)
-    r = sql.run(
-        f"select {ids}, j.judge, j.p, j.decision from jev_demo.bench.{spec.model} m "
+    r = _q(
+        sql, f"select {ids}, j.judge, j.p, j.decision from jev_demo.bench.{spec.model} m "
         # unqualified state columns resolve to m: judgments has no column with those names
         f"join {JUDGMENTS} j on j.state = {state_expr(spec.state_cols)} "
         f"and j.test_name = '{spec.name}' and j.mode = 'live' "
