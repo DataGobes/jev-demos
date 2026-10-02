@@ -4,6 +4,25 @@ Notable changes to the demos in this repo, newest first. Each entry names the de
 The demos aren't versioned, so entries are dated by the day they land on `main`. Numbers quoted
 here come from live, logged runs; see each demo's own docs for the full record.
 
+## 2026-10-01
+
+### 05 · dbt semantic tests on Databricks — new demo
+
+- **Added** [`05-dbt-databricks/`](05-dbt-databricks/): demo 04's four `jev_expect` tests on
+  Databricks. Jev runs in a Unity Catalog Python function (`jev_demo.jev.noul_pack`) that reads the
+  TypeSafe key from a UC secret, a dbt post-hook judges each distinct state once and caches it in a
+  Delta table, and packs are cut by estimated tokens (48k budget, 256-row cap). The same project
+  also runs inside Databricks as a bundle job, with a results-only mode that judges nothing.
+- **Yardstick** (demo 04's data, answer key and regex baselines): four fresh live runs, all gate
+  PASS, each 1,057 states in 6 requests for $0.006 (demo 04 needed 18 requests at 64 rows per
+  request). Recall moved by one row between identical runs (two rows sit on their threshold);
+  precision did not move.
+- **Production**: 50,000 Amazon Fine Food reviews with 1,386 planted star flips, 44,292 distinct
+  states judged in 277 requests for $0.437, a 2,500-row increment judging only its 2,219 new states
+  ($0.022), and a rerun with 0 requests. The raw gate **fails**: recall 0.84 against 0.85. Audited
+  precision is 0.94 (blind audit by two LLM labellers); 2 of 100 audited planted flips don't read as
+  mismatched, and corrected for that, recall is about 0.86 (a point estimate). Regex baseline F1 0.36, Jev raw F1 0.85.
+
 ## 2026-09-28
 
 ### 04 · dbt semantic tests — tests warn instead of fail; packing recording ([#5](https://github.com/DataGobes/jev-demos/pull/5))

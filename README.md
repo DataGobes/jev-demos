@@ -18,6 +18,7 @@ honestly: live vs simulated is always labelled, and numbers come from logged run
 | 02 | [semsql](02-semsql/) | semantic SQL in DuckDB: plain-English judgments like `jev_noul(body, 'asks for a refund') > 0.8` become typed columns you can filter, sort and aggregate |
 | 03 | [VISUALIZE](03-visualize/) | a SQL query ends in `VISUALIZE '<intent>'`; code proposes only valid charts, Jev scores which one answers the intent, and code builds the chart or dashboard |
 | 04 | [dbt semantic tests](04-dbt-semantic-tests/) | dbt tests written as English sentences catch rows that pass every structural test but are still wrong (or leak PII), scored against a hidden answer key and a regex baseline |
+| 05 | [dbt semantic tests on Databricks](05-dbt-databricks/) | the same English-sentence dbt tests on Databricks: Jev runs in a Unity Catalog Python function that reads the key from a UC secret, judgments are cached in Delta, and a 50,000-review production run is scored against planted star flips and a blind audit |
 
 Every demo lives in its own folder with its own README, dependencies and instructions. Most run
 without an API key in a clearly labelled `SIMULATED` mode; put `TYPESAFE_API_KEY=...` in the
