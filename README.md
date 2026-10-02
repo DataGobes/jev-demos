@@ -105,10 +105,12 @@ do not change any raw score. There is no LLM audit of the keys.
   renderings carry the same sentence, criteria and fields.
 - **Per-judge cache.** Judgments go into `jev_demo.bench.judgments`; the key hashes the judge, test
   and state, so each judge judges each distinct state once. `--fresh` deletes one judge's rows for
-  the selected tests only.
+  the given mode (`live` or `demo`), across all tests.
 - **Errors are loud.** `ai_query` returns `result` and `errorMessage`. Failed rows are stored as
-  errors, counted in the run summary and the eval log, and never treated as a pass or a fail.
-  Inserted must equal missing, with no duplicate keys, for every judge.
+  errors, counted in the run summary and the eval log (`unjudged`), and never treated as a pass or
+  a fail: the scorer scores judged rows only. More than 1% unjudged rows in any test is not a
+  result; a rerun fills them (errored rows are not cached as successes, so only those are called
+  again). Inserted must equal missing, with no duplicate keys, for every judge.
 - **SIMULATED mode.** `JEV_MODE=demo` swaps in `noul_pack_demo` for Jev and a deterministic
   hash-based SQL stand-in (`jev_demo.bench.llm_demo()`) for the LLMs. Output is labelled
   `SIMULATED` and is never logged or quoted as a result; the scorer refuses to append it.
@@ -141,14 +143,18 @@ uv run python scripts/fetch_data.py --upload     # to the volume (confirm-first)
 uv run python scripts/deploy.py                  # print the platform DDL
 uv run python scripts/deploy.py --apply          # apply it (confirm-first the first time)
 
-uv run python scripts/score.py --preregister     # once, before pass 1
-uv run python scripts/score.py --run --judge <judge> --scope <pilot|sample|full> --pass <n> \
-    --mode live --append                         # a live pass: billed for LLM judges
+uv run python scripts/score.py --preregister     # once, before the pilot (pins a frozen digest)
+uv run python scripts/score.py --run --judge <judge> --scope pilot --pass 0 \
+    --mode live --append                         # the pilot: billed for LLM judges
+uv run python scripts/score.py --measure --append # after the pilot: wait for usage (~2 h), then
+                                                 # replace estimated cost with measured cost
+uv run python scripts/score.py --run --judge <judge> --scope <sample|full> --pass <n> \
+    --mode live --append [--fresh]               # a live pass; --fresh deletes the judge's live
+                                                 # rows first (pass 2: run-to-run noise)
 uv run python scripts/score.py --usage           # endpoint usage so far, by served entity
-uv run python scripts/score.py --measure --append # replace estimated cost with measured cost
 uv run python scripts/score.py --compare         # side analyses once every judge has a live pass
 uv run python scripts/show.py tests              # the three sentences
-uv run python scripts/show.py board              # latest logged pass per judge
+uv run python scripts/show.py board [--pass N] [--scope sample|full]  # default pass 1, sample
 ```
 
 dbt is only called through `scripts/dbtw.py`, which runs it in `bench/`. Live Jev runs, real
@@ -157,19 +163,23 @@ dbt is only called through `scripts/dbtw.py`, which runs it in `bench/`. Live Je
 ## Budgets and how cost is measured
 
 - **LLM cap: $15 in total**, enforced by `scripts/score.py`. Before each LLM pass it projects
-  cost as spend so far plus tokens per row times remaining rows times the price, and refuses to
-  start if that passes the cap.
+  the cost of every row in scope (tokens per row times rows times the price), and refuses to start
+  if logged spend so far plus 1.15 times that projection passes the cap. A live LLM run must
+  `--append`, and always ends in a log entry: the result, or a `refused` entry that keeps its spend
+  in the guard (estimated at no less than the projection until `--measure` replaces it).
 - **Prices** (`src/jevdbx/budget.py`, Azure Premium at $0.070 per DBU, checked 2026-10-01) in $ per
   1M input / output tokens: gpt-oss-20b 0.07 / 0.30; llama-3.3-70b 0.50 / 1.50. The
   claude-opus-5 price, about 5 / 25, is an ESTIMATE until verified before the pilot gate.
 - **Estimates until measured.** Tokens per row start as assumptions in `budget.py` and are replaced
   by the pilot's measured tokens per row. Every cost line in the log says `measured` or `estimated`.
 - **Measured cost.** `system.serving.endpoint_usage` is read and attributed to a run by time
-  window (the run's hook window plus or minus 5 seconds), because `served_entities` has no rows for
-  these endpoints. A window counts only if exactly one served entity was used in it. Usage lags
-  by about two hours, so `score.py --measure` fills it in afterwards. If usage cannot be read, the
-  cost stays a labelled estimate.
-- **Jev cost** comes from the TypeSafe credit ledger, as in demo 05.
+  window (the judging build's window, logged as `- window`; for older entries the run's hook window
+  plus or minus 5 seconds), because `served_entities` has no rows for these endpoints. A window
+  counts only if exactly one served entity was used in it and its requests cover every row judged
+  in the run (more than 5% extra is flagged as possible duplicate evaluation). Usage lags by about
+  two hours, so `score.py --measure --append` fills it in afterwards. If usage cannot be read, the
+  cost stays a labelled estimate. Every entry also logs its token totals (measured or estimated).
+- **Jev cost** is pack tokens × the list price ($0.042 per 1M tokens), as in demo 05.
 - **Run plan.** Pilot (50 rows per dataset per judge), pass 1 (shared sample, all four judges),
   pass 2 (`--fresh` rerun for run-to-run noise: Jev and the two open models only, not Opus), then
   Jev at scale. Each step is confirm-first.
@@ -180,8 +190,10 @@ dbt is only called through `scripts/dbtw.py`, which runs it in `bench/`. Live Je
   rerunning every judge and logging before and after; a prompt is never tuned for one judge.
   `jev_prompt_version` is part of the cache key.
 - The same sentence, criteria and record fields go to every judge, at temperature 0.
-- Before pass 1, `docs/eval-results.md` records the frozen prompts and wording, the swap seed and
-  family table, the sample definitions and the headline comparisons:
+- Before the pilot, `docs/eval-results.md` records the frozen prompts and wording, the swap seed and
+  family table, the sample definitions, a frozen digest (sha256 of `git ls-files -s` over
+  `bench/macros`, `bench/models`, `bench/seeds`, `bench/tests`, `bench/dbt_project.yml` and `eval`),
+  the 1% unjudged tolerance, the 1.15 budget margin and the headline comparisons:
   1. per dataset, F1 of Jev against each LLM at decision level, with Wilson 95% intervals for
      precision and recall (wanderbricks also reports the false-alarm rate on natural states);
   2. per dataset, cost per 1,000 rows and wall time per judge;
@@ -189,7 +201,8 @@ dbt is only called through `scripts/dbtw.py`, which runs it in `bench/`. Live Je
 - Side analyses are reported apart from the headline: calibration (Brier score, reliability
   table), each LLM thresholded like Jev, an agreement matrix, and possible key errors.
 - Only live runs started by the scorer are logged, one entry per (pass, judge). SIMULATED runs are
-  refused.
+  refused. A live append is refused without the pre-registration, or when the frozen paths are
+  dirty or no longer match its digest.
 
 ## Results
 

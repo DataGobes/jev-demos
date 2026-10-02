@@ -11,8 +11,10 @@ read only.
   `uv run pytest -m databricks -q` · lint `uv run ruff check`
 - dbt only through `uv run python scripts/dbtw.py …` (runs in `bench/`)
 - Platform DDL: `uv run python scripts/deploy.py` (print) · `--apply` (confirm-first the first time)
-- Score: `uv run python scripts/score.py` (stored) · live pass:
+- Board: `uv run python scripts/show.py board` · live pass:
   `uv run python scripts/score.py --run --judge <judge> --scope <pilot|sample|full> --pass <n> --mode live --append`
+- Pre-register (once, before the pilot): `uv run python scripts/score.py --preregister` · measured
+  cost (usage lags ~2 h): `uv run python scripts/score.py --measure --append`
 
 ## Rules
 - Never read/print/log `.env`, secrets, tokens or the TypeSafe key; never a PAT.
