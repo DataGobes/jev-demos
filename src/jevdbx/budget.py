@@ -1,6 +1,8 @@
 """The $15 LLM budget (Databricks pay-per-token, Azure Premium, $0.070/DBU; prices checked
-2026-10-01, re-check before pass 1). Spend comes from system.serving.endpoint_usage when it is
-readable, else from the eval log's cost lines; the guard uses the larger of the two."""
+2026-10-01, re-check before pass 1). Spend so far is read from the eval log's cost lines (a measured
+entry written by `score.py --measure` replaces the estimate of its invocation; measured costs come
+from system.serving.endpoint_usage attributed by time window). Before an LLM pass the guard refuses
+when spend so far + MARGIN × the projected cost of the rows in scope passes the cap."""
 
 DBU_USD = 0.070
 # $ per 1M tokens (input, output), Azure Premium at DBU_USD, from the Databricks pricing pages
@@ -14,6 +16,7 @@ PRICES: dict[str, tuple[float, float]] = {
     "databricks-claude-opus-5": (5.00, 25.00),
 }
 CAP_USD = 15.0
+MARGIN = 1.15  # on projections: tokens/row and prices are estimates until measured
 SINCE = "2026-10-01"
 # ESTIMATES (input, output tokens per row) until the pilot measures them
 DEFAULT_TOKENS_PER_ROW: dict[str, tuple[int, int]] = {
@@ -37,8 +40,9 @@ def project(endpoint: str, rows: int, per_row: tuple[int, int]) -> float:
 
 
 def check(spent: float, projected: float, cap: float = CAP_USD) -> None:
-    if spent + projected > cap:
-        raise BudgetExceeded(f"spent ${spent:.2f} + projected ${projected:.2f} > cap ${cap:.2f}")
+    if spent + MARGIN * projected > cap:
+        raise BudgetExceeded(f"spent ${spent:.2f} + {MARGIN} × projected ${projected:.2f} = "
+                             f"${spent + MARGIN * projected:.2f} > cap ${cap:.2f}")
 
 
 def _lit(s: str) -> str:

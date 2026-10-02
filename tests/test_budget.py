@@ -11,9 +11,13 @@ def test_prices_per_endpoint():
 def test_projection_and_guard():
     p = budget.project("databricks-meta-llama-3-3-70b-instruct", 2000, (300, 25))
     assert p == pytest.approx(2000 * (300 * 0.50 + 25 * 1.50) / 1e6)
-    budget.check(spent=10.0, projected=4.9)
-    with pytest.raises(budget.BudgetExceeded):
-        budget.check(spent=10.0, projected=5.1)
+    # the guard adds MARGIN (1.15) to the projection: 10 + 1.15 * 4.3 = 14.945 <= 15
+    assert budget.MARGIN == 1.15
+    budget.check(spent=10.0, projected=4.3)
+    with pytest.raises(budget.BudgetExceeded, match=r"spent \$10.00 \+ 1.15 × projected \$4.40"):
+        budget.check(spent=10.0, projected=4.4)
+    with pytest.raises(budget.BudgetExceeded):  # passed before the margin; refused now
+        budget.check(spent=10.0, projected=4.9)
 
 
 def test_usage_sql_reads_my_endpoint_usage_in_a_window():

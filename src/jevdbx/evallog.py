@@ -3,7 +3,7 @@
 import re
 from pathlib import Path
 
-_COST = re.compile(r"^- llm cost \$([0-9.]+) \((?:measured|estimated)\)$", re.M)
+_COST = re.compile(r"- llm cost \$([0-9.]+) \((?:measured|estimated)\)")
 PREREG = "## Pre-registration (frozen before pass 1)"
 
 
@@ -16,7 +16,13 @@ def llm_spend(md: str) -> float:
     by_inv: dict[str, float] = {}
     loose = 0.0
     for block in re.split(r"\n(?=## )", md):
-        costs = [float(x) for x in _COST.findall(block)]
+        costs = []
+        for line in block.split("\n"):  # not splitlines(): a stray \r must fail, not vanish
+            if line.startswith("- llm cost"):
+                m = _COST.fullmatch(line)
+                if m is None:  # an unparsed cost line would drop spend from the $15 guard
+                    raise ValueError(f"cannot parse llm cost line {line!r}")
+                costs.append(float(m[1]))
         if not costs:
             continue
         inv = _INV.search(block)

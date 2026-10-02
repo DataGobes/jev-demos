@@ -1,3 +1,5 @@
+import pytest
+
 from jevdbx import evallog
 
 MD = """# Eval results
@@ -30,3 +32,11 @@ def test_append_and_preregistration(tmp_path):
     assert p.read_text().endswith("\n## x\n- y\n")
     assert not evallog.has_preregistration(p.read_text())
     assert evallog.has_preregistration("## Pre-registration (frozen before pass 1)\n")
+
+
+@pytest.mark.parametrize("line", ["- llm cost $0.40 (estimated)\r", "- llm cost $0.40 (estimated) ",
+                                  "- llm cost $0.40 (guessed)", "- llm cost 0.40 (measured)"])
+def test_spend_fails_loudly_on_a_cost_line_it_cannot_parse(line):
+    md = f"## a · pass 1 · x\n- invocation inv-1\n{line}\n"
+    with pytest.raises(ValueError, match="llm cost"):
+        evallog.llm_spend(md)
