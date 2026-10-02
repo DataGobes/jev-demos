@@ -7,12 +7,11 @@ when spend so far + MARGIN × the projected cost of the rows in scope passes the
 DBU_USD = 0.070
 # $ per 1M tokens (input, output), Azure Premium at DBU_USD, from the Databricks pricing pages
 # (DBU per 1M: gpt-oss-20b 1.000 / 4.286, llama-3.3-70b 7.143 / 21.429).
-# opus-5 is an ESTIMATE (S2 replaced sonnet-5-5, which ai_query rejects): verify before the pilot.
+# opus-5 (S2 replaced sonnet-5-5, which ai_query rejects): 71.429 / 357.143, verified 2026-10-02 on
+# the proprietary foundation model serving pricing page.
 PRICES: dict[str, tuple[float, float]] = {
     "databricks-gpt-oss-20b": (0.07, 0.30),
     "databricks-meta-llama-3-3-70b-instruct": (0.50, 1.50),
-    # ESTIMATE until verified before the pilot gate (Task 15 Step 5);
-    # S2: no Sonnet works with ai_query
     "databricks-claude-opus-5": (5.00, 25.00),
 }
 CAP_USD = 15.0
