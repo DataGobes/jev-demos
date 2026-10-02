@@ -3,21 +3,26 @@
     uv run python scripts/score.py --preregister                      # once, before pass 1
     uv run python scripts/score.py --run --judge databricks-gpt-oss-20b --scope pilot --pass 0 \
         --mode live --append                                          # confirm-first: billed
-    uv run python scripts/score.py --usage                            # measured LLM spend so far
+    uv run python scripts/score.py --measure --append                 # usage lags ~2 h
+    uv run python scripts/score.py --usage                            # endpoint usage so far
 
-`--run` builds the models (no judging), counts the states, checks the $15 budget for an LLM
-judge, then runs `dbt build --select +tag:semantic tag:baseline` with the judge (judging), and
-scores what dbt stored. `--append` writes the entry to docs/eval-results.md (live only).
+`--run` checks the pre-registration (live appends) and the ground-truth files, builds the models
+(no judging), checks the keys against the tables and the $15 budget for an LLM judge, then runs
+`dbt build --select +tag:semantic tag:baseline` with the judge (judging) and scores what dbt stored,
+on judged rows only. `--append` writes the entry to docs/eval-results.md (live only). A live LLM
+run must `--append` and always ends in an entry: the result, or a refused entry that keeps its spend
+in the guard.
 """
 
 import argparse
 import csv
+import hashlib
 import json
 import re
 import subprocess
 import sys
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from jevdbx import budget, evallog, keys, metrics, pricing
@@ -28,6 +33,15 @@ EVAL, LOG = ROOT / "eval", ROOT / "docs" / "eval-results.md"
 AUDIT = "jev_demo.bench_dbt_test__audit"
 JUDGMENTS = "jev_demo.bench.judgments"
 JUDGES = ["jev", *budget.PRICES]
+# More unjudged (errored) rows than this fraction of a test's in-scope rows: not a result.
+UNJUDGED_TOLERANCE = 0.01
+# What produces the numbers: pinned by digest at pre-registration (the scorer itself is not: it
+# changes no judge input).
+FROZEN = ["bench/macros", "bench/models", "bench/seeds", "bench/tests", "bench/dbt_project.yml",
+          "eval"]
+GROUND_TRUTH = ["banking77_swaps.csv", "abt_buy_pairs.csv", "wanderbricks_polarity.csv",
+                "wanderbricks_flips.csv"]
+INVOCATION_ID = re.compile(r"^[0-9a-f-]{36}$|^refused-\d{8}T\d{6}Z$")
 
 
 @dataclass(frozen=True)
@@ -114,12 +128,29 @@ def baseline_flags(sql: Sql, spec: TestSpec) -> set[str]:
     return {row_id(spec.name, row) for row in r.rows}
 
 
-def refuse_reasons(mode: str, judge: str, invocation_ids: set, errors: int) -> list[str]:
+def judged_scores(flagged: set, unjudged: set, pos: set, uni: set):
+    """Scores on judged rows only: an unjudged (errored) row is neither a pass nor a fail."""
+    judged = uni - unjudged
+    pos_j = pos & judged
+    return metrics.score(flagged & judged, pos_j, judged), judged, pos_j
+
+
+def refuse_reasons(mode: str, judge: str, invocation_ids: set, unjudged_by_test: dict[str, int],
+                   rows_by_test: dict[str, int]) -> list[str]:
     if mode != "live":
         return ["SIMULATED runs are never logged"]
-    if len(invocation_ids) != 1:
-        return [f"stored failures from more than one invocation: {sorted(invocation_ids)}"]
-    return []
+    out = []
+    if not invocation_ids:
+        out.append("no stored failures read")
+    elif len(invocation_ids) > 1:
+        out.append(f"stored failures from more than one invocation: {sorted(invocation_ids)}")
+    for test, n in rows_by_test.items():
+        u = unjudged_by_test.get(test, 0)
+        if n and u / n > UNJUDGED_TOLERANCE:
+            out.append(f"{test}: {u:,} of {n:,} in-scope rows unjudged by {judge} ({u / n:.1%} > "
+                       f"{UNJUDGED_TOLERANCE:.0%}); rerun to fill them (errored rows are not "
+                       "cached as successes, so a rerun re-calls only those)")
+    return out
 
 
 def entry_md(stamp, label, judge, invocation, rows, cost, cost_source, tokens_per_row,
@@ -169,8 +200,9 @@ _HOOK_WALL = "coalesce((unix_micros(max(finished_at)) - unix_micros(min(started_
 
 
 def run_stats(sql: Sql, invocation: str, is_llm: bool) -> dict:
-    """One invocation: overall {requests, judged, wall_s} (wall = first hook start to last hook
-    end) and per_test {judged, wall_s, jev_cost | est_tokens}."""
+    """One invocation: overall {requests, judged, wall_s, tokens} (wall = first hook start to last
+    hook end; tokens = Jev pack tokens from the ledger, or the LLM's estimated prompt tokens) and
+    per_test {judged, wall_s, jev_cost | est_tokens}."""
     inv = invocation.replace("'", "")
     hooks = "jev_demo.bench.hook_runs"
     o = _q(sql, f"select coalesce(sum(missing), 0), {_HOOK_WALL} from {hooks} "
@@ -186,24 +218,67 @@ def run_stats(sql: Sql, invocation: str, is_llm: bool) -> dict:
         for d in per_test.values():
             d.setdefault("est_tokens", 0)
         requests = judged
+        tokens = sum(d["est_tokens"] for d in per_test.values())
     else:
-        requests = 0
+        requests = tokens = 0
         for t, n, tok in _q(sql, "select test_name, count(*), coalesce(sum(pack_tokens), 0) from "
                                  f"jev_demo.bench.requests where invocation_id = '{inv}' "
                                  "group by test_name").rows:
             requests += int(n)
+            tokens += int(tok)
             per_test.setdefault(t, {"judged": 0, "wall_s": 0.0})["jev_cost"] = \
                 pricing.cost_usd(int(tok))
         for d in per_test.values():
             d.setdefault("jev_cost", 0.0)
-    return {"requests": requests, "judged": judged, "wall_s": float(o[1]), "per_test": per_test}
+    return {"requests": requests, "judged": judged, "wall_s": float(o[1]), "tokens": tokens,
+            "per_test": per_test}
 
 
-def window_judged(sql: Sql, judge: str, since: str) -> dict[str, int]:
-    """States this judge judged per test since `since` (UTC, from the hook windows)."""
+def window_judged(sql: Sql, judge: str, since: str, until: str | None = None) -> dict[str, int]:
+    """States this judge judged per test in [since, until) (UTC, from the hook windows)."""
+    until_sql = f" and started_at < timestamp'{until}'" if until else ""
     r = _q(sql, "select test_name, coalesce(sum(missing), 0) from jev_demo.bench.hook_runs "
-                f"where judge = '{judge}' and started_at >= timestamp'{since}' group by test_name")
+                f"where judge = '{judge}' and started_at >= timestamp'{since}'{until_sql} "
+                "group by test_name")
     return {t: int(n) for t, n in r.rows}
+
+
+def usage_verdict(m, judged: int) -> tuple[bool, list[str]]:
+    """Whether a window's usage (cost, requests, in, out) stands as the run's measured cost: only
+    when it covers every row judged now (usage lags; less means it has not all landed)."""
+    if m is None:
+        return False, []
+    n = m[1]
+    lines = [f"- usage requests {n:,} vs judged {judged:,}"]
+    if judged == 0 or n < judged:
+        return False, lines
+    if n > 1.05 * judged:
+        lines.append(f"- usage check: {n:,} requests for {judged:,} judged rows "
+                     "(possible duplicate evaluation)")
+        print(f"WARNING: {n:,} requests for {judged:,} judged rows (possible duplicate evaluation)")
+    return True, lines
+
+
+def estimate(judge: str, md: str, judged_per_test: dict[str, int]) -> float:
+    """Estimated LLM cost of the rows judged now: tokens/row (pilot-measured, else default)."""
+    return sum(budget.project(judge, judged_per_test.get(t, 0),
+                              evallog.tokens_per_row(md, judge, t)
+                              or budget.DEFAULT_TOKENS_PER_ROW[t]) for t in TESTS)
+
+
+def llm_cost(sql: Sql, judge: str, md: str, window: tuple[str, str],
+             judged_per_test: dict[str, int]):
+    """(cost, source, accepted usage or None, usage lines) for one LLM run's window."""
+    try:  # tolerant: a failed or empty usage read stays estimated
+        r = sql.run(budget.usage_sql(*window))
+        m = budget.window_cost(judge, r.rows) if r.state == "SUCCEEDED" else None
+    except Exception as e:  # noqa: BLE001
+        print(f"usage read failed ({type(e).__name__}); cost stays estimated")
+        m = None
+    ok, lines = usage_verdict(m, sum(judged_per_test.values()))
+    if ok:
+        return m[0], "measured", m, lines
+    return estimate(judge, md, judged_per_test), "estimated", None, lines
 
 
 def headline2_lines(per_test: dict, run_cost: float, source: str, is_llm: bool) -> list[str]:
@@ -226,15 +301,56 @@ def headline2_lines(per_test: dict, run_cost: float, source: str, is_llm: bool) 
     return out
 
 
-def refused_md(stamp: str, label: str, judge: str, invs: set, cost: float,
-               reasons: list[str]) -> str:
-    """A billed run that is not a result: logged cost-only so the $15 guard still counts it."""
+def refused_md(stamp: str, label: str, judge: str, invs: set, cost: float, reasons: list[str],
+               window: tuple[str, str], source: str = "estimated", extra=()) -> str:
+    """A billed run that is not a result: logged cost-only so the $15 guard still counts it. The
+    invocation is the real one when exactly one, else refused-<stamp> (so --measure can settle
+    it from the window and llm_spend can replace the estimate)."""
+    inv = (next(iter(invs)) if len(invs) == 1
+           else "refused-" + stamp.replace("-", "").replace(":", ""))
     lines = [f"## {stamp} · refused · {label} · {judge}", "",
-             f"- not a result: {'; '.join(reasons)}"]
-    if len(invs) == 1:
-        lines.append(f"- invocation {next(iter(invs))}")
-    lines.append(f"- llm cost ${cost:.3f} (estimated)")
+             f"- not a result: {'; '.join(reasons)}", f"- invocation {inv}",
+             f"- window {window[0]} {window[1]} (UTC)", *extra,
+             f"- llm cost ${cost:.3f} ({source})"]
     return "\n".join(lines) + "\n"
+
+
+def _logged(md: str, inv: str) -> bool:
+    return re.search(rf"^- invocation {re.escape(inv)}$", md, re.M) is not None
+
+
+def _iso(t: datetime) -> str:
+    return t.strftime("%Y-%m-%dT%H:%M:%S")
+
+
+def _stamp() -> str:
+    return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _label(a) -> str:
+    return "pilot" if a.scope == "pilot" else f"pass {a.pass_}"
+
+
+def write_refused(sql: Sql, a, window: tuple[str, str], invs: set, projected: float,
+                  reasons: list[str]) -> None:
+    """Append the refused entry of a billed live LLM run. Its cost is measured when usage covers
+    the rows judged in the window, else max(window estimate, pre-run projection): never $0.
+    Reads here are tolerant: the run may have failed because reads fail."""
+    md = LOG.read_text()
+    invs = {i for i in invs if not _logged(md, i)}  # a stale audit invocation is never reused
+    try:
+        judged = window_judged(sql, a.judge, *window)
+        cost, source, m, extra = llm_cost(sql, a.judge, md, window, judged)
+        if m is not None:
+            extra = [*extra, f"- tokens in {m[2]:,} out {m[3]:,} (measured)"]
+        else:
+            cost = max(cost, projected)
+    except Exception as e:  # noqa: BLE001
+        cost, source = projected, "estimated"
+        extra = [f"- cost not read after the build ({type(e).__name__}); the pre-run projection "
+                 "stands"]
+    evallog.append(LOG, refused_md(_stamp(), _label(a), a.judge, invs, cost, reasons, window,
+                                   source, extra))
 
 
 def dbt(*args: str) -> int:
@@ -242,7 +358,8 @@ def dbt(*args: str) -> int:
 
 
 def unmeasured(md: str) -> list[tuple[str, str, str]]:
-    """Logged LLM runs whose cost is still an estimate and has no later measured-cost entry."""
+    """Logged LLM runs (results and refused) whose cost is still an estimate and has no later
+    measured-cost entry: (label, judge, invocation); a refused label reads `refused · <label>`."""
     blocks = re.split(r"\n(?=## )", md)
     measured = set()
     for block in blocks:
@@ -251,122 +368,245 @@ def unmeasured(md: str) -> list[tuple[str, str, str]]:
             measured.add(inv[1])
     out = []
     for block in blocks:
-        m = re.match(r"## \S+ · (pilot|pass \d+) · (\S+)$", block.splitlines()[0])
+        m = re.match(r"## \S+ · (refused · )?(pilot|pass \d+) · (\S+)$", block.splitlines()[0])
         inv = re.search(r"^- invocation (\S+)$", block, re.M)
         if m and inv and "(estimated)" in block and inv[1] not in measured:
-            out.append((m[1], m[2], inv[1]))
+            out.append(((m[1] or "") + m[2], m[3], inv[1]))
     return out
 
 
-def measure(append: bool) -> int:
-    """Attribute endpoint usage to logged runs whose cost is still estimated (usage lags ~2 h):
-    window = the run's hook_runs window ± 5 s; exactly one served entity must have been used."""
-    sql = Sql()
-    for label, judge, inv in unmeasured(LOG.read_text()):
-        w = _q(sql, "select min(started_at) - interval 5 seconds, max(finished_at) + interval 5 "
-                    "seconds from jev_demo.bench.hook_runs where invocation_id = "
-                    f"'{inv.replace(chr(39), '')}'")
-        start, end = w.rows[0]
-        if start is None or end is None:
-            print(f"{label} · {judge} · {inv}: no hook window recorded; cannot attribute usage")
+def entry_window(md: str, inv: str) -> tuple[str, str] | None:
+    """The `- window <t0> <t1>` recorded by the run entry of this invocation, if any."""
+    for block in re.split(r"\n(?=## )", md):
+        if " · measured cost · " in block.splitlines()[0] or not _logged(block, inv):
             continue
-        r = sql.run(budget.usage_sql(str(start), str(end)))
+        w = re.search(r"^- window (\S+) (\S+)", block, re.M)
+        if w:
+            return w[1], w[2]
+    return None
+
+
+def measure(append: bool) -> int:
+    """Attribute endpoint usage to logged runs (results and refused) whose cost is still estimated
+    (usage lags ~2 h): window = the entry's `- window` line, else the run's hook_runs window ± 5 s;
+    exactly one served entity must have been used, and its requests must cover the rows judged."""
+    sql = Sql()
+    md = LOG.read_text()
+    skipped = 0
+    for label, judge, inv in unmeasured(md):
+        if not INVOCATION_ID.match(inv):
+            print(f"{label} · {judge} · {inv!r}: invalid invocation id; skipped")
+            skipped += 1
+            continue
+        window = entry_window(md, inv)
+        if window is None and inv.startswith("refused-"):
+            print(f"{label} · {judge} · {inv}: no window recorded; cannot attribute usage")
+            continue
+        if window is None:
+            w = _q(sql, "select min(started_at) - interval 5 seconds, max(finished_at) + interval "
+                        f"5 seconds from jev_demo.bench.hook_runs where invocation_id = '{inv}'")
+            start, end = w.rows[0]
+            if start is None or end is None:
+                print(f"{label} · {judge} · {inv}: no hook window recorded; cannot attribute usage")
+                continue
+            window = (str(start), str(end))
+        if label.startswith("refused") or inv.startswith("refused-"):
+            judged = sum(window_judged(sql, judge, *window).values())
+        else:
+            judged = int(_q(sql, "select coalesce(sum(missing), 0) from jev_demo.bench.hook_runs "
+                                 f"where invocation_id = '{inv}'").rows[0][0])
+        r = sql.run(budget.usage_sql(*window))
         m = budget.window_cost(judge, r.rows) if r.state == "SUCCEEDED" else None
-        if m is None:
-            print(f"{label} · {judge} · {inv}: usage not attributable yet; try again later")
+        ok, usage_lines = usage_verdict(m, judged)
+        if not ok:
+            print(f"{label} · {judge} · {inv}: usage not attributable yet "
+                  f"({'; '.join(x[2:] for x in usage_lines) or 'no single served entity'}); "
+                  "try again later")
             continue
         cost, n, i, o = m
-        lines = [f"## {datetime.now(UTC).strftime('%Y-%m-%dT%H:%M:%SZ')} · measured cost · "
-                 f"{label} · {judge}", "", f"- invocation {inv}",
-                 f"- requests {n:,} · tokens in {i:,} out {o:,}",
+        lines = [f"## {_stamp()} · measured cost · {label} · {judge}", "", f"- invocation {inv}",
+                 f"- requests {n:,} · tokens in {i:,} out {o:,}", *usage_lines,
                  f"- llm cost ${cost:.3f} (measured)"]
         if label == "pilot":
             lines += [f"- tokens/row {t} in {i // n} out {o // n} (measured)" for t in TESTS]
         print("\n".join(lines))
         if append:
             evallog.append(LOG, "\n".join(lines) + "\n")
-    return 0
+    return 1 if skipped else 0
+
+
+def _git(*args: str) -> str:
+    return subprocess.run(["git", *args], cwd=ROOT, capture_output=True, text=True,
+                          check=True).stdout
+
+
+def frozen_digest() -> str:
+    """sha256 of `git ls-files -s` over FROZEN: blob ids of everything that produces the numbers."""
+    return hashlib.sha256(_git("ls-files", "-s", "--", *FROZEN).encode()).hexdigest()
+
+
+def frozen_dirty() -> bool:
+    return bool(_git("status", "--porcelain", "--", *FROZEN).strip())
+
+
+def prereg_reasons(md: str) -> list[str]:
+    """Why a live append cannot count: no pre-registration, or the frozen paths moved since."""
+    if not evallog.has_preregistration(md):
+        return ["no pre-registration in docs/eval-results.md (run --preregister first)"]
+    out = []
+    if frozen_dirty():
+        out.append("frozen paths have uncommitted changes: " + " ".join(FROZEN))
+    m = re.search(r"^- frozen digest ([0-9a-f]{64})\b", md, re.M)
+    if m is None:
+        out.append("the pre-registration records no frozen digest")
+    elif (d := frozen_digest()) != m[1]:
+        out.append(f"frozen paths changed since pre-registration (digest {d[:12]}… != "
+                   f"{m[1][:12]}…)")
+    return out
+
+
+def missing_ground_truth() -> list[str]:
+    missing = [f"eval/{n}" for n in GROUND_TRUTH if not (EVAL / n).is_file()]
+    return [f"ground truth missing: {', '.join(missing)}"] if missing else []
+
+
+def preflight(sql: Sql) -> list[str]:
+    """Keys against the built tables, before any billed build: every wanderbricks comment has a
+    polarity label and the Jaccard baseline has exactly one threshold."""
+    out = []
+    labelled = {p["comment_sha256"] for p in _csv("wanderbricks_polarity.csv")}
+    comments = _q(sql, "select distinct comment from jev_demo.bench.stg_wanderbricks_reviews "
+                       "where comment is not null").rows
+    unlabelled = [c for (c,) in comments if keys.comment_hash(c) not in labelled]
+    if unlabelled:
+        out.append(f"{len(unlabelled)} of {len(comments)} wanderbricks comments have no polarity "
+                   "label in eval/wanderbricks_polarity.csv")
+    n = int(_q(sql, "select count(*) from jev_demo.bench.baseline_params "
+                    "where name = 'abt_jaccard_threshold'").rows[0][0])
+    if n != 1:
+        out.append(f"jev_demo.bench.baseline_params has {n} abt_jaccard_threshold rows "
+                   "(needs exactly 1)")
+    return out
 
 
 def run(a) -> int:
-    sql = Sql()
     is_llm = a.judge != "jev"
+    live_llm = is_llm and a.mode == "live"
+    if live_llm and not a.append:
+        print("refused: live LLM runs must be logged: pass --append")
+        return 1
+    md = LOG.read_text()
+    reasons = missing_ground_truth() if a.mode == "live" else []
+    if a.append and a.mode == "live":
+        reasons = prereg_reasons(md) + reasons
+    if reasons:
+        print("refused before any build: " + "; ".join(reasons))
+        return 1
+    sql = Sql()
     vars_ = json.dumps({"judge": a.judge, "bench_scope": a.scope})
     if dbt("build", "--vars", vars_, "--exclude", "tag:semantic", "tag:baseline") != 0:
         return 1
-    md = LOG.read_text()
+    if a.mode == "live" and (reasons := preflight(sql)):
+        print("refused before the judging build: " + "; ".join(reasons))
+        return 1
+    projected = 0.0
     if is_llm:
         spent = evallog.llm_spend(md)  # logged runs; measured entries replace estimates
-        projected = 0.0
         for test, spec in TESTS.items():
             n = len(universe(sql, spec))
             per_row = (evallog.tokens_per_row(md, a.judge, test)
                        or budget.DEFAULT_TOKENS_PER_ROW[test])
             projected += budget.project(a.judge, n, per_row)
-        print(f"budget: spent ${spent:.2f} (logged) + projected ${projected:.2f}"
-              f" of ${budget.CAP_USD:.2f}")
+        print(f"budget: spent ${spent:.2f} (logged) + {budget.MARGIN} × projected "
+              f"${projected:.2f} = ${spent + budget.MARGIN * projected:.2f} "
+              f"of ${budget.CAP_USD:.2f}")
         budget.check(spent, projected)
     if a.fresh:
         _q(sql, f"delete from {JUDGMENTS} where judge = '{a.judge}' and mode = '{a.mode}'")
-    t0 = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S")
-    rc = dbt("build", "--vars", vars_, "--select", "+tag:semantic", "tag:baseline")
-    t1 = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S")
-    rows, invs, errors, extra_lines = [], set(), 0, []
+    t0, t1 = _iso(datetime.now(UTC)), None
+    logged: list[bool] = []
+    try:  # billed from here: a live LLM run always ends in an entry (result or refused)
+        rc = dbt("build", "--vars", vars_, "--select", "+tag:semantic", "tag:baseline")
+        t1 = _iso(datetime.now(UTC) + timedelta(seconds=1))  # ceil: the window covers the build
+        return finish(sql, a, md, rc, (t0, t1), projected, logged)
+    except BaseException as e:
+        if live_llm and not logged:
+            window = (t0, t1 or _iso(datetime.now(UTC) + timedelta(seconds=1)))
+            write_refused(sql, a, window, set(), projected, [f"{type(e).__name__}: {e}"[:300]])
+        raise
+
+
+def finish(sql: Sql, a, md: str, rc: int, window: tuple[str, str], projected: float,
+           logged: list) -> int:
+    """Score what the judging build stored (judged rows only) and log the entry."""
+    is_llm = a.judge != "jev"
+    rows, invs, extra_lines = [], set(), []
+    unjudged_by, rows_by = {}, {}
     for test, spec in TESTS.items():
-        uni, pos = universe(sql, spec), positives(sql, spec) & universe(sql, spec)
+        uni = universe(sql, spec)
+        pos = positives(sql, spec) & uni
         flagged, unjudged, inv = stored_flags(sql, spec, a.judge, is_llm)
         invs |= inv
-        errors += len(unjudged)
-        rows.append(_row(test, metrics.score(flagged, pos, uni), len(uni), len(pos), len(unjudged)))
+        s, judged, pos_j = judged_scores(flagged, unjudged, pos, uni)
+        unjudged_by[test], rows_by[test] = len(uni - judged), len(uni)
+        rows.append(_row(test, s, len(judged), len(pos_j), len(uni - judged)))
         if test == "banking_query_not_about_intent":
-            for kind, (k, n) in swap_recall(flagged, uni, _csv("banking77_swaps.csv")).items():
+            for kind, (k, n) in swap_recall(flagged, judged, _csv("banking77_swaps.csv")).items():
                 lo, hi = metrics.wilson(k, n)
                 extra_lines.append(f"- banking recall on {kind} swaps {k}/{n} "
                                    f"({k / n if n else 0:.2f}, 95% {lo:.2f}–{hi:.2f})")
         if test == "wanderbricks_comment_contradicts_rating":
-            k, n = false_alarms(flagged, natural_ids(sql, spec), pos)
+            k, n = false_alarms(flagged, natural_ids(sql, spec) & judged, pos_j)
             lo, hi = metrics.wilson(k, n)
             extra_lines.append(f"- wanderbricks false alarms on natural states {k}/{n} "
                                f"({k / n if n else 0:.2f}, 95% {lo:.2f}–{hi:.2f})")
         if spec.baseline and a.judge == "jev":
-            rows.append(_row(spec.baseline, metrics.score(baseline_flags(sql, spec), pos, uni),
+            name = spec.baseline
+            if a.scope == "full" and test == "pairs_describe_same_product":
+                name += " (threshold fit on train; train in scope)"
+            rows.append(_row(name, metrics.score(baseline_flags(sql, spec), pos, uni),
                              len(uni), len(pos), 0))
     print("\n".join(rows))
-    cost, source, tpr = 0.0, "estimated", {}
+    if not a.append:
+        return rc
+    reasons = refuse_reasons(a.mode, a.judge, invs, unjudged_by, rows_by)
+    if rc != 0:
+        reasons.append(f"dbt exited {rc}")
+    if len(invs) == 1 and _logged(md, next(iter(invs))):
+        reasons.append(f"invocation {next(iter(invs))} is already in the log (stale stored "
+                       "failures)")
+    if reasons:
+        if a.mode == "live" and is_llm:  # billed but not a result: the guard must count it
+            write_refused(sql, a, window, invs, projected, reasons)
+            logged.append(True)
+        print("not appended as a result: " + "; ".join(reasons))
+        return 1
+    inv = next(iter(invs))
+    st = run_stats(sql, inv, is_llm)
+    extra = [f"- scope {a.scope} · {sum(rows_by.values()):,} rows in scope · scored on judged "
+             f"rows (unjudged excluded) · {st['judged']:,} judged now · "
+             f"requests {st['requests']:,} · wall time {st['wall_s']:.1f} s "
+             "(first hook start to last hook end)"]
+    cost, source, tpr = 0.0, "ledger", {}
     if is_llm:
-        r = sql.run(budget.usage_sql(t0, t1))  # tolerant: a failed or empty read stays estimated
-        m = budget.window_cost(a.judge, r.rows) if r.state == "SUCCEEDED" else None
+        judged_now = {t: d["judged"] for t, d in st["per_test"].items()}
+        cost, source, m, usage_lines = llm_cost(sql, a.judge, md, window, judged_now)
         if m is not None:
-            cost, n_req, i, o = m
-            source = "measured"
+            tokens = f"- tokens in {m[2]:,} out {m[3]:,} (measured)"
             if a.scope == "pilot":
-                tpr = {t: (i // n_req, o // n_req) for t in TESTS}
+                tpr = {t: (m[2] // m[1], m[3] // m[1]) for t in TESTS}
         else:
-            now = window_judged(sql, a.judge, t0)
-            cost = sum(budget.project(a.judge, now.get(t, 0),
-                                      evallog.tokens_per_row(md, a.judge, t)
-                                      or budget.DEFAULT_TOKENS_PER_ROW[t]) for t in TESTS)
-    if a.append:
-        reasons = refuse_reasons(a.mode, a.judge, invs, errors)
-        if rc != 0:
-            reasons.append(f"dbt exited {rc}")
-        label = "pilot" if a.scope == "pilot" else f"pass {a.pass_}"
-        stamp = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
-        if reasons:
-            if a.mode == "live" and is_llm:  # billed but not a result: the guard must count it
-                evallog.append(LOG, refused_md(stamp, label, a.judge, invs, cost, reasons))
-            print("not appended as a result: " + "; ".join(reasons))
-            return 1
-        inv = next(iter(invs))
-        st = run_stats(sql, inv, is_llm)
-        n_rows = sum(len(universe(sql, s)) for s in TESTS.values())
-        run_cost = cost if is_llm else sum(d["jev_cost"] for d in st["per_test"].values())
-        extra = [f"- scope {a.scope} · {n_rows:,} rows in scope · {st['judged']:,} judged now · "
-                 f"requests {st['requests']:,} · wall time {st['wall_s']:.1f} s "
-                 "(first hook start to last hook end)",
-                 *headline2_lines(st["per_test"], run_cost, source, is_llm),
-                 *extra_lines]
-        evallog.append(LOG, entry_md(stamp, label, a.judge, inv, rows, cost, source, tpr, extra))
+            est = sum(d["est_tokens"] for d in st["per_test"].values())
+            tokens = f"- tokens in ~{est:,} (estimated)"
+        extra += [f"- window {window[0]} {window[1]} (UTC)", tokens, *usage_lines]
+        run_cost = cost
+    else:
+        extra.append(f"- tokens in {st['tokens']:,} (ledger)")
+        run_cost = sum(d["jev_cost"] for d in st["per_test"].values())
+    extra += [*headline2_lines(st["per_test"], run_cost, source, is_llm), *extra_lines]
+    evallog.append(LOG, entry_md(_stamp(), _label(a), a.judge, inv, rows, cost, source, tpr,
+                                 extra))
+    logged.append(True)
     return rc
 
 
@@ -396,8 +636,25 @@ def _flags(judge: str, rows: dict[str, tuple]) -> set[str]:
     return {i for i, (_, d) in rows.items() if d}
 
 
+def one_question(sql: Sql, spec: TestSpec) -> None:
+    """--compare reads judgments by state: refuse if a test was judged under more than one question
+    (a prompt change after pre-registration)."""
+    n = int(_q(sql, f"select count(distinct question) from {JUDGMENTS} where test_name = "
+                    f"'{spec.name}' and mode = 'live' and (p is not null or decision is not null)"
+               ).rows[0][0])
+    if n > 1:
+        raise RuntimeError(f"{spec.name}: {n} distinct questions among live judgments; "
+                           "compare needs one")
+
+
+def common_universe(per: dict[str, dict], judges: list[str]) -> set[str]:
+    """Ids judged (successfully, live) by every judge: the side analyses compare like with like."""
+    return set.intersection(*(set(per.get(j, {})) for j in judges))
+
+
 def side_md(test: str, per_judge: dict, pos: set, uni: set) -> str:
     lines = [f"### {test}", "",
+             f"common universe: {len(uni):,} ids judged live by every judge", "",
              "| judge | Brier | reliability (bin: observed, n) | thresholded F1 |",
              "|---|---|---|---|"]
     for judge, rows in per_judge.items():
@@ -405,12 +662,12 @@ def side_md(test: str, per_judge: dict, pos: set, uni: set) -> str:
         probs = [rows[i][0] for i in ids]
         labels = [i in pos for i in ids]
         b = f"{metrics.brier(probs, labels):.2f}" if ids else "n/a"  # undefined without data
-        rel = " ".join(f"{lo:.1f}-{hi:.1f}: {rate:.2f}, {n}"
+        rel = "; ".join(f"{lo:.1f}-{hi:.1f}: {rate:.2f}, {n}"
                        for lo, hi, rate, n in metrics.reliability(probs, labels, bins=5) if n)
         thr = {i for i in ids if rows[i][0] >= THRESHOLD}
         f1 = metrics.score(thr, pos, uni).f1
-        lines.append(f"| {judge} | {b} | {rel} | "
-                     + ("(the decision rule)" if judge == "jev" else f"{f1:.2f}") + " |")
+        thr_f1 = "(the decision rule)" if judge == "jev" else f"{f1:.2f}" if ids else "n/a"
+        lines.append(f"| {judge} | {b} | {rel} | {thr_f1} |")
     flags = {j: _flags(j, rows) for j, rows in per_judge.items()}
     a = metrics.agreement(flags, pos)
     lines += ["", "agreement on positives: " + " · ".join(
@@ -426,17 +683,29 @@ def preregister() -> int:
     if evallog.has_preregistration(md):
         print("pre-registration already present; it is frozen")
         return 1
-    out = subprocess.run(
-        [sys.executable, str(ROOT / "scripts" / "dbtw.py"), "compile", "--select", "tag:semantic"],
-        capture_output=True, text=True)
+    reasons = []
+    if frozen_dirty():
+        reasons.append("frozen paths have uncommitted changes (commit them first): "
+                       + " ".join(FROZEN))
+    missing = [f"eval/{n}" for n in ("wanderbricks_polarity.csv", "wanderbricks_flips.csv")
+               if not (EVAL / n).is_file()]
+    if missing:
+        reasons.append("ground truth missing: " + ", ".join(missing))
+    if reasons:
+        print("refused: " + "; ".join(reasons))
+        return 1
+    rc = dbt("compile", "--select", "tag:semantic")
+    if rc != 0:
+        print(f"refused: dbt compile exited {rc}")
+        return 1
     swaps = _csv("banking77_swaps.csv")
     entry = "\n".join([
         evallog.PREREG, "",
         "- judges: " + ", ".join(JUDGES) + "; temperature 0; prompt version p1",
         "- prompts and test wording: bench/models/staging/schema.yml and "
-        "bench/macros/jev_question.sql at commit " + subprocess.run(
-            ["git", "rev-parse", "--short", "HEAD"], capture_output=True, text=True,
-            cwd=ROOT).stdout.strip(),
+        "bench/macros/jev_question.sql at commit " + _git("rev-parse", "--short", "HEAD").strip(),
+        f"- frozen digest {frozen_digest()} (sha256 of `git ls-files -s -- {' '.join(FROZEN)}`; "
+        "a live append is refused when it differs or those paths are dirty)",
         f"- Banking77: seed 42, sample 2,000 test queries, swaps in sample "
         f"{sum(s['in_sample'] == 'True' for s in swaps)} (75 random + 75 near-miss), "
         "families in eval/intent_families.csv",
@@ -448,7 +717,10 @@ def preregister() -> int:
         "- headline 1: per dataset, F1 of Jev vs each LLM (decision level), Wilson 95% for P and R",
         "- headline 2: per dataset, cost per 1,000 rows and wall time per judge",
         "- headline 3: Banking77 recall on random vs near-miss swaps, per judge",
-        f"- dbt compile exit {out.returncode}", ""])
+        f"- unjudged tolerance {UNJUDGED_TOLERANCE:.0%} of in-scope rows per test (more is not a "
+        "result; rerun to fill)",
+        f"- budget margin {budget.MARGIN} on projections",
+        f"- dbt compile exit {rc}", ""])
     evallog.append(LOG, entry)
     return 0
 
@@ -481,13 +753,15 @@ def main(argv=None) -> int:
         sql = Sql()
         parts = []
         for test, spec in TESTS.items():
+            one_question(sql, spec)
             per = judged_rows(sql, spec)
             missing = [j for j in JUDGES if j not in per]
             if missing:
                 print(f"{test}: no live judgments yet for {missing}; nothing compared")
                 return 1
-            uni = universe(sql, spec)
-            parts.append(side_md(test, per, positives(sql, spec) & uni, uni))
+            common = common_universe(per, JUDGES)
+            per = {j: {i: v for i, v in per[j].items() if i in common} for j in JUDGES}
+            parts.append(side_md(test, per, positives(sql, spec) & common, common))
         text = "\n".join(parts)
         print(text)
         if a.append:
