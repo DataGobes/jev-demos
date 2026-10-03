@@ -16,6 +16,7 @@ numbered prefix. The dev repo is the source of truth: change the demo there, the
 | `03-visualize/` | `~/Projects/jev-demo-3` | `feat/jev-visualize` |
 | `04-dbt-semantic-tests/` | `~/Projects/jev-demo-4` | `main` (or the feature branch being PR'd) |
 | `05-dbt-databricks/` | `~/Projects/jev-demo-5` | `feature/jev-databricks` |
+| `06-jev-vs-ai-query/` | `~/Projects/jev-demo-6` | `feature/jev-vs-ai-query` |
 
 - Add a demo: `git subtree add --prefix=NN-name <dev-repo-path> <branch>`
 - Update a demo: commit in the dev repo, then

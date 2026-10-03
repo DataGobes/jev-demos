@@ -1,0 +1,21 @@
+[banking77]
+train_url = "https://raw.githubusercontent.com/PolyAI-LDN/task-specific-datasets/master/banking_data/train.csv"
+test_url = "https://raw.githubusercontent.com/PolyAI-LDN/task-specific-datasets/master/banking_data/test.csv"
+licence = "CC BY 4.0"
+citation = "Casanueva et al. 2020, Efficient Intent Detection with Dual Sentence Encoders"
+rows_train = 10003   # from page
+rows_test = 3080     # from page
+
+[abt_buy]
+dataset = "Abt-Buy (DeepMatcher Textual split)"
+table_a_url = "https://pages.cs.wisc.edu/~anhai/data1/deepmatcher_data/Textual/Abt-Buy/exp_data/tableA.csv"
+table_b_url = "https://pages.cs.wisc.edu/~anhai/data1/deepmatcher_data/Textual/Abt-Buy/exp_data/tableB.csv"
+train_url = "https://pages.cs.wisc.edu/~anhai/data1/deepmatcher_data/Textual/Abt-Buy/exp_data/train.csv"
+valid_url = "https://pages.cs.wisc.edu/~anhai/data1/deepmatcher_data/Textual/Abt-Buy/exp_data/valid.csv"
+test_url = "https://pages.cs.wisc.edu/~anhai/data1/deepmatcher_data/Textual/Abt-Buy/exp_data/test.csv"
+licence = "Creative Commons (variant not named on the source page); credit dbs.uni-leipzig.de and Köpcke et al., VLDB 2010"
+citation = "Abt-Buy (DeepMatcher Textual split, Mudgal et al., SIGMOD 2018) from the Leipzig benchmark datasets for entity resolution (Rahm group); Köpcke, Thor, Rahm, VLDB 2010"
+pairs_total = 9575     # from page
+matches_total = 1028   # from page
+pairs_test = 1916      # counted at download 2026-10-01 (Task 15 Step 1); S1 had derived 1,915
+matches_test = 206     # counted at download 2026-10-01 (Task 15 Step 1)

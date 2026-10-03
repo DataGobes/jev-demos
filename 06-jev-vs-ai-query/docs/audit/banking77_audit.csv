@@ -1,0 +1,35 @@
+query_id,swap_type,original_intent,labelled_intent,audit,reason,J,G,L
+test-00041,,card_linking,card_linking,questionable,reactivating is closer to activate_my_card,0,1,1
+test-00202,near_miss,pending_cash_withdrawal,pending_card_payment,both_fit,a cash withdrawal pending on the card fits pending_card_payment too,0,1,0
+test-00562,,contactless_not_working,contactless_not_working,original_wrong,not about contactless,1,1,1
+test-00586,,contactless_not_working,contactless_not_working,original_wrong,not about contactless,1,1,1
+test-00612,,top_up_by_bank_transfer_charge,top_up_by_bank_transfer_charge,questionable,"a SWIFT question, not a top-up charge",0,1,1
+test-00630,,top_up_by_bank_transfer_charge,top_up_by_bank_transfer_charge,questionable,"a SWIFT question, not a top-up charge",0,1,1
+test-00640,near_miss,pending_top_up,pending_card_payment,original_wrong,a pending fuel purchase is a card payment: the swap fixes the original label,0,0,0
+test-00796,near_miss,wrong_amount_of_cash_received,wrong_exchange_rate_for_cash_withdrawal,both_fit,less cash can come from the exchange rate,0,0,0
+test-01244,,get_physical_card,get_physical_card,questionable,dataset convention: PIN questions under get_physical_card,1,1,0
+test-01247,,get_physical_card,get_physical_card,questionable,dataset convention: PIN questions under get_physical_card,1,1,1
+test-01250,,get_physical_card,get_physical_card,questionable,dataset convention: PIN questions under get_physical_card,1,1,0
+test-01254,,get_physical_card,get_physical_card,questionable,dataset convention: PIN questions under get_physical_card,1,1,0
+test-01269,,get_physical_card,get_physical_card,questionable,dataset convention: PIN questions under get_physical_card,1,0,0
+test-01272,,get_physical_card,get_physical_card,questionable,dataset convention: PIN questions under get_physical_card,1,1,0
+test-01274,,get_physical_card,get_physical_card,questionable,dataset convention: PIN questions under get_physical_card,1,1,0
+test-01276,,get_physical_card,get_physical_card,questionable,dataset convention: PIN questions under get_physical_card,1,1,0
+test-01278,,get_physical_card,get_physical_card,questionable,dataset convention: PIN questions under get_physical_card,1,1,0
+test-01511,random,direct_debit_payment_not_recognised,compromised_card,both_fit,an unrecognised payment can mean a compromised card,0,0,0
+test-01672,,lost_or_stolen_phone,lost_or_stolen_phone,original_wrong,"cards, not a phone",0,1,1
+test-01754,near_miss,declined_transfer,declined_card_payment,original_wrong,an online purchase is a card payment: the swap fixes the original label,0,0,0
+test-02166,,beneficiary_not_allowed,beneficiary_not_allowed,questionable,"a how-to, not a blocked beneficiary",0,1,1
+test-02172,,beneficiary_not_allowed,beneficiary_not_allowed,questionable,"crypto support, not a blocked beneficiary",0,1,1
+test-02177,,beneficiary_not_allowed,beneficiary_not_allowed,questionable,dataset convention: crypto under beneficiary_not_allowed,0,1,1
+test-02402,near_miss,getting_spare_card,getting_virtual_card,both_fit,another card can be a virtual one,0,0,1
+test-02428,near_miss,getting_spare_card,getting_virtual_card,both_fit,a second card can be a virtual one,0,1,0
+test-02500,,order_physical_card,order_physical_card,questionable,"card fees, not ordering a card",1,1,0
+test-02568,near_miss,wrong_exchange_rate_for_cash_withdrawal,wrong_amount_of_cash_received,both_fit,a wrong rate means a wrong amount of cash,0,1,1
+test-02576,near_miss,wrong_exchange_rate_for_cash_withdrawal,wrong_amount_of_cash_received,both_fit,overcharged at an ATM fits a wrong amount as well as a wrong rate,1,0,0
+test-02581,near_miss,wrong_exchange_rate_for_cash_withdrawal,wrong_amount_of_cash_received,both_fit,too much taken fits a wrong amount,0,0,0
+test-02583,near_miss,wrong_exchange_rate_for_cash_withdrawal,wrong_amount_of_cash_received,both_fit,asks about amount and rate,0,1,1
+test-02589,near_miss,wrong_exchange_rate_for_cash_withdrawal,wrong_amount_of_cash_received,both_fit,says outright the amount of cash was wrong,0,1,0
+test-02591,near_miss,wrong_exchange_rate_for_cash_withdrawal,wrong_amount_of_cash_received,both_fit,a lower rate means less cash,0,1,0
+test-02745,,cash_withdrawal_not_recognised,cash_withdrawal_not_recognised,questionable,"a stolen card, closer to lost_or_stolen_card",0,1,1
+test-02921,,card_about_to_expire,card_about_to_expire,questionable,dataset convention: delivery abroad under card_about_to_expire,0,1,1
