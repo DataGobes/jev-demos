@@ -18,3 +18,23 @@ SIMULATED runs are never written here. LLM cost lines say `measured` (from
 - unjudged tolerance 1% of in-scope rows per test (more is not a result; rerun to fill)
 - budget margin 1.15 on projections
 - dbt compile exit 0
+
+## 2026-10-03T07:37:46Z · pilot · jev
+
+- invocation 206d4056-20c9-4605-a969-ae43dbf4205e
+- scope pilot · 150 rows in scope · scored on judged rows (unjudged excluded) · 150 judged now · requests 3 · wall time 46.0 s (first hook start to last hook end)
+- tokens in 24,584 (ledger)
+- headline 2 · wanderbricks_comment_contradicts_rating · judged now 50 · wall time 43.3 s · cost per 1,000 judged rows $0.0058 (ledger)
+- headline 2 · banking_query_not_about_intent · judged now 50 · wall time 42.3 s · cost per 1,000 judged rows $0.0052 (ledger)
+- headline 2 · pairs_describe_same_product · judged now 50 · wall time 44.0 s · cost per 1,000 judged rows $0.0097 (ledger)
+- banking recall on random swaps 1/1 (1.00, 95% 0.21–1.00)
+- banking recall on near_miss swaps 1/2 (0.50, 95% 0.09–0.91)
+- wanderbricks false alarms on natural states 0/40 (0.00, 95% 0.00–0.09)
+
+| test | rows | positives | flagged | P (95% CI) | R (95% CI) | F1 | unjudged |
+|---|---|---|---|---|---|---|---|
+| banking_query_not_about_intent | 50 | 3 | 2 | 1.00 (0.34–1.00) | 0.67 (0.21–0.94) | 0.80 | 0 |
+| baseline_banking_keyword | 50 | 3 | 2 | 0.50 (0.09–0.91) | 0.33 (0.06–0.79) | 0.40 | 0 |
+| pairs_describe_same_product | 50 | 7 | 6 | 1.00 (0.61–1.00) | 0.86 (0.49–0.97) | 0.92 | 0 |
+| baseline_pairs_jaccard | 50 | 7 | 3 | 1.00 (0.44–1.00) | 0.43 (0.16–0.75) | 0.60 | 0 |
+| wanderbricks_comment_contradicts_rating | 50 | 9 | 9 | 1.00 (0.70–1.00) | 1.00 (0.70–1.00) | 1.00 | 0 |
