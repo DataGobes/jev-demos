@@ -313,3 +313,97 @@ SIMULATED runs are never written here. LLM cost lines say `measured` (from
 | pairs_describe_same_product | 9,575 | 1,028 | 890 | 0.95 (0.93–0.96) | 0.82 (0.80–0.84) | 0.88 | 0 |
 | baseline_pairs_jaccard (threshold fit on train; train in scope) | 9,575 | 1,028 | 1,391 | 0.32 (0.30–0.35) | 0.43 (0.40–0.46) | 0.37 | 0 |
 | wanderbricks_comment_contradicts_rating | 245 | 31 | 30 | 1.00 (0.89–1.00) | 0.97 (0.84–0.99) | 0.98 | 0 |
+
+## 2026-10-03T14:49:00Z · measured cost · pilot · databricks-gpt-oss-20b
+
+- invocation 9f57db48-bc3d-4e46-a9e9-9c2330bc5ea1
+- requests 150 · tokens in 54,962 out 12,700
+- usage requests 48 vs judged 150
+- usage coverage 48 of 150 judged rows logged after 6 h; tokens and cost are the logged mean per request × 150
+- llm cost $0.008 (measured)
+- tokens/row banking_query_not_about_intent in 366 out 84 (measured)
+- tokens/row pairs_describe_same_product in 366 out 84 (measured)
+- tokens/row wanderbricks_comment_contradicts_rating in 366 out 84 (measured)
+
+## 2026-10-03T14:49:02Z · measured cost · pilot · databricks-meta-llama-3-3-70b-instruct
+
+- invocation a531f22c-8390-42b8-9689-f1e0eba08016
+- requests 150 · tokens in 50,242 out 2,100
+- usage requests 41 vs judged 150
+- usage coverage 41 of 150 judged rows logged after 6 h; tokens and cost are the logged mean per request × 150
+- llm cost $0.028 (measured)
+- tokens/row banking_query_not_about_intent in 334 out 14 (measured)
+- tokens/row pairs_describe_same_product in 334 out 14 (measured)
+- tokens/row wanderbricks_comment_contradicts_rating in 334 out 14 (measured)
+
+## 2026-10-03T14:49:04Z · measured cost · refused · pilot · databricks-claude-opus-5
+
+- invocation refused-20261003T074052Z
+- requests 0 · tokens in 0 out 0
+- no usage logged in the window after 6 h
+- llm cost $0.000 (measured)
+
+## 2026-10-03T14:49:07Z · measured cost · pilot · databricks-gpt-oss-20b
+
+- invocation 34a0954f-e100-4633-8916-a522b4aa7fa5
+- requests 150 · tokens in 54,439 out 12,017
+- usage requests 44 vs judged 150
+- usage coverage 44 of 150 judged rows logged after 6 h; tokens and cost are the logged mean per request × 150
+- llm cost $0.007 (measured)
+- tokens/row banking_query_not_about_intent in 362 out 80 (measured)
+- tokens/row pairs_describe_same_product in 362 out 80 (measured)
+- tokens/row wanderbricks_comment_contradicts_rating in 362 out 80 (measured)
+
+## 2026-10-03T14:49:09Z · measured cost · pilot · databricks-meta-llama-3-3-70b-instruct
+
+- invocation c3c2d232-cf9c-4353-838a-7bab73a7ee31
+- requests 150 · tokens in 50,264 out 2,100
+- usage requests 41 vs judged 150
+- usage coverage 41 of 150 judged rows logged after 6 h; tokens and cost are the logged mean per request × 150
+- llm cost $0.028 (measured)
+- tokens/row banking_query_not_about_intent in 335 out 14 (measured)
+- tokens/row pairs_describe_same_product in 335 out 14 (measured)
+- tokens/row wanderbricks_comment_contradicts_rating in 335 out 14 (measured)
+
+## 2026-10-03T14:49:12Z · measured cost · pilot · databricks-claude-opus-4-8
+
+- invocation 2ca6d810-90f2-40d8-a4df-85e0986cea00
+- requests 150 · tokens in 109,065 out 8,330
+- usage requests 39 vs judged 150
+- usage coverage 39 of 150 judged rows logged after 6 h; tokens and cost are the logged mean per request × 150
+- llm cost $0.754 (measured)
+- tokens/row banking_query_not_about_intent in 727 out 55 (measured)
+- tokens/row pairs_describe_same_product in 727 out 55 (measured)
+- tokens/row wanderbricks_comment_contradicts_rating in 727 out 55 (measured)
+
+## 2026-10-03T14:49:14Z · measured cost · pass 1 · databricks-gpt-oss-20b
+
+- invocation f51c9e10-4204-448b-ae55-8686c3296f61
+- requests 4,006 · tokens in 1,323,858 out 300,794
+- usage requests 1,350 vs judged 4,006
+- usage coverage 1,350 of 4,006 judged rows logged after 6 h; tokens and cost are the logged mean per request × 4,006
+- llm cost $0.183 (measured)
+
+## 2026-10-03T14:49:17Z · measured cost · pass 1 · databricks-meta-llama-3-3-70b-instruct
+
+- invocation 35113ac0-f8f2-4a03-8a40-beaf802d3ac1
+- requests 4,006 · tokens in 1,163,856 out 47,322
+- usage requests 1,336 vs judged 4,006
+- usage coverage 1,336 of 4,006 judged rows logged after 6 h; tokens and cost are the logged mean per request × 4,006
+- llm cost $0.653 (measured)
+
+## 2026-10-03T14:49:19Z · measured cost · pass 2 · databricks-gpt-oss-20b
+
+- invocation 1c720a38-9aff-4e61-a516-fdb68de0cda1
+- requests 4,156 · tokens in 1,454,071 out 349,596
+- usage requests 1,400 vs judged 4,156
+- usage coverage 1,400 of 4,156 judged rows logged after 6 h; tokens and cost are the logged mean per request × 4,156
+- llm cost $0.207 (measured)
+
+## 2026-10-03T14:49:21Z · measured cost · pass 2 · databricks-meta-llama-3-3-70b-instruct
+
+- invocation b9bc16d4-461d-428f-a0f6-01f798419a21
+- requests 4,156 · tokens in 1,226,525 out 49,595
+- usage requests 1,381 vs judged 4,156
+- usage coverage 1,381 of 4,156 judged rows logged after 6 h; tokens and cost are the logged mean per request × 4,156
+- llm cost $0.688 (measured)
