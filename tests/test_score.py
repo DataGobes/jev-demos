@@ -463,6 +463,35 @@ def test_preregister_refuses_dirty_paths_missing_keys_and_compile_failure(prereg
     assert not score.evallog.has_preregistration(score.LOG.read_text())
 
 
+def test_amendment_records_reason_judges_and_a_new_digest_that_later_appends_check(prereg_env,
+                                                                                  monkeypatch):
+    assert score.preregister() == 0
+    monkeypatch.setattr(score, "frozen_digest", lambda: "cd" * 32)
+    assert score.prereg_reasons(score.LOG.read_text()) != []
+    assert score.amend("opus-5 is not supported for batch inference") == 0
+    md = score.LOG.read_text()
+    assert md.count(score.evallog.AMEND) == 1
+    entry = md.split(score.evallog.AMEND)[1]
+    assert "- reason: opus-5 is not supported for batch inference" in entry
+    assert "- judges: " + ", ".join(score.JUDGES) in entry
+    assert f"- frozen digest {'cd' * 32}" in entry and "- dbt compile exit 0" in entry
+    assert score.prereg_reasons(md) == []  # the latest digest counts
+
+
+@pytest.mark.parametrize("problem", ["no-prereg", "dirty", "compile", "no-reason"])
+def test_amendment_refuses_without_preregistration_dirty_paths_compile_or_reason(
+        prereg_env, monkeypatch, problem):
+    if problem != "no-prereg":
+        assert score.preregister() == 0
+    before = score.LOG.read_text()
+    if problem == "dirty":
+        monkeypatch.setattr(score, "frozen_dirty", lambda: True)
+    elif problem == "compile":
+        prereg_env["rc"] = 2
+    assert score.amend("" if problem == "no-reason" else "why") == 1
+    assert score.LOG.read_text() == before
+
+
 def test_frozen_digest_hashes_the_index_of_the_frozen_paths():
     assert score.FROZEN == ["bench/macros", "bench/models", "bench/seeds", "bench/tests",
                             "bench/dbt_project.yml", "eval"]

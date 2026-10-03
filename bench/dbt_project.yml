@@ -25,8 +25,9 @@ vars:
   jev_llm_endpoints:
     - databricks-gpt-oss-20b
     - databricks-meta-llama-3-3-70b-instruct
-    - databricks-claude-opus-5
+    - databricks-claude-opus-4-8   # amendment 2026-10-03: opus-5 rejects batch inference
   jev_llm_reasoning_low: [databricks-gpt-oss-20b]   # Task 3 (S2): [] if the endpoint rejects it
+  jev_llm_no_temperature: [databricks-claude-opus-4-8]  # rejects `temperature`: its default
   jev_llm_response_format: '{"type": "json_schema", "json_schema": {"name": "judgment", "schema": {"type": "object", "properties": {"decision": {"type": "boolean"}, "probability": {"type": "number"}}, "required": ["decision", "probability"], "additionalProperties": false}, "strict": true}}'
   bench_scope: sample            # pilot | sample | full
 

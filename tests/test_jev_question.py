@@ -8,7 +8,7 @@ from tests.dbt_helpers import render
 FAILS_IF = "The customer's `query` is not about its labelled `intent`."
 CRITERIA = {"true": "The `query` asks about another topic", "false": "Fits `intent`"}
 ARGS = {"column_name": "query", "context": ["intent"], "fails_if": FAILS_IF, "criteria": CRITERIA}
-LLM = "databricks-claude-opus-5"
+LLM = "databricks-claude-opus-4-8"
 
 
 @pytest.mark.slow
@@ -51,8 +51,18 @@ def test_llm_call_live_uses_ai_query_with_schema_temperature_and_no_fail():
     assert "responseFormat => '{\"type\": \"json_schema\"" in call
     assert "named_struct('temperature', 0.0, 'reasoning_effort', 'low')" in call
     assert call.endswith("failOnError => false)")
-    sonnet = render("jev_render_llm_call", {}, vars={"judge": LLM})
-    assert "reasoning_effort" not in sonnet
+    llama = render("jev_render_llm_call", {},
+                   vars={"judge": "databricks-meta-llama-3-3-70b-instruct"})
+    assert "named_struct('temperature', 0.0)" in llama and "reasoning_effort" not in llama
+
+
+@pytest.mark.slow
+def test_llm_call_omits_model_parameters_for_an_endpoint_that_rejects_temperature():
+    # amendment 2026-10-03: Opus 4.8 rejects `temperature`, so it runs at its default
+    call = render("jev_render_llm_call", {}, vars={"judge": LLM})
+    assert call.startswith(f"ai_query('{LLM}', 'P'")
+    assert "modelParameters" not in call and "temperature" not in call
+    assert "responseFormat => " in call and call.endswith("failOnError => false)")
 
 
 @pytest.mark.slow

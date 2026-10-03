@@ -456,12 +456,13 @@ def prereg_reasons(md: str) -> list[str]:
     out = []
     if frozen_dirty():
         out.append("frozen paths have uncommitted changes: " + " ".join(FROZEN))
-    m = re.search(r"^- frozen digest ([0-9a-f]{64})\b", md, re.M)
-    if m is None:
+    # an amendment's digest supersedes the earlier one: the latest is the one that counts
+    digests = re.findall(r"^- frozen digest ([0-9a-f]{64})\b", md, re.M)
+    if not digests:
         out.append("the pre-registration records no frozen digest")
-    elif (d := frozen_digest()) != m[1]:
+    elif (d := frozen_digest()) != digests[-1]:
         out.append(f"frozen paths changed since pre-registration (digest {d[:12]}… != "
-                   f"{m[1][:12]}…)")
+                   f"{digests[-1][:12]}…)")
     return out
 
 
@@ -725,6 +726,34 @@ def preregister() -> int:
     return 0
 
 
+def amend(reason: str) -> int:
+    """A dated amendment under the pre-registration: the reason, the judges and a new frozen digest
+    (the latest digest is the one live appends check). Every judge is rerun after it."""
+    md = LOG.read_text()
+    reasons = [] if evallog.has_preregistration(md) else ["no pre-registration to amend"]
+    if not reason.strip():
+        reasons.append("an amendment needs a reason")
+    if frozen_dirty():
+        reasons.append("frozen paths have uncommitted changes (commit them first): "
+                       + " ".join(FROZEN))
+    if reasons:
+        print("refused: " + "; ".join(reasons))
+        return 1
+    rc = dbt("compile", "--select", "tag:semantic")
+    if rc != 0:
+        print(f"refused: dbt compile exited {rc}")
+        return 1
+    evallog.append(LOG, "\n".join([
+        f"{evallog.AMEND} ({datetime.now(UTC).strftime('%Y-%m-%dT%H:%M:%SZ')})", "",
+        f"- reason: {reason.strip()}",
+        "- judges: " + ", ".join(JUDGES),
+        "- frozen paths at commit " + _git("rev-parse", "--short", "HEAD").strip(),
+        f"- frozen digest {frozen_digest()} (supersedes the earlier digest; every judge is rerun "
+        "from the pilot)",
+        f"- dbt compile exit {rc}", ""]))
+    return 0
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--run", action="store_true")
@@ -735,12 +764,15 @@ def main(argv=None) -> int:
     ap.add_argument("--append", action="store_true")
     ap.add_argument("--fresh", action="store_true")
     ap.add_argument("--preregister", action="store_true")
+    ap.add_argument("--amend", metavar="REASON")
     ap.add_argument("--usage", action="store_true")
     ap.add_argument("--measure", action="store_true")
     ap.add_argument("--compare", action="store_true")
     a = ap.parse_args(argv)
     if a.preregister:
         return preregister()
+    if a.amend is not None:
+        return amend(a.amend)
     if a.usage:
         r = Sql().run(budget.usage_sql(budget.SINCE))
         print(f"endpoint usage since {budget.SINCE} by served entity (no names: spec S2):")

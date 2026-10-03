@@ -5,7 +5,14 @@ from jevdbx import budget
 
 def test_prices_per_endpoint():
     assert budget.cost_usd("databricks-gpt-oss-20b", 1_000_000, 1_000_000) == pytest.approx(0.37)
-    assert budget.cost_usd("databricks-claude-opus-5", 1_000_000, 0) == pytest.approx(5.0)
+    assert budget.cost_usd("databricks-claude-opus-4-8", 1_000_000, 0) == pytest.approx(5.0)
+
+
+def test_judges_replace_opus_5_with_opus_4_8():
+    # amendment 2026-10-03: opus-5 is "not supported for batch inference" over a table
+    assert list(budget.PRICES) == ["databricks-gpt-oss-20b",
+                                   "databricks-meta-llama-3-3-70b-instruct",
+                                   "databricks-claude-opus-4-8"]
 
 
 def test_projection_and_guard():

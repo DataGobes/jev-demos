@@ -5,6 +5,7 @@ from pathlib import Path
 
 _COST = re.compile(r"- llm cost \$([0-9.]+) \((?:measured|estimated)\)")
 PREREG = "## Pre-registration (frozen before pass 1)"
+AMEND = "## Pre-registration amendment"
 
 
 _INV = re.compile(r"^- invocation (\S+)$", re.M)

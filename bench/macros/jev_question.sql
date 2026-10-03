@@ -103,11 +103,13 @@
   {%- if jev_mode() == 'demo' -%}
     {{ return(jev_relation('llm_demo') ~ "(" ~ jev_sql_string(endpoint) ~ ", " ~ prompt_expr ~ ")") }}
   {%- endif -%}
-  {%- set params = "'temperature', 0.0" -%}
+  {%- set params = [] if endpoint in var('jev_llm_no_temperature') else ["'temperature', 0.0"] -%}
   {%- if endpoint in var('jev_llm_reasoning_low') -%}
-    {%- set params = params ~ ", 'reasoning_effort', 'low'" -%}
+    {%- do params.append("'reasoning_effort', 'low'") -%}
   {%- endif -%}
+  {%- set model_params = (", modelParameters => named_struct(" ~ params | join(", ") ~ ")")
+                         if params else "" -%}
   {{ return("ai_query(" ~ jev_sql_string(endpoint) ~ ", " ~ prompt_expr
             ~ ", responseFormat => " ~ jev_sql_string(var('jev_llm_response_format'))
-            ~ ", modelParameters => named_struct(" ~ params ~ "), failOnError => false)") }}
+            ~ model_params ~ ", failOnError => false)") }}
 {% endmacro %}
