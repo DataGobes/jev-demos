@@ -1,0 +1,48 @@
+version: 2
+models:
+  - name: stg_banking_queries
+    columns:
+      - name: query_id
+        data_tests: [unique, not_null]
+      - name: query
+        data_tests:
+          - jev_expect:
+              name: banking_query_not_about_intent
+              arguments:
+                fails_if: "The customer's `query` is not about its labelled `intent` (a banking support category such as card_arrival or exchange_rate)."
+                context: [intent]
+                threshold: 0.8
+                criteria:
+                  "true": "The query plainly asks about a different topic than the intent names"
+                  "false": "The query fits the intent, or is too vague to tell"
+              config: {severity: warn, store_failures: true, tags: [semantic, banking]}
+  - name: stg_product_pairs
+    columns:
+      - name: pair_id
+        data_tests: [unique, not_null]
+      - name: left_record
+        data_tests:
+          - jev_expect:
+              name: pairs_describe_same_product
+              arguments:
+                fails_if: "`left_record` and `right_record` describe the same product (same brand and model; ignore price and wording)."
+                context: [right_record]
+                threshold: 0.8
+                criteria:
+                  "true": "Same brand and model number or the same specific item, written differently"
+                  "false": "Different products, different models, or accessories for the product"
+              config: {severity: warn, store_failures: true, tags: [semantic, pairs]}
+  - name: stg_wanderbricks_reviews
+    columns:
+      - name: comment
+        data_tests:
+          - jev_expect:
+              name: wanderbricks_comment_contradicts_rating
+              arguments:
+                fails_if: "The review `comment` clearly contradicts its `rating` (1.0 = very bad, 5.0 = excellent)."
+                context: [rating]
+                threshold: 0.8
+                criteria:
+                  "true": "A clearly negative comment with a rating of 4.0 or more, or a clearly positive comment with 2.0 or less"
+                  "false": "The comment roughly matches the rating, or the comment is neutral or mixed"
+              config: {severity: warn, store_failures: true, tags: [semantic, wanderbricks]}

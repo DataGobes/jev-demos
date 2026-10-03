@@ -1,0 +1,18 @@
+# Host, warehouse and token come from the environment (scripts/dbtw.py sets them from the
+# Databricks CLI profile). Every env_var has a default so `--target render` needs none of them.
+# The `render` target is offline (DuckDB, in memory) and only used by pytest to render macros.
+bench:
+  target: dev
+  outputs:
+    dev:
+      type: databricks
+      host: "{{ env_var('DATABRICKS_HOST', 'unset') }}"
+      http_path: "{{ env_var('JEV_HTTP_PATH', 'unset') }}"
+      token: "{{ env_var('DBT_ENV_SECRET_DATABRICKS_TOKEN', 'unset') }}"
+      catalog: jev_demo
+      schema: bench
+      threads: 4
+    render:
+      type: duckdb
+      path: ":memory:"
+      threads: 1
