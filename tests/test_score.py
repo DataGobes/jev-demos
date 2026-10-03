@@ -1,6 +1,7 @@
 import argparse
 import importlib.util
 import re
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -538,8 +539,52 @@ def test_measure_keeps_the_estimate_when_usage_does_not_cover_the_judged_rows(tm
                     ("hook_runs", _Res(rows=[[600]]))])
     monkeypatch.setattr(score, "LOG", log)
     monkeypatch.setattr(score, "Sql", lambda: sql)
+    monkeypatch.setattr(score, "_now", lambda: datetime(2026, 10, 2, 12, 0, tzinfo=UTC))  # < 6 h
     assert score.measure(True) == 0
     assert "measured cost" not in log.read_text()
+
+
+def test_measure_extrapolates_a_settled_partial_usage_log_from_its_per_request_mean(tmp_path,
+                                                                                   monkeypatch):
+    # endpoint_usage logs only part of ai_query's requests (39 of 150 for a pilot, still so 7 h
+    # later); once the window is 6 h old the logged subset's mean per request stands for every row
+    log = tmp_path / "e.md"
+    log.write_text(f"# Eval results\n\n## s · pilot · {LLM}\n\n- invocation {UUID}\n"
+                   "- window 2026-10-02T07:12:44 2026-10-02T07:20:02 (UTC)\n"
+                   "- llm cost $0.400 (estimated)\n")
+    sql = _FakeSql([("system.serving.endpoint_usage", _Res(rows=[["e1", "10", "1000", "100"]])),
+                    ("hook_runs", _Res(rows=[[600]]))])
+    monkeypatch.setattr(score, "LOG", log)
+    monkeypatch.setattr(score, "Sql", lambda: sql)
+    monkeypatch.setattr(score, "_now", lambda: datetime(2026, 10, 2, 13, 21, tzinfo=UTC))  # > 6 h
+    assert score.measure(True) == 0
+    md = log.read_text()
+    entry = md.split("· measured cost · pilot ·")[1]
+    assert "- usage requests 10 vs judged 600" in entry
+    assert ("- usage coverage 10 of 600 judged rows logged after 6 h; tokens and cost are the "
+            "logged mean per request × 600") in entry
+    assert "- requests 600 · tokens in 60,000 out 6,000" in entry
+    assert f"- llm cost ${score.budget.cost_usd(LLM, 60_000, 6_000):.3f} (measured)" in entry
+    assert f"- tokens/row {next(iter(score.TESTS))} in 100 out 10 (measured)" in entry
+
+
+def test_measure_settles_a_refused_run_with_no_usage_after_6_h_at_zero(tmp_path, monkeypatch):
+    # opus-5 failed at session creation ("not supported for batch inference"): nothing was served
+    log = tmp_path / "e.md"
+    log.write_text(f"# Eval results\n\n## s · refused · pilot · {LLM}\n\n"
+                   "- invocation refused-20261002T071244Z\n"
+                   "- window 2026-10-02T07:12:44 2026-10-02T07:20:02 (UTC)\n"
+                   "- llm cost $1.192 (estimated)\n")
+    sql = _FakeSql([("system.serving.endpoint_usage", _Res(rows=[])),
+                    ("hook_runs", _Res(rows=[]))])
+    monkeypatch.setattr(score, "LOG", log)
+    monkeypatch.setattr(score, "Sql", lambda: sql)
+    for now, measured in ((datetime(2026, 10, 2, 9, 0, tzinfo=UTC), False),
+                          (datetime(2026, 10, 2, 13, 21, tzinfo=UTC), True)):
+        monkeypatch.setattr(score, "_now", lambda now=now: now)
+        assert score.measure(True) == 0
+        assert ("- no usage logged in the window after 6 h" in log.read_text()) is measured
+    assert score.evallog.llm_spend(log.read_text()) == 0
 
 
 def test_compare_universe_is_the_ids_every_judge_judged():

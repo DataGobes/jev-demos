@@ -259,6 +259,31 @@ def usage_verdict(m, judged: int) -> tuple[bool, list[str]]:
     return True, lines
 
 
+# endpoint_usage logs only part of ai_query's requests (about a third, unchanged 7 h later); a
+# window this old counts as settled and its logged mean per request stands for every judged row
+SETTLED_HOURS = 6
+
+
+def _now() -> datetime:
+    return datetime.now(UTC)
+
+
+def settled(window_end: str) -> bool:
+    end = datetime.fromisoformat(window_end.replace(" ", "T").removesuffix("Z"))
+    end = end if end.tzinfo else end.replace(tzinfo=UTC)
+    return _now() - end >= timedelta(hours=SETTLED_HOURS)
+
+
+def extrapolate(endpoint: str, m, judged: int) -> tuple[tuple, list[str]]:
+    """A settled partial usage log scaled to every judged row: (cost, judged, in, out), lines."""
+    _, n, i, o = m
+    i, o = i * judged // n, o * judged // n
+    return (budget.cost_usd(endpoint, i, o), judged, i, o), [
+        f"- usage coverage {n:,} of {judged:,} judged rows logged after {SETTLED_HOURS} h; "
+        "tokens and cost are the "
+        f"logged mean per request × {judged:,}"]
+
+
 def estimate(judge: str, md: str, judged_per_test: dict[str, int]) -> float:
     """Estimated LLM cost of the rows judged now: tokens/row (pilot-measured, else default)."""
     return sum(budget.project(judge, judged_per_test.get(t, 0),
@@ -418,6 +443,14 @@ def measure(append: bool) -> int:
         r = sql.run(budget.usage_sql(*window))
         m = budget.window_cost(judge, r.rows) if r.state == "SUCCEEDED" else None
         ok, usage_lines = usage_verdict(m, judged)
+        if not ok and m is not None and 0 < m[1] < judged and settled(window[1]):
+            m, more = extrapolate(judge, m, judged)
+            ok, usage_lines = True, usage_lines + more
+        refused = label.startswith("refused") or inv.startswith("refused-")
+        if (not ok and refused and r.state == "SUCCEEDED" and not r.rows
+                and settled(window[1])):  # nothing was served (e.g. rejected at session start)
+            m, ok = (0.0, 0, 0, 0), True
+            usage_lines = [f"- no usage logged in the window after {SETTLED_HOURS} h"]
         if not ok:
             print(f"{label} · {judge} · {inv}: usage not attributable yet "
                   f"({'; '.join(x[2:] for x in usage_lines) or 'no single served entity'}); "
