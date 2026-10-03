@@ -109,6 +109,13 @@ time and cost per judge so the difference is visible.
   these foundation-model endpoints, so token usage per endpoint cannot be read there;
   `system.billing.usage` had no `MODEL_SERVING` rows yet (billing lag). How LLM cost is measured is
   decided before Task 11 (open item); until then every LLM cost is an estimate.
+- *Amended 2026-10-03 (pilot, user choices):* over a table `ai_query` rejects
+  `databricks-claude-opus-5` (and opus-5-5, sonnet-5-5) with "not supported for batch inference";
+  the S2 probe used inline rows. The user chose **`databricks-claude-opus-4-8`** (rejects
+  `temperature`: default temperature, no `modelParameters`), logged as a pre-registration amendment
+  (`score.py --amend`) with every pilot rerun. Its measured pass-1 cost (~$20) exceeds the cap, and
+  the user chose to report it from the pilot only. `endpoint_usage` logs ~1/3 of `ai_query`
+  requests; after 6 h the logged mean per request is scaled to the judged rows.
 
 - *Amended 2026-10-01 (Task 6):* Jev flags `p >= threshold` (demo 05's rule, kept for continuity), not `p > threshold`.
 

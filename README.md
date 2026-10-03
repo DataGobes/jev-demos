@@ -10,8 +10,8 @@ It follows demo 05 (`jev_expect` with Jev only) and a LinkedIn thread with Hugo 
 model should be served by the warehouse. This repo asks what that costs and what it buys, on three
 datasets, with a fixed sample, frozen prompts and a spend cap.
 
-Status: the code, data keys and tests are in place. The live runs have not been made, so there are
-no results yet (see Results).
+Status: the live runs were made on 2026-10-03. Results are summarised below and in
+[FINDINGS.md](FINDINGS.md), from the log in `docs/eval-results.md`.
 
 ## What it shows
 
@@ -19,7 +19,7 @@ no results yet (see Results).
 uv run python scripts/dbtw.py build --vars '{judge: jev}'                                --select +tag:semantic
 uv run python scripts/dbtw.py build --vars '{judge: databricks-gpt-oss-20b}'             --select +tag:semantic
 uv run python scripts/dbtw.py build --vars '{judge: databricks-meta-llama-3-3-70b-instruct}' --select +tag:semantic
-uv run python scripts/dbtw.py build --vars '{judge: databricks-claude-opus-5}'           --select +tag:semantic
+uv run python scripts/dbtw.py build --vars '{judge: databricks-claude-opus-4-8}'         --select +tag:semantic
 ```
 
 | judge (`judge` var) | how it is called | tier |
@@ -27,10 +27,12 @@ uv run python scripts/dbtw.py build --vars '{judge: databricks-claude-opus-5}'  
 | `jev` (default) | `jev_demo.jev.noul_pack`: states packed by estimated tokens (48k budget, 256-row cap) | n/a |
 | `databricks-gpt-oss-20b` | `ai_query`, one row per call | small |
 | `databricks-meta-llama-3-3-70b-instruct` | `ai_query`, one row per call | mid |
-| `databricks-claude-opus-5` | `ai_query`, one row per call | frontier |
+| `databricks-claude-opus-4-8` | `ai_query`, one row per call (default temperature) | frontier, pilot only |
 
-No Sonnet endpoint works with `ai_query` in this workspace (spike S2: "not supported for batch
-inference"), so the frontier judge is `databricks-claude-opus-5`, with one pass instead of two.
+Over a table, `ai_query` in this workspace rejects Opus 5, Opus 5.5 and the Sonnet 5.x endpoints
+with "not supported for batch inference", so the frontier judge is `databricks-claude-opus-4-8`
+(a dated amendment to the pre-registration). It rejects `temperature`, so it runs at its default.
+Its full pass would cost about $20, over the $15 cap, so it was run on the 50-row pilot only.
 Each judge is used the way it is built to be used (Jev packs many rows per request, `ai_query` is
 row-wise), and the scorecard shows requests, wall time and cost so the difference is visible.
 
@@ -97,7 +99,8 @@ do not change any raw score. There is no LLM audit of the keys.
   `judge: jev` it makes one `INSERT ... SELECT` that calls `noul_pack` once per pack. With any
   other judge it makes one set-based statement over the missing states calling
   `ai_query(<endpoint>, <prompt>, responseFormat => <schema>, modelParameters => named_struct(...),
-  failOnError => false)`. Temperature is 0; gpt-oss-20b also gets `reasoning_effort` low. The
+  failOnError => false)`. Temperature is 0; gpt-oss-20b also gets `reasoning_effort` low; Opus 4.8
+  rejects `temperature` and gets no `modelParameters`. The
   response schema is `{decision: boolean, probability: double}`.
 - **One prompt source.** `bench/macros/jev_question.sql` is the only place that reads `fails_if`,
   `context` and `criteria`. It renders the question JSON for Jev and a plain prompt for the LLMs
@@ -168,8 +171,8 @@ dbt is only called through `scripts/dbtw.py`, which runs it in `bench/`. Live Je
   `--append`, and always ends in a log entry: the result, or a `refused` entry that keeps its spend
   in the guard (estimated at no less than the projection until `--measure` replaces it).
 - **Prices** (`src/jevdbx/budget.py`, Azure Premium at $0.070 per DBU, checked 2026-10-01) in $ per
-  1M input / output tokens: gpt-oss-20b 0.07 / 0.30; llama-3.3-70b 0.50 / 1.50. The
-  claude-opus-5 price, about 5 / 25, is an ESTIMATE until verified before the pilot gate.
+  1M input / output tokens: gpt-oss-20b 0.07 / 0.30; llama-3.3-70b 0.50 / 1.50; claude-opus-4-8
+  5 / 25 (verified 2026-10-02).
 - **Estimates until measured.** Tokens per row start as assumptions in `budget.py` and are replaced
   by the pilot's measured tokens per row. Every cost line in the log says `measured` or `estimated`.
 - **Measured cost.** `system.serving.endpoint_usage` is read and attributed to a run by time
@@ -177,19 +180,23 @@ dbt is only called through `scripts/dbtw.py`, which runs it in `bench/`. Live Je
   plus or minus 5 seconds), because `served_entities` has no rows for these endpoints. A window
   counts only if exactly one served entity was used in it and its requests cover every row judged
   in the run (more than 5% extra is flagged as possible duplicate evaluation). Usage lags by about
-  two hours, so `score.py --measure --append` fills it in afterwards. If usage cannot be read, the
+  two hours, so `score.py --measure --append` fills it in afterwards. In practice
+  `endpoint_usage` logged only about a third of `ai_query`'s requests, still so 7 hours later; after
+  6 hours the logged mean per request is scaled to every judged row, and the entry states the
+  coverage. A refused run with no usage at all settles at $0. If usage cannot be read, the
   cost stays a labelled estimate. Every entry also logs its token totals (measured or estimated).
 - **Jev cost** is pack tokens × the list price ($0.042 per 1M tokens), as in demo 05.
-- **Run plan.** Pilot (50 rows per dataset per judge), pass 1 (shared sample, all four judges),
-  pass 2 (`--fresh` rerun for run-to-run noise: Jev and the two open models only, not Opus), then
-  Jev at scale. Each step is confirm-first.
+- **Run plan, as run.** Pilot (50 rows per dataset per judge), pass 1 (shared sample: Jev and the
+  two open models; Opus 4.8 stopped at the pilot on cost), pass 2 (`--fresh` rerun for run-to-run
+  noise, the same three judges), then Jev at scale. Total measured LLM spend: $2.56.
 
 ## Fairness rules
 
 - Prompts and test sentences are frozen at pre-registration. Changing one afterwards means
   rerunning every judge and logging before and after; a prompt is never tuned for one judge.
   `jev_prompt_version` is part of the cache key.
-- The same sentence, criteria and record fields go to every judge, at temperature 0.
+- The same sentence, criteria and record fields go to every judge, at temperature 0 (Opus 4.8
+  rejects the parameter and runs at its default).
 - Before the pilot, `docs/eval-results.md` records the frozen prompts and wording, the swap seed and
   family table, the sample definitions, a frozen digest (sha256 of `git ls-files -s` over
   `bench/macros`, `bench/models`, `bench/seeds`, `bench/tests`, `bench/dbt_project.yml` and `eval`),
@@ -206,16 +213,32 @@ dbt is only called through `scripts/dbtw.py`, which runs it in `bench/`. Live Je
 
 ## Results
 
-No numbers yet: the live runs have not been made.
+From `docs/eval-results.md` (pass 1, 2026-10-03, the same 4,161 rows for every judge); details,
+intervals and caveats in [FINDINGS.md](FINDINGS.md).
 
-Results will come only from `docs/eval-results.md`, the log that `scripts/score.py --run --append`
-writes. Costs there are labelled measured or estimated.
+| judge | Banking77 F1 | Abt-Buy F1 | wanderbricks F1 | requests | wall time | cost per 1,000 rows |
+|---|---|---|---|---|---|---|
+| Jev | 0.56 | **0.86** | **0.98** | 25 | 19.4 s | $0.007 (ledger) |
+| gpt-oss-20b | **0.67** | **0.86** | 0.91 | 4,006 | 56.9 s | $0.046 (measured\*) |
+| Llama 3.3 70B | 0.50 | 0.69 | 0.74 | 4,006 | 141.3 s | $0.163 (measured\*) |
+| Opus 4.8, 50-row pilot only | 0.67 | 1.00 | 1.00 | 150 | 16.4 s | $5.03 (measured\*) |
+| baseline | 0.33 | 0.34 | n/a | | | |
+
+- Jev is the most precise judge (0.85 to 1.00) and never raised a false alarm on the 205 clean
+  wanderbricks states; gpt-oss-20b catches far more of the subtle Banking77 near-miss swaps (0.72
+  against Jev's 0.24).
+- Pass 2 (fresh) reproduced every F1 within 0.02, except Llama on wanderbricks (0.04).
+- Jev at full scale: 18,674 new judgments over all 13,083 Banking77 queries and 9,575 Abt-Buy pairs
+  in 120 requests, 25.5 s and $0.132.
+- \*`endpoint_usage` logged about a third of the requests; cost is the logged mean per request
+  times the rows judged (see Budgets).
+- The wanderbricks polarity labels were made by Claude at the user's request.
 
 ## Pins
 
 - Jev model `jev-1.13.0`, prompt version `p1` (both in the cache key).
 - Endpoints: `databricks-gpt-oss-20b`, `databricks-meta-llama-3-3-70b-instruct`,
-  `databricks-claude-opus-5`.
+  `databricks-claude-opus-4-8`.
 - `dbt-databricks==1.12.5`; Python 3.13 or later; dependencies locked in `uv.lock`.
 - Design spec with dated amendments: `docs/superpowers/specs/2026-10-01-jev-vs-ai-query-design.md`;
   plan: `docs/superpowers/plans/2026-10-01-jev-vs-ai-query.md`.
