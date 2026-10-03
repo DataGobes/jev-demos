@@ -193,3 +193,23 @@ SIMULATED runs are never written here. LLM cost lines say `measured` (from
 | pairs_describe_same_product | 1,916 | 206 | 174 | 0.94 (0.89–0.96) | 0.79 (0.73–0.84) | 0.86 | 0 |
 | baseline_pairs_jaccard | 1,916 | 206 | 270 | 0.30 (0.24–0.35) | 0.39 (0.32–0.46) | 0.34 | 0 |
 | wanderbricks_comment_contradicts_rating | 245 | 31 | 30 | 1.00 (0.89–1.00) | 0.97 (0.84–0.99) | 0.98 | 0 |
+
+## 2026-10-03T07:57:42Z · pass 1 · databricks-gpt-oss-20b
+
+- invocation f51c9e10-4204-448b-ae55-8686c3296f61
+- scope sample · 4,161 rows in scope · scored on judged rows (unjudged excluded) · 4,006 judged now · requests 4,006 · wall time 56.9 s (first hook start to last hook end)
+- window 2026-10-03T07:56:18 2026-10-03T07:57:34 (UTC)
+- tokens in ~865,801 (estimated)
+- headline 2 · wanderbricks_comment_contradicts_rating · judged now 195 · wall time 11.2 s · cost per 1,000 judged rows $0.0753 (estimated, split by estimated tokens)
+- headline 2 · banking_query_not_about_intent · judged now 1,950 · wall time 32.9 s · cost per 1,000 judged rows $0.0740 (estimated, split by estimated tokens)
+- headline 2 · pairs_describe_same_product · judged now 1,861 · wall time 56.9 s · cost per 1,000 judged rows $0.1315 (estimated, split by estimated tokens)
+- banking recall on random swaps 71/75 (0.95, 95% 0.87–0.98)
+- banking recall on near_miss swaps 54/75 (0.72, 95% 0.61–0.81)
+- wanderbricks false alarms on natural states 6/205 (0.03, 95% 0.01–0.06)
+- llm cost $0.404 (estimated)
+
+| test | rows | positives | flagged | P (95% CI) | R (95% CI) | F1 | unjudged |
+|---|---|---|---|---|---|---|---|
+| banking_query_not_about_intent | 2,000 | 150 | 225 | 0.56 (0.49–0.62) | 0.83 (0.77–0.88) | 0.67 | 0 |
+| pairs_describe_same_product | 1,916 | 206 | 245 | 0.80 (0.74–0.84) | 0.95 (0.91–0.97) | 0.86 | 0 |
+| wanderbricks_comment_contradicts_rating | 245 | 31 | 37 | 0.84 (0.69–0.92) | 1.00 (0.89–1.00) | 0.91 | 0 |
