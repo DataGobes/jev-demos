@@ -85,3 +85,11 @@ SIMULATED runs are never written here. LLM cost lines say `measured` (from
 - invocation refused-20261003T074052Z
 - window 2026-10-03T07:40:27 2026-10-03T07:40:46 (UTC)
 - llm cost $1.192 (estimated)
+
+## Pre-registration amendment (2026-10-03T07:50:03Z)
+
+- reason: databricks-claude-opus-5 replaced by databricks-claude-opus-4-8 (user choice 2026-10-03): opus-5, opus-5-5 and sonnet-5-5 fail ai_query over a table with 'not supported for batch inference'; opus-4-8 rejects temperature and runs at its default (no modelParameters); prompts unchanged
+- judges: jev, databricks-gpt-oss-20b, databricks-meta-llama-3-3-70b-instruct, databricks-claude-opus-4-8
+- frozen paths at commit 4410d17
+- frozen digest 7ad33a154159af0847d50dafa42c3d90129ed2a820f2a29c00e90a5c86e16c95 (supersedes the earlier digest; every judge is rerun from the pilot)
+- dbt compile exit 0
