@@ -89,6 +89,12 @@ less; Llama on wanderbricks moved by 0.04. Jev's scores did not move at all.
 - **Who labelled the ground truth.** The 15 wanderbricks comment polarities were labelled by Claude
   at the user's request: 6 positive, 5 negative, 4 neutral. The Banking77 swaps are planted (seed
   42). The Abt-Buy labels are the dataset's own.
+- **Banking77 label noise (post-hoc audit).** At the user's request, Claude reviewed the swaps and
+  the flagged clean rows after the runs ([docs/audit/banking77-audit.md](docs/audit/banking77-audit.md)).
+  34 of the 2,000 rows are debatable: 2 swaps fix an original error, 11 swaps leave a label that also
+  fits, and 21 original labels are wrong or questionable. Without those rows Jev's precision is 0.98
+  (12 of its 13 false alarms sit on them) and the F1s are Jev 0.62, gpt-oss-20b 0.71 and Llama 0.53,
+  so the ranking holds. Jev's recall gap is real. The key and the logged scores are unchanged.
 - **Thresholds differ by design.** Jev is thresholded at 0.8 and the LLMs answer yes or no. A lower Jev
   threshold would trade precision for recall. The side analysis that thresholds each judge the same
   way needs a full pass from every judge, so it was not run.
