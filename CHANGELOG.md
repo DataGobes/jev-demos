@@ -4,6 +4,26 @@ Notable changes to the demos in this repo, newest first. Each entry names the de
 The demos aren't versioned, so entries are dated by the day they land on `main`. Numbers quoted
 here come from live, logged runs; see each demo's own docs for the full record.
 
+## 2026-10-03
+
+### 06 · Jev vs LLMs through `ai_query` — new demo
+
+- **Added** [`06-jev-vs-ai-query/`](06-jev-vs-ai-query/): one `jev_expect` test per dataset, judged
+  by Jev or by an LLM served in Databricks through `ai_query`, switched with
+  `--vars '{judge: …}'`. Prompts are frozen and pre-registered, the LLM spend has a $15 cap, and
+  every number comes from the logged runs in `docs/eval-results.md`.
+- **Pass 1** (the same 4,161 rows for every judge), F1 on Banking77 / Abt-Buy / wanderbricks: Jev
+  0.56 / 0.86 / 0.98, gpt-oss-20b 0.67 / 0.86 / 0.91, Llama 3.3 70B 0.50 / 0.69 / 0.74. Jev is the
+  most precise (0.85 to 1.00, 0 false alarms on 205 clean states), and gpt-oss-20b catches far more
+  near-miss label swaps (0.72 against 0.24). Jev took 25 requests, 19.4 s and $0.029; gpt-oss-20b
+  4,006 requests, 56.9 s and $0.183; Llama 141.3 s and $0.653. A fresh pass 2 reproduced every F1
+  within 0.02 except Llama on wanderbricks (0.04).
+- **Frontier judge**: Opus 5 is rejected by `ai_query` over a table ("not supported for batch
+  inference"), so Opus 4.8 replaced it in a dated amendment. A full pass would cost about $20, over
+  the cap, so Opus 4.8 is reported from the 50-row pilot only (0.67 / 1.00 / 1.00).
+- **Jev at scale**: 18,674 new judgments over all of Banking77 and Abt-Buy in 120 requests, 25.5 s
+  and $0.132.
+
 ## 2026-10-01
 
 ### 05 · dbt semantic tests on Databricks — new demo
