@@ -293,3 +293,23 @@ SIMULATED runs are never written here. LLM cost lines say `measured` (from
 | banking_query_not_about_intent | 2,000 | 150 | 144 | 0.51 (0.43–0.59) | 0.49 (0.41–0.57) | 0.50 | 0 |
 | pairs_describe_same_product | 1,916 | 206 | 367 | 0.55 (0.50–0.60) | 0.98 (0.94–0.99) | 0.70 | 0 |
 | wanderbricks_comment_contradicts_rating | 245 | 31 | 55 | 0.55 (0.42–0.67) | 0.97 (0.84–0.99) | 0.70 | 0 |
+
+## 2026-10-03T08:09:08Z · pass 3 · jev
+
+- invocation f6c8624d-d687-4bec-8a6b-8060de604d21
+- scope full · 22,903 rows in scope · scored on judged rows (unjudged excluded) · 18,674 judged now · requests 120 · wall time 25.5 s (first hook start to last hook end)
+- tokens in 3,135,871 (ledger)
+- headline 2 · wanderbricks_comment_contradicts_rating · judged now 0 · wall time 0.0 s · cost per 1,000 judged rows n/a (all cached)
+- headline 2 · banking_query_not_about_intent · judged now 11,083 · wall time 23.1 s · cost per 1,000 judged rows $0.0052 (ledger)
+- headline 2 · pairs_describe_same_product · judged now 7,591 · wall time 20.9 s · cost per 1,000 judged rows $0.0098 (ledger)
+- banking recall on random swaps 293/491 (0.60, 95% 0.55–0.64)
+- banking recall on near_miss swaps 98/491 (0.20, 95% 0.17–0.24)
+- wanderbricks false alarms on natural states 0/205 (0.00, 95% 0.00–0.02)
+
+| test | rows | positives | flagged | P (95% CI) | R (95% CI) | F1 | unjudged |
+|---|---|---|---|---|---|---|---|
+| banking_query_not_about_intent | 13,083 | 982 | 450 | 0.87 (0.83–0.90) | 0.40 (0.37–0.43) | 0.55 | 0 |
+| baseline_banking_keyword | 13,083 | 982 | 2,454 | 0.23 (0.21–0.25) | 0.57 (0.54–0.60) | 0.33 | 0 |
+| pairs_describe_same_product | 9,575 | 1,028 | 890 | 0.95 (0.93–0.96) | 0.82 (0.80–0.84) | 0.88 | 0 |
+| baseline_pairs_jaccard (threshold fit on train; train in scope) | 9,575 | 1,028 | 1,391 | 0.32 (0.30–0.35) | 0.43 (0.40–0.46) | 0.37 | 0 |
+| wanderbricks_comment_contradicts_rating | 245 | 31 | 30 | 1.00 (0.89–1.00) | 0.97 (0.84–0.99) | 0.98 | 0 |
