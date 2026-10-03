@@ -93,3 +93,83 @@ SIMULATED runs are never written here. LLM cost lines say `measured` (from
 - frozen paths at commit 4410d17
 - frozen digest 7ad33a154159af0847d50dafa42c3d90129ed2a820f2a29c00e90a5c86e16c95 (supersedes the earlier digest; every judge is rerun from the pilot)
 - dbt compile exit 0
+
+## 2026-10-03T07:51:19Z · pilot · jev
+
+- invocation 51d18044-37c7-4e15-8bd8-14c778b42bea
+- scope pilot · 150 rows in scope · scored on judged rows (unjudged excluded) · 150 judged now · requests 3 · wall time 15.7 s (first hook start to last hook end)
+- tokens in 24,584 (ledger)
+- headline 2 · wanderbricks_comment_contradicts_rating · judged now 50 · wall time 12.9 s · cost per 1,000 judged rows $0.0058 (ledger)
+- headline 2 · banking_query_not_about_intent · judged now 50 · wall time 12.3 s · cost per 1,000 judged rows $0.0052 (ledger)
+- headline 2 · pairs_describe_same_product · judged now 50 · wall time 12.0 s · cost per 1,000 judged rows $0.0097 (ledger)
+- banking recall on random swaps 1/1 (1.00, 95% 0.21–1.00)
+- banking recall on near_miss swaps 1/2 (0.50, 95% 0.09–0.91)
+- wanderbricks false alarms on natural states 0/40 (0.00, 95% 0.00–0.09)
+
+| test | rows | positives | flagged | P (95% CI) | R (95% CI) | F1 | unjudged |
+|---|---|---|---|---|---|---|---|
+| banking_query_not_about_intent | 50 | 3 | 2 | 1.00 (0.34–1.00) | 0.67 (0.21–0.94) | 0.80 | 0 |
+| baseline_banking_keyword | 50 | 3 | 2 | 0.50 (0.09–0.91) | 0.33 (0.06–0.79) | 0.40 | 0 |
+| pairs_describe_same_product | 50 | 7 | 6 | 1.00 (0.61–1.00) | 0.86 (0.49–0.97) | 0.92 | 0 |
+| baseline_pairs_jaccard | 50 | 7 | 3 | 1.00 (0.44–1.00) | 0.43 (0.16–0.75) | 0.60 | 0 |
+| wanderbricks_comment_contradicts_rating | 50 | 9 | 9 | 1.00 (0.70–1.00) | 1.00 (0.70–1.00) | 1.00 | 0 |
+
+## 2026-10-03T07:52:24Z · pilot · databricks-gpt-oss-20b
+
+- invocation 34a0954f-e100-4633-8916-a522b4aa7fa5
+- scope pilot · 150 rows in scope · scored on judged rows (unjudged excluded) · 150 judged now · requests 150 · wall time 9.0 s (first hook start to last hook end)
+- window 2026-10-03T07:51:46 2026-10-03T07:52:16 (UTC)
+- tokens in ~29,467 (estimated)
+- headline 2 · wanderbricks_comment_contradicts_rating · judged now 50 · wall time 6.7 s · cost per 1,000 judged rows $0.0802 (estimated, split by estimated tokens)
+- headline 2 · banking_query_not_about_intent · judged now 50 · wall time 5.8 s · cost per 1,000 judged rows $0.0772 (estimated, split by estimated tokens)
+- headline 2 · pairs_describe_same_product · judged now 50 · wall time 6.7 s · cost per 1,000 judged rows $0.1390 (estimated, split by estimated tokens)
+- banking recall on random swaps 1/1 (1.00, 95% 0.21–1.00)
+- banking recall on near_miss swaps 1/2 (0.50, 95% 0.09–0.91)
+- wanderbricks false alarms on natural states 6/40 (0.15, 95% 0.07–0.29)
+- llm cost $0.015 (estimated)
+
+| test | rows | positives | flagged | P (95% CI) | R (95% CI) | F1 | unjudged |
+|---|---|---|---|---|---|---|---|
+| banking_query_not_about_intent | 50 | 3 | 5 | 0.40 (0.12–0.77) | 0.67 (0.21–0.94) | 0.50 | 0 |
+| pairs_describe_same_product | 50 | 7 | 8 | 0.88 (0.53–0.98) | 1.00 (0.65–1.00) | 0.93 | 0 |
+| wanderbricks_comment_contradicts_rating | 50 | 9 | 15 | 0.60 (0.36–0.80) | 1.00 (0.70–1.00) | 0.75 | 0 |
+
+## 2026-10-03T07:53:26Z · pilot · databricks-meta-llama-3-3-70b-instruct
+
+- invocation c3c2d232-cf9c-4353-838a-7bab73a7ee31
+- scope pilot · 150 rows in scope · scored on judged rows (unjudged excluded) · 150 judged now · requests 150 · wall time 13.0 s (first hook start to last hook end)
+- window 2026-10-03T07:52:47 2026-10-03T07:53:18 (UTC)
+- tokens in ~29,467 (estimated)
+- headline 2 · wanderbricks_comment_contradicts_rating · judged now 50 · wall time 6.0 s · cost per 1,000 judged rows $0.4424 (estimated, split by estimated tokens)
+- headline 2 · banking_query_not_about_intent · judged now 50 · wall time 10.6 s · cost per 1,000 judged rows $0.4256 (estimated, split by estimated tokens)
+- headline 2 · pairs_describe_same_product · judged now 50 · wall time 8.8 s · cost per 1,000 judged rows $0.7669 (estimated, split by estimated tokens)
+- banking recall on random swaps 1/1 (1.00, 95% 0.21–1.00)
+- banking recall on near_miss swaps 0/2 (0.00, 95% 0.00–0.66)
+- wanderbricks false alarms on natural states 10/40 (0.25, 95% 0.14–0.40)
+- llm cost $0.082 (estimated)
+
+| test | rows | positives | flagged | P (95% CI) | R (95% CI) | F1 | unjudged |
+|---|---|---|---|---|---|---|---|
+| banking_query_not_about_intent | 50 | 3 | 4 | 0.25 (0.05–0.70) | 0.33 (0.06–0.79) | 0.29 | 0 |
+| pairs_describe_same_product | 50 | 7 | 10 | 0.70 (0.40–0.89) | 1.00 (0.65–1.00) | 0.82 | 0 |
+| wanderbricks_comment_contradicts_rating | 50 | 9 | 19 | 0.47 (0.27–0.68) | 1.00 (0.70–1.00) | 0.64 | 0 |
+
+## 2026-10-03T07:54:32Z · pilot · databricks-claude-opus-4-8
+
+- invocation 2ca6d810-90f2-40d8-a4df-85e0986cea00
+- scope pilot · 150 rows in scope · scored on judged rows (unjudged excluded) · 150 judged now · requests 150 · wall time 16.4 s (first hook start to last hook end)
+- window 2026-10-03T07:53:48 2026-10-03T07:54:23 (UTC)
+- tokens in ~29,467 (estimated)
+- headline 2 · wanderbricks_comment_contradicts_rating · judged now 50 · wall time 8.9 s · cost per 1,000 judged rows $6.4540 (estimated, split by estimated tokens)
+- headline 2 · banking_query_not_about_intent · judged now 50 · wall time 8.1 s · cost per 1,000 judged rows $6.2088 (estimated, split by estimated tokens)
+- headline 2 · pairs_describe_same_product · judged now 50 · wall time 16.4 s · cost per 1,000 judged rows $11.1873 (estimated, split by estimated tokens)
+- banking recall on random swaps 1/1 (1.00, 95% 0.21–1.00)
+- banking recall on near_miss swaps 2/2 (1.00, 95% 0.34–1.00)
+- wanderbricks false alarms on natural states 0/40 (0.00, 95% 0.00–0.09)
+- llm cost $1.192 (estimated)
+
+| test | rows | positives | flagged | P (95% CI) | R (95% CI) | F1 | unjudged |
+|---|---|---|---|---|---|---|---|
+| banking_query_not_about_intent | 50 | 3 | 6 | 0.50 (0.19–0.81) | 1.00 (0.44–1.00) | 0.67 | 0 |
+| pairs_describe_same_product | 50 | 7 | 7 | 1.00 (0.65–1.00) | 1.00 (0.65–1.00) | 1.00 | 0 |
+| wanderbricks_comment_contradicts_rating | 50 | 9 | 9 | 1.00 (0.70–1.00) | 1.00 (0.70–1.00) | 1.00 | 0 |
