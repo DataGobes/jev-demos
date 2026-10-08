@@ -287,3 +287,31 @@ Jev · 46,511 judgments · 100% cached · 0 requests · 0 retries (0× 429) · 0
 **Gate: FAIL** — recall on planted flips 0.84 < 0.85
 
 recall (key-noise corrected) ≥ 0.85: PASS (0.86) (point estimate, LLM-labelled; see the Wilson interval of recall vs audited-real)
+
+## Production misses (2026-10-08T07:08:08Z)
+
+What the missed planted flips have in common. Read from the stored LIVE judgments of the
+production run above (no Jev call; `scripts/miss_analysis.py`). A miss is a planted flip with p < 0.8.
+
+1,386 planted flips · 1,160 caught · 226 missed · recall 0.84
+
+| flip | planted | missed | recall | share of misses | median p of misses |
+|---|---|---|---|---|---|
+| 4 → 2 | 210 | 113 | 0.46 | 50% | 0.48 |
+| 5 → 1 | 942 | 79 | 0.92 | 35% | 0.65 |
+| 2 → 4 | 78 | 23 | 0.71 | 10% | 0.53 |
+| 1 → 5 | 156 | 11 | 0.93 | 5% | 0.48 |
+
+Misses by p band:
+
+| flip | 0.0–0.2 | 0.2–0.5 | 0.5–0.7 | 0.7–0.8 |
+|---|---|---|---|---|
+| 4 → 2 | 12 | 48 | 34 | 19 |
+| 5 → 1 | 5 | 22 | 24 | 28 |
+| 2 → 4 | 1 | 9 | 8 | 5 |
+| 1 → 5 | 1 | 5 | 4 | 1 |
+| all | 19 | 84 | 70 | 53 |
+
+- Just under the threshold (p 0.7–0.8): 53 of 226 misses; the rest were not close.
+- Length: median 58.5 words for caught flips, 71 for missed ones.
+- Key audit: 12 of the 100 audited planted flips are misses; 10 labelled real, 2 ok.
