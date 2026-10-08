@@ -4,6 +4,16 @@ Notable changes to the demos in this repo, newest first. Each entry names the de
 The demos aren't versioned, so entries are dated by the day they land on `main`. Numbers quoted
 here come from live, logged runs; see each demo's own docs for the full record.
 
+## 2026-10-08
+
+### 05 · dbt semantic tests on Databricks — what the production misses have in common
+
+- **Added** `scripts/miss_analysis.py` and a "Production misses" section in
+  [`docs/eval-results.md`](05-dbt-databricks/docs/eval-results.md), read from the production run's
+  stored live judgments (no new Jev call). Half of the 226 missed flips are 4-star reviews
+  relabelled as 2 (recall 0.46 on that flip type, against 0.92 on 5 → 1 and 0.93 on 1 → 5). 53
+  misses sit just under the 0.8 threshold (p 0.7–0.8); the rest were not close.
+
 ## 2026-10-01
 
 ### 05 · dbt semantic tests on Databricks — new demo
